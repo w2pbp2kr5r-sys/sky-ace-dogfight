@@ -16,7 +16,7 @@
   #gameCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
   .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; background: radial-gradient(circle at center, rgba(10,18,34,0.25) 0%, rgba(5,9,18,0.72) 100%); overflow-y: auto; }
   .hidden { display: none !important; }
-  .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: rgba(15,23,42,0.85); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px; padding: 10px 16px; }
+  .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; padding: 10px 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
   .brand h1 { font-size: clamp(1.1rem, 2.5vw, 1.6rem); letter-spacing: 2px; color: #38bdf8; text-transform: uppercase; }
   .brand span { font-size: 0.78rem; color: #94a3b8; }
   .stats-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -24,22 +24,23 @@
   .topnav .btn { border: 1px solid rgba(56,189,248,0.55); }
   .rarity-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.6px; color: #0b0f16; vertical-align: middle; }
   .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); vertical-align: middle; }
-  .pill { background: #1e293b; border: 1px solid #334155; padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+  .pill { background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
   .pill.coins { color: #fbbf24; border-color: rgba(251,191,36,0.4); }
   .pill.rank { color: #a78bfa; border-color: rgba(167,139,250,0.4); }
-  .menu-center { max-width: 470px; width: 100%; margin: auto auto auto 0; align-self: flex-start; background: rgba(15,23,42,0.82); border: 1px solid rgba(148,163,184,0.25); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .menu-center { max-width: 470px; width: 100%; margin: auto auto auto 0; align-self: flex-start; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
   @media (max-width: 760px) { .menu-center { max-width: 100%; margin: auto; align-self: stretch; } }
   .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }
   .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .mode-btn { background: #1e293b; border: 2px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; transition: 0.15s; }
-  .mode-btn.active { border-color: #38bdf8; background: rgba(56,189,248,0.15); }
+  .mode-btn { background: linear-gradient(160deg, rgba(56,89,199,0.28), rgba(10,12,28,0.85)); border: 2px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; transition: 0.15s; }
+  .mode-btn:hover { border-color: rgba(56,189,248,0.7); box-shadow: 0 0 14px rgba(56,189,248,0.35); }
+  .mode-btn.active { border-color: #38bdf8; background: linear-gradient(160deg, rgba(56,189,248,0.35), rgba(139,92,246,0.22)); box-shadow: 0 0 16px rgba(56,189,248,0.3); }
   .mode-btn strong { display: block; font-size: 0.95rem; margin-bottom: 3px; color: #fff; }
   .mode-btn small { font-size: 0.75rem; color: #94a3b8; line-height: 1.2; display: block; }
   .sub-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: #0f172a; padding: 12px; border-radius: 10px; border: 1px solid #1e293b; }
   select, input[type="text"] { background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; }
   .nav-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .btn { border: none; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.15s; }
-  .btn-play { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; font-size: 1.05rem; }
+  .btn-play { background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #fff; font-size: 1.05rem; box-shadow: 0 6px 22px rgba(34,211,238,0.35); }
   .btn-sec { background: #1e293b; color: #f8fafc; border: 1px solid #475569; }
   .btn-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; }
   .btn-danger { background: #dc2626; color: #fff; }
@@ -89,9 +90,9 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v14 — GUN GAME FIXED ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v15 — ULTRA GRAPHICS ★</div></div>
     <div class="stats-row">
-      <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
+      <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
       <div class="pill coins" id="uiCoins">Coins: 300</div>
     </div>
@@ -187,12 +188,22 @@
   <div class="modal-card">
     <div class="modal-header"><h2>Settings &amp; Controls</h2><button class="btn btn-sec btn-sm" id="btnCloseSettings">Resume / Close</button></div>
     <div class="modal-body">
+      <div class="section-label">Flight</div>
       <label>Flight Sensitivity: <span id="sensVal">1.0x</span> <input type="range" id="sensSlider" min="0.3" max="2" step="0.1" value="1" /></label>
+      <label><input type="checkbox" id="invertYToggle" /> Invert Y (pitch controls flipped)</label>
+      <label><input type="checkbox" id="assistToggle" checked /> Flight Assist (auto-levels pitch when you let go of the controls)</label>
+      <div class="section-label">Camera</div>
+      <label>Field of View: <span id="fovVal">65°</span> <input type="range" id="fovSlider" min="55" max="85" step="1" value="65" /></label>
+      <label>Camera Distance: <span id="camDistVal">1.0x</span> <input type="range" id="camDistSlider" min="0.7" max="1.5" step="0.05" value="1" /></label>
+      <label>Camera Shake: <span id="shakeVal">0.6</span> <input type="range" id="shakeSlider" min="0" max="1" step="0.1" value="0.6" /></label>
+      <div class="section-label">Graphics</div>
+      <label>Quality: <select id="qualitySelect"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+      <div class="section-label">Touch</div>
       <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
       <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
       <div id="pauseActions" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-play btn-sm" id="btnResumeGame">Resume Flight</button>
-        <button class="btn btn-sec btn-sm" id="btnRestartMission">Restart Mission</button>
+        <button class="btn btn-sec btn-sm" id="btnRestartMission">Restart Match</button>
         <button class="btn btn-danger btn-sm" id="btnQuitHome">Quit to Home</button>
       </div>
       <table class="bind-table"><thead><tr><th>Action</th><th>Current Key</th><th>Customize</th></tr></thead><tbody id="bindTableBody"></tbody></table>
@@ -216,6 +227,7 @@ const defaultState = {
   ownedSkins: ['stock'], equippedSkin: 'stock',
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1 },
   sensitivity: 1.0, mobileTouch: false,
+  fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
 };
 let state;
@@ -225,14 +237,21 @@ state.binds = Object.assign({}, defaultState.binds, state.binds || {});
 if (!Array.isArray(state.ownedJets) || !state.ownedJets.length) state.ownedJets = ['f16'];
 if (!Array.isArray(state.ownedSkins) || !state.ownedSkins.length) state.ownedSkins = ['stock'];
 if (!state.equippedSkin) state.equippedSkin = 'stock';
+// v15 settings guards: old saves get the new defaults, existing values are kept
+if (typeof state.fov !== 'number') state.fov = 65;
+if (typeof state.camDist !== 'number') state.camDist = 1.0;
+if (typeof state.shake !== 'number') state.shake = 0.6;
+if (typeof state.invertY !== 'boolean') state.invertY = false;
+if (typeof state.assist !== 'boolean') state.assist = true;
+if (['high', 'medium', 'low'].indexOf(state.quality) === -1) state.quality = 'high';
 function saveState() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} updateTopUI(); }
 
 const JETS = [
   { id: 'f16', name: 'F-16 Falcon', cost: 0, premium: false, color: 0x94a3b8, accent: 0x38bdf8, hp: 120, spd: 1.0, turn: 1.05, dmg: 14, desc: 'Balanced agile multirole fighter.' },
-  { id: 'fa18', name: 'F/A-18 Hornet', cost: 450, premium: false, color: 0x64748b, accent: 0x22c55e, hp: 155, spd: 1.06, turn: 1.0, dmg: 18, desc: 'Carrier twin-tail strike jet with heavier hull.' },
-  { id: 'f35', name: 'F-35 Lightning', cost: 950, premium: false, color: 0x475569, accent: 0xa855f7, hp: 185, spd: 1.14, turn: 1.12, dmg: 23, desc: 'Stealth airframe with upgraded sensors.' },
-  { id: 'f22', name: 'F-22 Raptor', cost: 1600, premium: false, color: 0x334155, accent: 0xf59e0b, hp: 220, spd: 1.24, turn: 1.22, dmg: 28, desc: 'Air-superiority stealth twin-engine apex jet.' },
-  { id: 'su57', name: 'Su-57 Felon', cost: 2400, premium: false, color: 0x1e293b, accent: 0xef4444, hp: 250, spd: 1.30, turn: 1.28, dmg: 33, desc: 'Super-maneuverable fifth-gen interceptor.' },
+  { id: 'fa18', name: 'F/A-18 Hornet', cost: 550, premium: false, color: 0x64748b, accent: 0x22c55e, hp: 155, spd: 1.06, turn: 1.0, dmg: 18, desc: 'Carrier twin-tail strike jet with heavier hull.' },
+  { id: 'f35', name: 'F-35 Lightning', cost: 1200, premium: false, color: 0x475569, accent: 0xa855f7, hp: 185, spd: 1.14, turn: 1.12, dmg: 23, desc: 'Stealth airframe with upgraded sensors.' },
+  { id: 'f22', name: 'F-22 Raptor', cost: 2000, premium: false, color: 0x334155, accent: 0xf59e0b, hp: 220, spd: 1.24, turn: 1.22, dmg: 28, desc: 'Air-superiority stealth twin-engine apex jet.' },
+  { id: 'su57', name: 'Su-57 Felon', cost: 3000, premium: false, color: 0x1e293b, accent: 0xef4444, hp: 250, spd: 1.30, turn: 1.28, dmg: 33, desc: 'Super-maneuverable fifth-gen interceptor.' },
   { id: 'x02', name: 'X-02 Wyvern Prototype', cost: '$2.99', premium: true, color: 0x0f172a, accent: 0x38bdf8, hp: 290, spd: 1.38, turn: 1.35, dmg: 38, desc: 'Exclusive switch-blade experimental fighter.' },
   { id: 'adf11', name: 'ADF-11 Raven Darkstar', cost: '$6.99', premium: true, color: 0x111827, accent: 0xf43f5e, hp: 340, spd: 1.48, turn: 1.42, dmg: 45, desc: 'Exclusive hypersonic black-ops prototype.' },
   // Mystery jets (v10): type hidden behind "???" until purchased; mesh reuses an existing silhouette
@@ -278,8 +297,8 @@ function getSkinById(id) { return SKINS.find(function(s) { return s.id === id; }
 function getEquippedSkin() { return getSkinById(state.equippedSkin); }
 // ---- Supply crates (v10): roll a rarity by the odds, then a random skin of that rarity ----
 const CRATES = [
-  { id: 'std', name: 'Standard Crate', cost: 400, refund: 150, odds: { Common: 60, Rare: 28, Epic: 9, Legendary: 2.5, Mythic: 0.5 } },
-  { id: 'elite', name: 'Elite Crate', cost: 1200, refund: 450, odds: { Common: 25, Rare: 35, Epic: 25, Legendary: 11, Mythic: 4 } }
+  { id: 'std', name: 'Standard Crate', cost: 500, refund: 200, odds: { Common: 60, Rare: 28, Epic: 9, Legendary: 2.5, Mythic: 0.5 } },
+  { id: 'elite', name: 'Elite Crate', cost: 1500, refund: 550, odds: { Common: 25, Rare: 35, Epic: 25, Legendary: 11, Mythic: 4 } }
 ];
 const GUN_GAME_TIERS = [
   { name: 'T-1 Trainer', ability: 'Standard Twin Guns', color: 0x94a3b8, dmg: 16, fireRate: 0.16, spd: 1.0, rockets: false, turn: 1.00, hpBonus: 0, rocketCd: 1.00, rocketDmg: 1.00 },
@@ -315,7 +334,7 @@ let currentMode = 'campaign';
 const chSel = document.getElementById('chapterSelect');
 CHAPTERS.forEach(function(c) { const o = document.createElement('option'); o.value = c.num; o.textContent = c.name; chSel.appendChild(o); });
 function updateTopUI() {
-  const xpReq = state.level * 250;
+  const xpReq = state.level * 400;
   document.getElementById('uiPilotLvl').textContent = `Pilot Lv. ${state.level} (${state.xp}/${xpReq} XP)`;
   document.getElementById('uiRank').textContent = `Rank: ${getRankName(state.rp)} (${state.rp} RP)`;
   document.getElementById('uiCoins').textContent = `Coins: ${state.coins}`;
@@ -324,15 +343,19 @@ function updateTopUI() {
   Array.from(chSel.options).forEach(function(opt) { opt.disabled = Number(opt.value) > state.unlockedChapter; });
 }
 updateTopUI();
+const START_LABELS = { campaign: '▶ Start Mission', gungame: '▶ Start Gun Game', royale: '▶ Enter the Royale', online1v1: '▶ Start Online 1v1' };
+function updateStartLabel() { const b = document.getElementById('btnStartPlay'); if (b) b.textContent = START_LABELS[currentMode] || '▶ Start'; }
 document.querySelectorAll('.mode-btn').forEach(function(btn) {
   btn.onclick = function() {
     document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active'); currentMode = btn.dataset.mode;
+    updateStartLabel();
     document.getElementById('chapterSelectWrap').classList.toggle('hidden', currentMode !== 'campaign');
     document.getElementById('diffSelectWrap').classList.toggle('hidden', currentMode === 'royale' || currentMode === 'online1v1');
     document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1');
   };
 });
+updateStartLabel();
 function showBanner(msg, ms) {
   if (ms === undefined) ms = 3200;
   const b = document.getElementById('bannerAlert'); if (!b) return;
@@ -340,8 +363,8 @@ function showBanner(msg, ms) {
   b._t = setTimeout(function() { b.classList.add('hidden'); }, ms);
 }
 function awardXP(amount) {
-  state.xp += amount; let req = state.level * 250;
-  while (state.xp >= req) { state.xp -= req; state.level++; const bonus = state.level * 50; state.coins += bonus; showBanner(`LEVEL UP! Pilot Lv.${state.level} (+${bonus} Coins Reward!)`, 4000); req = state.level * 250; }
+  state.xp += Math.round(amount * 0.5); let req = state.level * 400; // v15: XP grants halved
+  while (state.xp >= req) { state.xp -= req; state.level++; const bonus = state.level * 50; state.coins += bonus; showBanner(`LEVEL UP! Pilot Lv.${state.level} (+${bonus} Coins Reward!)`, 4000); req = state.level * 400; }
   saveState();
 }
 
@@ -355,26 +378,34 @@ if (typeof THREE !== 'undefined') {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 1.12;
   if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   scene = new THREE.Scene();
-  // Equirectangular gradient sky as an environment map: MeshStandardMaterials (jet hulls,
-  // canopies, buildings) now pick up realistic sky/sun reflections instead of flat shading.
+  // Image-based lighting (v15): a tiny gradient "sky room" — deep blue-purple dome,
+  // magenta horizon band, dark floor — plus two bright emissive planes as softbox
+  // lights, PMREM-baked ONCE here at startup. scene.environment makes every
+  // standard/physical material (jet hulls, platform, station, buildings) pick up
+  // realistic colored reflections instead of flat shading.
   try {
-    const envC = document.createElement('canvas'); envC.width = 512; envC.height = 256;
-    const ectx = envC.getContext('2d');
-    const eg = ectx.createLinearGradient(0, 0, 0, 256);
-    eg.addColorStop(0, '#0b2d5e'); eg.addColorStop(0.42, '#3d7ac2'); eg.addColorStop(0.52, '#cfe8ff'); eg.addColorStop(0.58, '#8a97a8'); eg.addColorStop(1, '#14181f');
-    ectx.fillStyle = eg; ectx.fillRect(0, 0, 512, 256);
-    const sg = ectx.createRadialGradient(384, 118, 2, 384, 118, 62);
-    sg.addColorStop(0, 'rgba(255,250,220,1)'); sg.addColorStop(0.3, 'rgba(255,230,160,0.85)'); sg.addColorStop(1, 'rgba(255,220,140,0)');
-    ectx.fillStyle = sg; ectx.fillRect(0, 0, 512, 256);
-    const envTex = new THREE.CanvasTexture(envC);
-    envTex.mapping = THREE.EquirectangularReflectionMapping;
-    if (THREE.SRGBColorSpace) envTex.colorSpace = THREE.SRGBColorSpace;
-    scene.environment = envTex;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    const gradC = document.createElement('canvas'); gradC.width = 64; gradC.height = 256;
+    const gx = gradC.getContext('2d');
+    const gg = gx.createLinearGradient(0, 0, 0, 256);
+    gg.addColorStop(0, '#0a1030'); gg.addColorStop(0.45, '#27306e'); gg.addColorStop(0.55, '#c2339e'); gg.addColorStop(0.68, '#3a1c54'); gg.addColorStop(1, '#05060a');
+    gx.fillStyle = gg; gx.fillRect(0, 0, 64, 256);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 16, 12), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gradC), side: THREE.BackSide }));
+    envScene.add(dome);
+    const soft1 = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), new THREE.MeshBasicMaterial());
+    soft1.material.color.setRGB(9, 9, 10); // HDR-bright key softbox
+    soft1.position.set(14, 16, 8); soft1.lookAt(0, 0, 0); envScene.add(soft1);
+    const soft2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 7), new THREE.MeshBasicMaterial());
+    soft2.material.color.setRGB(4, 5, 9); // cooler blue fill softbox
+    soft2.position.set(-16, 6, -10); soft2.lookAt(0, 0, 0); envScene.add(soft2);
+    scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    pmrem.dispose();
   } catch (envErr) { /* reflections are cosmetic; game runs fine without them */ }
-  camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 4500);
+  camera = new THREE.PerspectiveCamera(state.fov || 65, window.innerWidth / window.innerHeight, 0.5, 4500);
   camera.up.set(0, 1, 0);
   window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
   scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85));
@@ -382,7 +413,7 @@ if (typeof THREE !== 'undefined') {
   sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6); sunLight.position.set(300, 600, 250);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(2048, 2048);
-  sunLight.shadow.camera.left = -500; sunLight.shadow.camera.right = 500; sunLight.shadow.camera.top = 500; sunLight.shadow.camera.bottom = -500;
+  sunLight.shadow.camera.left = -600; sunLight.shadow.camera.right = 600; sunLight.shadow.camera.top = 600; sunLight.shadow.camera.bottom = -600;
   sunLight.shadow.camera.near = 50; sunLight.shadow.camera.far = 1800; sunLight.shadow.bias = -0.0006;
   scene.add(sunLight); scene.add(sunLight.target);
 } else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
@@ -462,6 +493,7 @@ let _cgTexDay = null, _cgTexNeon = null;
 function getCityGroundTexture(neon) {
   if (neon && _cgTexNeon) return _cgTexNeon;
   if (!neon && _cgTexDay) return _cgTexDay;
+  const _aniso = (typeof renderer !== 'undefined' && renderer && renderer.capabilities) ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
   const t = makeCanvas(1024, 1024, function(ctx, w, h) {
     // One texture tile = exactly one city block (CITY_PITCH world units); roads run along the tile edges
     ctx.fillStyle = neon ? '#05070f' : '#181d24'; ctx.fillRect(0, 0, w, h); // asphalt roads
@@ -474,6 +506,7 @@ function getCityGroundTexture(neon) {
     for (let i = 0; i < 480; i++) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(66 + Math.random() * (w - 132), 66 + Math.random() * (h - 132), 5, 5); }
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(32, 32);
+  t.anisotropy = _aniso; // v15: sharper ground at grazing angles
   if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
   if (neon) _cgTexNeon = t; else _cgTexDay = t;
   return t;
@@ -756,6 +789,7 @@ function getHullTexture(baseColor, jetId, skin) {
   });
   if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (typeof renderer !== 'undefined' && renderer && renderer.capabilities) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   _hullTexCache[cacheKey] = t;
   return t;
 }
@@ -794,6 +828,7 @@ function getHullMaps(baseColor, jetId, skin) {
   nx.putImageData(nImg, 0, 0); rx.putImageData(rImg, 0, 0);
   const nTex = new THREE.CanvasTexture(nc); nTex.wrapS = nTex.wrapT = THREE.RepeatWrapping;
   const rTex = new THREE.CanvasTexture(rc); rTex.wrapS = rTex.wrapT = THREE.RepeatWrapping;
+  if (typeof renderer !== 'undefined' && renderer && renderer.capabilities) { const an = Math.min(8, renderer.capabilities.getMaxAnisotropy()); nTex.anisotropy = an; rTex.anisotropy = an; }
   const maps = { n: nTex, r: rTex };
   _hullMapCache[key] = maps;
   return maps;
@@ -948,10 +983,11 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const hullTex = getHullTexture(paintColor, jetId, skinActive ? skin : null);
   const hullMaps = getHullMaps(paintColor, jetId, skinActive ? skin : null);
   const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide };
-  // Hero jets (player + home-screen showcase, flagged via withBurnerLight) get a premium
-  // clearcoat physical material; bots keep the standard material for performance (v9).
-  const hullMat = (withBurnerLight && THREE.MeshPhysicalMaterial)
-    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: 0.3, clearcoatRoughness: 0.25, envMapIntensity: 1.0 }))
+  // v15: clearcoat physical hull for ALL jets (the PMREM env makes it cheap to look
+  // good) — modest 0.25 clearcoat on bots, the hero jets (withBurnerLight: player +
+  // home-screen showcase) keep the richer 0.3 coat and full env intensity.
+  const hullMat = (THREE.MeshPhysicalMaterial)
+    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: withBurnerLight ? 0.3 : 0.25, clearcoatRoughness: 0.25, envMapIntensity: withBurnerLight ? 1.0 : 0.9 }))
     : new THREE.MeshStandardMaterial(hullProps);
   const armorMat = new THREE.MeshStandardMaterial({ color: 0x1c222c, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.6 });
   // Control surfaces (v8): same paint, darkened ~15% so the hinge gaps read as separate panels
@@ -1239,6 +1275,88 @@ let menuGroup = null, menuJet = null, menuTime = 0;
 // right, clear of the left-docked menu panel; the camera looks essentially AT
 // the jet (offset <= 5), so jet + platform always stay in frame.
 const MENU_JET_OFFSET = (typeof THREE !== 'undefined') ? new THREE.Vector3(46, 12, 0) : null;
+
+// ---- Home platform surface (v15): painted metal pad texture — panel seams, a glowing
+// ring guide, hazard chevrons at the rim and worn scratches, so the PMREM env has
+// something real to reflect off ----
+let _padTex = null;
+function getPadTexture() {
+  if (_padTex) return _padTex;
+  _padTex = makeCanvas(1024, 1024, function(ctx, w, h) {
+    const cx = w / 2, cy = h / 2;
+    ctx.fillStyle = '#252b38'; ctx.fillRect(0, 0, w, h);
+    // brushed-metal mottling
+    for (let i = 0; i < 2600; i++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)'; ctx.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+    // radial panel seams (the pad top cap UVs are a disc, so paint in polar space)
+    ctx.strokeStyle = 'rgba(6,8,12,0.55)'; ctx.lineWidth = 3;
+    [0.22, 0.45, 0.68, 0.88].forEach(function(fr) { ctx.beginPath(); ctx.arc(cx, cy, fr * cx, 0, 6.3); ctx.stroke(); });
+    for (let s = 0; s < 12; s++) { const a = (s / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * cx * 0.2, cy + Math.sin(a) * cx * 0.2); ctx.lineTo(cx + Math.cos(a) * cx, cy + Math.sin(a) * cx); ctx.stroke(); }
+    // rivet rings
+    ctx.fillStyle = 'rgba(200,215,235,0.35)';
+    [0.45, 0.88].forEach(function(fr) { for (let rv = 0; rv < 48; rv++) { const a = (rv / 48) * Math.PI * 2; ctx.fillRect(cx + Math.cos(a) * fr * cx - 2, cy + Math.sin(a) * fr * cx - 2, 4, 4); } });
+    // painted glowing ring guide (under the emissive inlay ring)
+    ctx.strokeStyle = 'rgba(34,211,238,0.85)'; ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.arc(cx, cy, cx * 0.885, 0, 6.3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(103,232,249,0.8)'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.arc(cx, cy, cx * 0.44, 0, 6.3); ctx.stroke();
+    // hazard chevrons near the rim, alternating amber / charcoal
+    for (let s = 0; s < 24; s++) {
+      const a0 = (s / 24) * Math.PI * 2, a1 = ((s + 0.55) / 24) * Math.PI * 2;
+      ctx.fillStyle = s % 2 ? 'rgba(12,14,18,0.9)' : 'rgba(245,178,24,0.85)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, cx * 0.995, a0, a1); ctx.arc(cx, cy, cx * 0.925, a1, a0, true);
+      ctx.closePath(); ctx.fill();
+    }
+    // centre touchdown marker
+    ctx.fillStyle = 'rgba(226,240,255,0.75)'; ctx.font = '900 92px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('H', cx, cy + 4);
+    // wear: light scratches + scuff arcs
+    ctx.strokeStyle = 'rgba(210,225,245,0.10)';
+    for (let i = 0; i < 46; i++) { ctx.lineWidth = 1 + Math.random() * 1.5; ctx.beginPath(); const a = Math.random() * 6.3, r = Math.random() * cx * 0.9; ctx.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.lineTo(cx + Math.cos(a) * r + (Math.random() - 0.5) * 130, cy + Math.sin(a) * r + (Math.random() - 0.5) * 130); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    for (let i = 0; i < 26; i++) { ctx.beginPath(); ctx.ellipse(Math.random() * w, Math.random() * h, 14 + Math.random() * 46, 8 + Math.random() * 22, Math.random() * 3.1, 0, 6.3); ctx.fill(); }
+  });
+  if (THREE.SRGBColorSpace) _padTex.colorSpace = THREE.SRGBColorSpace;
+  if (typeof renderer !== 'undefined' && renderer && renderer.capabilities) _padTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return _padTex;
+}
+// ---- Holo info panels (v15): two small additive displays floating beside the hero
+// jet — equipped-jet stats and collection progress. Redrawn by refreshMenuJet ----
+function drawHoloPanels() {
+  if (!menuGroup || !menuGroup.userData.holoPanels) return;
+  const jc = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
+  const skin = getEquippedSkin();
+  const jetsOwned = JETS.filter(function(j) { return state.ownedJets.includes(j.id); }).length;
+  const skinsOwned = SKINS.filter(function(s) { return state.ownedSkins.includes(s.id); }).length;
+  const hull = jc.hp + (state.upgrades.hull - 1) * 35;
+  const panels = menuGroup.userData.holoPanels;
+  function paint(cv, title, lines, frac) {
+    const ctx = cv.getContext('2d'); const w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(5,18,34,0.66)'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(34,211,238,0.95)'; ctx.lineWidth = 4; ctx.strokeRect(3, 3, w - 6, h - 6);
+    ctx.strokeStyle = 'rgba(168,85,247,0.5)'; ctx.lineWidth = 2; ctx.strokeRect(10, 10, w - 20, h - 20);
+    ctx.fillStyle = '#67e8f9'; ctx.font = '900 34px Arial'; ctx.textAlign = 'left';
+    ctx.fillText(title, 26, 52);
+    ctx.font = '700 27px Arial'; ctx.fillStyle = '#e2f3ff';
+    lines.forEach(function(ln, i) { ctx.fillText(ln, 26, 102 + i * 38); });
+    if (typeof frac === 'number') {
+      ctx.fillStyle = 'rgba(148,163,255,0.25)'; ctx.fillRect(26, h - 34, w - 52, 12);
+      ctx.fillStyle = '#22d3ee'; ctx.fillRect(26, h - 34, (w - 52) * Math.max(0, Math.min(1, frac)), 12);
+    }
+  }
+  paint(panels[0].userData.canvas, jc.name.toUpperCase(), [
+    'HULL ' + hull + '  ·  DMG ' + (jc.dmg + (state.upgrades.damage - 1) * 6),
+    'SPD ' + Math.round(jc.spd * 100) + '%  ·  TURN ' + Math.round(jc.turn * 100) + '%',
+    'SKIN: ' + skin.name.toUpperCase()
+  ], null);
+  paint(panels[1].userData.canvas, 'COLLECTION', [
+    'JETS  ' + jetsOwned + ' / ' + JETS.length,
+    'SKINS ' + skinsOwned + ' / ' + SKINS.length,
+    'PILOT LV.' + state.level + '  ·  ' + getRankName(state.rp).toUpperCase()
+  ], (jetsOwned + skinsOwned) / (JETS.length + SKINS.length));
+  panels.forEach(function(pn) { pn.userData.tex.needsUpdate = true; });
+}
 function buildMenuScene() {
   if (!scene || menuGroup) return;
   menuGroup = new THREE.Group();
@@ -1300,7 +1418,7 @@ function buildMenuScene() {
   (function() {
     const ax = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, jetY = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
     const plat = new THREE.Group(); plat.position.set(ax, jetY - 8.5, 0); // pad top sits 7 under the jet
-    const padMat = new THREE.MeshStandardMaterial({ color: 0x2b3242, metalness: 0.8, roughness: 0.4, envMapIntensity: 0.9 });
+    const padMat = new THREE.MeshStandardMaterial({ map: getPadTexture(), color: 0xffffff, metalness: 0.85, roughness: 0.38, envMapIntensity: 1.0 }); // v15: painted metal pad
     const padDark = new THREE.MeshStandardMaterial({ color: 0x171c28, metalness: 0.7, roughness: 0.55 });
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(26, 27.5, 3, 40), padMat); plat.add(pad);
     const padSkirt = new THREE.Mesh(new THREE.CylinderGeometry(27.5, 22, 2.2, 40), padDark); padSkirt.position.y = -2.6; plat.add(padSkirt);
@@ -1348,6 +1466,23 @@ function buildMenuScene() {
     const motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0x9be9ff, size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.55, depthWrite: false }));
     motes.position.set(ax, jetY - 2, 0); menuGroup.add(motes); menuGroup.userData.motes = motes;
   })();
+  // Holo info panels (v15): floating displays left of the jet, angled toward the
+  // camera, kept clear of the left UI panel (jet x -23..-26, above the pad line)
+  (function() {
+    const ax = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, jetY = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
+    function makeHoloPanel(px, py, pz, ry) {
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
+      const tex = new THREE.CanvasTexture(cv);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(17, 8.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.88, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      m.position.set(px, py, pz); m.rotation.y = ry;
+      m.userData.canvas = cv; m.userData.tex = tex; m.userData.baseY = py; m.userData.baseRotY = ry;
+      return m;
+    }
+    const hp1 = makeHoloPanel(ax - 23, jetY + 10, 6, 0.5);
+    const hp2 = makeHoloPanel(ax - 25, jetY + 5, 11, 0.62);
+    menuGroup.add(hp1); menuGroup.add(hp2);
+    menuGroup.userData.holoPanels = [hp1, hp2];
+  })();
   // Hero-jet lighting (v10 galaxy): soft violet-white key from upper right, cyan rim
   // from behind, plus a purple ambient wash near the platform — all inside
   // menuGroup, so they vanish with it during missions.
@@ -1375,6 +1510,7 @@ function refreshMenuJet() {
   menuJet.scale.setScalar(1.25); // hero jet reads big and detailed on the home screen
   menuJet.position.set(MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12), 0);
   menuGroup.add(menuJet);
+  drawHoloPanels(); // v15: keep the holo displays in sync with jet / skin / collection
 }
 function showMenuScene() {
   if (!scene) return;
@@ -1397,6 +1533,7 @@ function animateMenuScene(dt) {
   if (ud.motes) { ud.motes.rotation.y += dt * 0.02; ud.motes.position.y = (150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12)) - 2 + Math.sin(t * 0.4) * 0.8; }
   if (ud.beacons) ud.beacons.forEach(function(bc, bi) { bc.material.opacity = (Math.sin(t * 2.4 + bi * Math.PI) > 0) ? 0.95 : 0.07; });
   if (ud.padLight) ud.padLight.intensity = 120 + Math.sin(t * 2.2) * 28; // downwash glow breathing
+  if (ud.holoPanels) ud.holoPanels.forEach(function(hp, hi) { hp.position.y = hp.userData.baseY + Math.sin(t * 0.9 + hi * 1.7) * 1.1; hp.rotation.y = hp.userData.baseRotY + Math.sin(t * 0.5 + hi * 1.3) * 0.05; }); // holo panels bob with the jet
   const mj = menuJet;
   if (mj) {
     // HOVER (v10): the jet floats above its platform — gentle bob, a slow turntable
@@ -1665,6 +1802,7 @@ function getOrbitPlanetTexture() {
     ctx.fillStyle = tg; ctx.fillRect(0, 0, w, h);
   });
   if (THREE.SRGBColorSpace) _orbitPlanetTex.colorSpace = THREE.SRGBColorSpace;
+  if (typeof renderer !== 'undefined' && renderer && renderer.capabilities) _orbitPlanetTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   return _orbitPlanetTex;
 }
 let _asteroidGeos = null;
@@ -1687,7 +1825,7 @@ function getAsteroidGeos() {
 }
 function buildAsteroids(count, radius, yMin, yMax, avoid) {
   const geos = getAsteroidGeos();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6b6472, roughness: 0.95, metalness: 0.05, flatShading: true });
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6b6472, roughness: 0.95, metalness: 0.15, flatShading: true, envMapIntensity: 0.7 }); // v15: slight metalness + env so rocks catch rim light
   const spin = worldGroup.userData.spin || (worldGroup.userData.spin = []);
   let placed = 0, guard = 0;
   while (placed < count && guard++ < count * 40) {
@@ -1708,12 +1846,12 @@ function buildAsteroids(count, radius, yMin, yMax, avoid) {
     placed++;
   }
 }
-function buildCrystalSpires(radius) {
+function buildCrystalSpires(radius, count) {
   const geos = getAsteroidGeos();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x554e60, roughness: 0.95, metalness: 0.05, flatShading: true });
   const crysMats = [0xa855f7, 0xec4899].map(function(c) { return new THREE.MeshStandardMaterial({ color: 0x1a0b2e, emissive: c, emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.1 }); });
   const crysGeo = new THREE.OctahedronGeometry(1, 0);
-  for (let ci = 0; ci < 12; ci++) {
+  for (let ci = 0; ci < (count || 12); ci++) {
     const a = Math.random() * Math.PI * 2, d = 210 + Math.random() * Math.max(80, radius * 0.9 - 210);
     const x = Math.cos(a) * d, z = Math.sin(a) * d, y = 60 + Math.random() * 260;
     const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = Math.random() * 3.1;
@@ -1765,14 +1903,16 @@ function buildSpaceStation() {
   worldGroup.add(grp);
   obstacles.push({ x: SX, z: SZ, r: 55, h: SY + 42 }); // one obstacle routes bots around the whole station
 }
-function buildSpaceEnvironment(theme, radius) {
+function buildSpaceEnvironment(theme, radius, density) {
+  if (typeof density !== 'number') density = 1;
   worldGroup.userData.spin = [];
   // Env-scoped violet lighting (dies with worldGroup on rebuild; the global directional keeps its cfg.sun tint)
   worldGroup.add(new THREE.AmbientLight(0x7c5cff, 0.55));
   worldGroup.add(new THREE.HemisphereLight(0x8a6fe0, 0x14042a, 0.45));
   // Starfield: Points on a far shell (fog:false so the deep-space fog never washes them out)
   (function() {
-    const N = theme === 'orbit' ? 1000 : 1200, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    let N = theme === 'orbit' ? 1300 : 1560; if (density < 1) N += 300; // v15: star counts +30%, Gun Game gets +300 bonus stars
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
     const tints = [[1, 1, 1], [0.98, 0.66, 0.83], [0.77, 0.71, 0.99], [0.72, 0.84, 1], [1, 1, 1], [0.98, 0.66, 0.83]];
     const shellR = Math.min(radius * 1.8, 3900); // inside the sky dome (<=4200) and the camera far plane (4500)
     for (let si = 0; si < N; si++) {
@@ -1791,7 +1931,7 @@ function buildSpaceEnvironment(theme, radius) {
   (function() {
     const nebTex = getCloudTexture();
     const nebCols = [0xa855f7, 0xec4899, 0xd946ef, 0xf472b6, 0x8b5cf6, 0xc026d3, 0x7c3aed, 0xe879f9, 0xa855f7, 0xec4899];
-    const nCount = theme === 'orbit' ? 6 : 9;
+    let nCount = theme === 'orbit' ? 9 : 12; if (density < 1) nCount += 4; // v15: nebulae 9->12 / 6->9, Gun Game +4 richer sky
     for (let ni = 0; ni < nCount; ni++) {
       const nm = new THREE.SpriteMaterial({ map: nebTex, color: nebCols[ni % nebCols.length], transparent: true, opacity: 0.10 + Math.random() * 0.10, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
       const sp = new THREE.Sprite(nm);
@@ -1806,8 +1946,8 @@ function buildSpaceEnvironment(theme, radius) {
     // No ground in deep space: a faint additive nebula glow far below stands in for a floor
     const disc = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.4, 40), new THREE.MeshBasicMaterial({ map: getCloudTexture(), color: 0x7c3aed, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     disc.rotation.x = -Math.PI / 2; disc.position.y = -140; worldGroup.add(disc);
-    buildAsteroids(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))), radius, 40, 380, null);
-    buildCrystalSpires(radius);
+    buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), radius, 40, 380, null); // density 0.38 at r=1300: 70 -> ~27 rocks
+    buildCrystalSpires(radius, density < 1 ? 6 : 12);
   } else { // orbit: a gas giant fills the sky below + a station to fight around
     const planet = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 32), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
     planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
@@ -1817,8 +1957,9 @@ function buildSpaceEnvironment(theme, radius) {
     buildAsteroids(35, radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // keep the station's airspace clear
   }
 }
-function buildEnvironment(theme, radius) {
+function buildEnvironment(theme, radius, densityScale) {
   if (!scene) return; radius = radius || 1400;
+  const density = (typeof densityScale === 'number') ? densityScale : 1; // v15: Gun Game thins the asteroid field
   if (menuGroup) menuGroup.visible = false;
   scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
   const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
@@ -1904,7 +2045,7 @@ function buildEnvironment(theme, radius) {
       }
     }
   } else if (isSpace) {
-    buildSpaceEnvironment(theme, radius);
+    buildSpaceEnvironment(theme, radius, density);
   } else {
     buildCityGrid(theme, radius);
   }
@@ -1928,7 +2069,7 @@ function startMission() {
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
   const mapRadius = currentMode === 'royale' ? 2400 : 1300;
   const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : ch.theme);
-  buildEnvironment(theme, mapRadius);
+  buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.38 : 1); // v15: Gun Game gets ~38% asteroid density
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
@@ -2100,6 +2241,7 @@ const _flightEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, '
 const _camEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ') : null;
 const _camQuat = (typeof THREE !== 'undefined') ? new THREE.Quaternion() : null;
 const _camOff = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+let shakeT = 0; // v15 camera shake: trauma value set by hits/explosions, decays in the cam update, scaled by state.shake
 function angleWrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
@@ -2250,7 +2392,7 @@ function animate(now) {
       p.heading = Math.atan2(-p.mesh.position.x, -p.mesh.position.z); p.pitch = 0; p.roll = 0; p.yawIn = 0; p.pitchIn = 0;
       p.hp = p.maxHp; p.lastHitBy = null; p.lastHitAt = -99; p.mesh.visible = true; p.spawnProtT = 2.0;
       orientFlight(p);
-      const _respOff = new THREE.Vector3(0, 3.6, -12).applyQuaternion(p.mesh.quaternion);
+      const _respOff = new THREE.Vector3(0, 3.6 * (state.camDist || 1), -12 * (state.camDist || 1)).applyQuaternion(p.mesh.quaternion);
       camera.position.copy(p.mesh.position).add(_respOff); // snap the chase cam behind the jet
       showBanner('BACK IN THE FIGHT!', 1200);
     }
@@ -2263,6 +2405,7 @@ function animate(now) {
   if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
   if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
   rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
+  if (state.invertY) rawPitch = -rawPitch; // v15 setting: Invert Y
   const smoothK = Math.min(1, 8.5 * dt);
   p.yawIn = THREE.MathUtils.lerp(p.yawIn || 0, rawYaw, smoothK);
   p.pitchIn = THREE.MathUtils.lerp(p.pitchIn || 0, rawPitch, smoothK);
@@ -2284,11 +2427,11 @@ function animate(now) {
     }
   }
   const tierTurn = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].turn : 1;
-  const yawRate = 0.95 * (p.turn / 1.45) * sens * tierTurn;
-  const pitchRate = 0.88 * (p.turn / 1.45) * sens * tierTurn;
+  const yawRate = 1.06 * (p.turn / 1.45) * sens * tierTurn; // v15: base rates +~12% (was 0.95 / 0.88)
+  const pitchRate = 0.99 * (p.turn / 1.45) * sens * tierTurn;
   p.heading = angleWrap(p.heading + p.yawIn * yawRate * dt);
   p.pitch = clampNum(p.pitch + p.pitchIn * pitchRate * dt, -1.05, 1.05);
-  if (rawPitch === 0 && p.autoAimLeft <= 0) p.pitch += (0 - p.pitch) * Math.min(1, 0.8 * dt); // gentle auto-level when hands off the pitch controls
+  if (state.assist && rawPitch === 0 && p.autoAimLeft <= 0) p.pitch += (0 - p.pitch) * Math.min(1, 0.8 * dt); // Flight Assist (v15 setting): gentle pitch auto-level when hands off the pitch controls; OFF = pitch stays where you leave it
   const rollTarget = -p.yawIn * 0.55;
   p.roll = THREE.MathUtils.lerp(p.roll || 0, rollTarget, Math.min(1, 6 * dt));
   orientFlight(p);
@@ -2450,7 +2593,7 @@ function animate(now) {
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
-    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; hit = true; spawnImpactFx(b.mesh.position); }
+    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); hit = true; spawnImpactFx(b.mesh.position); }
     else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
@@ -2469,7 +2612,7 @@ function animate(now) {
     // Visible white smoke trail so pilots can see missiles coming
     rk._smokeAcc = (rk._smokeAcc || 0) + 20 * dt;
     while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.1, grow: 2.4, life: 0.5, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
-    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     let rHit = false;
     for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
@@ -2509,8 +2652,13 @@ function animate(now) {
   // Stable chase camera: offset built from heading/pitch only (roll excluded), world-up preserved so the view never barrel-rolls
   camera.up.set(0, 1, 0);
   _camEuler.set(-p.pitch, p.heading, 0, 'YXZ'); _camQuat.setFromEuler(_camEuler);
-  _camOff.set(0, 3.6, -12).applyQuaternion(_camQuat);
+  _camOff.set(0, 3.6 * (state.camDist || 1), -12 * (state.camDist || 1)).applyQuaternion(_camQuat); // v15: Camera Distance setting
   camera.position.lerp(_camOff.add(p.mesh.position), Math.min(1, 10 * dt));
+  if (shakeT > 0) { // v15: trauma shake — random jitter scaled by trauma and the player's shake setting
+    const sAmt = shakeT * (state.shake || 0) * 1.5;
+    if (sAmt > 0.001) { camera.position.x += (Math.random() - 0.5) * sAmt; camera.position.y += (Math.random() - 0.5) * sAmt; camera.position.z += (Math.random() - 0.5) * sAmt; }
+    shakeT = Math.max(0, shakeT - dt * 1.7);
+  }
   camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(20)));
   updateHUD(curSpd); renderer.render(scene, camera);
 }
@@ -2553,13 +2701,14 @@ function gungamePlayerDown(cause) {
   }
   for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
   for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8 });
+  shakeT = Math.max(shakeT, 0.6); // v15: your own explosion kicks the camera
   p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
   showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
 }
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (killerId === 'player') {
-    p.kills++; const coinGain = activeGame.mode === 'campaign' ? 20 : 6; const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain);
+    p.kills++; const coinGain = Math.round((activeGame.mode === 'campaign' ? 20 : 6) * 0.6); const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain); // v15: kill coins x0.6 (12 campaign / 4 other)
     if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); }
   } else {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
@@ -2569,8 +2718,8 @@ function handleEntityEliminated(eIdx, killerId) {
   else {
     scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
     if (activeGame.entities.length === 0) {
-      if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; state.coins += ch.reward; state.unlockedChapter = Math.min(10, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${ch.reward} Coins & +90 XP!`); }
-      else if (activeGame.mode === 'royale') { state.rp += 35; state.coins += 90; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); }
+      if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; const chReward = Math.round(ch.reward * 0.6); state.coins += chReward; state.unlockedChapter = Math.min(10, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${chReward} Coins & +45 XP!`); }
+      else if (activeGame.mode === 'royale') { state.rp += 35; state.coins += 54; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); } // v15: royale coins 90 -> 54 (x0.6), RP unchanged
       else if (activeGame.mode === 'online1v1' || currentMode === 'online1v1') { endMatch(true, '1V1 VICTORY!', 'You shot down your online rival!'); }
     }
   }
@@ -2640,7 +2789,7 @@ function switchHangarTab(tab, btnEl) {
       { key: 'rocket', name: 'Homing Missile Rack', desc: 'Boosts rocket damage & cuts reload time.' }
     ];
     body.innerHTML = '<div class="card-grid">' + upgs.map(function(u) {
-      const lvl = state.upgrades[u.key]; const cost = lvl * 140;
+      const lvl = state.upgrades[u.key]; const cost = lvl * 210; // v15: upgrade prices x1.5
       const btn = lvl >= 6 ? '<button class="btn btn-sec btn-sm" disabled>MAXED</button>' : `<button class="btn btn-gold btn-sm" onclick="buyUpgrade('${u.key}', ${cost})">Upgrade (${cost} Coins)</button>`;
       return `<div class="item-card"><h3>${u.name} (Lv.${lvl}/6)</h3><p>${u.desc}</p><div class="stat-bar"><div class="stat-fill" style="width:${lvl / 6 * 100}%"></div></div>${btn}</div>`;
     }).join('') + '</div>';
@@ -2734,15 +2883,49 @@ function equipSkinFromCollection(id) { state.equippedSkin = id; saveState(); ref
 function simulateIAP(title, coins, jetId) { if (!confirm(`Confirm test purchase of ${title}?`)) return; if (coins) state.coins += coins; if (jetId && !state.ownedJets.includes(jetId)) { state.ownedJets.push(jetId); state.selectedJet = jetId; } saveState(); refreshMenuJet(); renderShop(); }
 const BIND_LABELS = [ ['pitchUp', 'Pitch Nose Up'], ['pitchDown', 'Pitch Nose Down'], ['turnLeft', 'Bank / Turn Left'], ['turnRight', 'Bank / Turn Right'], ['fire', 'Fire Primary Guns'], ['rocket', 'Launch Homing Rocket'], ['autoaim', 'Activate Auto-Aim Lock'], ['boost', 'Engage Afterburner'], ['pause', 'Pause / Settings Menu'] ];
 let listeningAction = null;
+// ---- v15 settings: quality + camera appliers ----
+function applyQuality() {
+  if (!renderer) return;
+  const q = state.quality || 'high';
+  if (q === 'medium') {
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.shadowMap.enabled = true;
+    if (sunLight) { sunLight.castShadow = true; sunLight.shadow.mapSize.set(1024, 1024); if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+  } else if (q === 'low') {
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled = false;
+    if (sunLight) sunLight.castShadow = false;
+  } else { // high
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    if (sunLight) { sunLight.castShadow = true; sunLight.shadow.mapSize.set(2048, 2048); if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+  }
+  // Toggling shadowMap.enabled only takes effect once materials recompile
+  if (scene) scene.traverse(function(o) { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m) { m.needsUpdate = true; }); } });
+}
+function applyFov() { if (camera) { camera.fov = state.fov || 65; camera.updateProjectionMatrix(); } }
 function renderKeybinds() {
   const slider = document.getElementById('sensSlider'); if (!slider) return;
   slider.value = state.sensitivity; document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; document.getElementById('mobileToggle').checked = state.mobileTouch;
+  const fovS = document.getElementById('fovSlider'); if (fovS) { fovS.value = state.fov; document.getElementById('fovVal').textContent = state.fov + '°'; }
+  const cdS = document.getElementById('camDistSlider'); if (cdS) { cdS.value = state.camDist; document.getElementById('camDistVal').textContent = Number(state.camDist).toFixed(2).replace(/0$/, '') + 'x'; }
+  const shS = document.getElementById('shakeSlider'); if (shS) { shS.value = state.shake; document.getElementById('shakeVal').textContent = Number(state.shake).toFixed(1); }
+  const iyT = document.getElementById('invertYToggle'); if (iyT) iyT.checked = !!state.invertY;
+  const asT = document.getElementById('assistToggle'); if (asT) asT.checked = !!state.assist;
+  const qS = document.getElementById('qualitySelect'); if (qS) qS.value = state.quality;
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
 window.addEventListener('keydown', function(e) { if (!listeningAction) return; e.preventDefault(); state.binds[listeningAction] = e.code; listeningAction = null; saveState(); renderKeybinds(); });
 document.getElementById('sensSlider').oninput = function(e) { state.sensitivity = parseFloat(e.target.value); document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; saveState(); };
 document.getElementById('mobileToggle').onchange = function(e) { state.mobileTouch = e.target.checked; saveState(); };
+document.getElementById('fovSlider').oninput = function(e) { state.fov = parseFloat(e.target.value); document.getElementById('fovVal').textContent = state.fov + '°'; applyFov(); saveState(); };
+document.getElementById('camDistSlider').oninput = function(e) { state.camDist = parseFloat(e.target.value); document.getElementById('camDistVal').textContent = state.camDist.toFixed(2).replace(/0$/, '') + 'x'; saveState(); };
+document.getElementById('shakeSlider').oninput = function(e) { state.shake = parseFloat(e.target.value); document.getElementById('shakeVal').textContent = state.shake.toFixed(1); saveState(); };
+document.getElementById('invertYToggle').onchange = function(e) { state.invertY = e.target.checked; saveState(); };
+document.getElementById('assistToggle').onchange = function(e) { state.assist = e.target.checked; saveState(); };
+document.getElementById('qualitySelect').onchange = function(e) { state.quality = e.target.value; applyQuality(); saveState(); };
+applyFov(); applyQuality(); // v15: boot with the saved camera + quality settings
 document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
 // Touch joystick & HUD buttons
 const tz = document.getElementById('touchZone'); const tk = document.getElementById('touchKnob');
