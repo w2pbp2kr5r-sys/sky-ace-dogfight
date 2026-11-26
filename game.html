@@ -268,7 +268,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v35 — STICK & AIM ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v36 — LIVING WORLD ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -490,12 +490,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 35; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 36; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
   ownedJets: ['f16'],
   ownedSkins: ['stock'], equippedSkin: 'stock',
+  ownedTrails: ['standard'], equippedTrail: 'standard', // v36 WS9: plane trails (collectible cosmetics; 'standard' = skin-tinted vapor)
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0 },
   sensitivity: 1.0, mobileTouch: 'auto', // v33: three-way touch-controls mode ('auto' | 'on' | 'off'); legacy boolean saves migrate in loadGameState
   touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1, // v32: customizable touch-button layout (editor in Settings)
@@ -563,6 +564,8 @@ function loadGameState() {
   if (!Array.isArray(state.ownedJets) || !state.ownedJets.length) state.ownedJets = ['f16'];
   if (!Array.isArray(state.ownedSkins) || !state.ownedSkins.length) state.ownedSkins = ['stock'];
   if (!state.equippedSkin) state.equippedSkin = 'stock';
+  if (!Array.isArray(state.ownedTrails) || !state.ownedTrails.length) state.ownedTrails = ['standard']; // v36 WS9: same default-merge as skins — old saves gain the trail fields untouched
+  if (!state.equippedTrail) state.equippedTrail = 'standard';
   // v15 settings guards: old saves get the new defaults, existing values are kept
   if (typeof state.fov !== 'number') state.fov = 65;
   if (typeof state.camDist !== 'number') state.camDist = 1.0;
@@ -642,8 +645,45 @@ const SKINS = [
   { id: 'aurora', name: 'Aurora', rarity: 'Epic', c1: 0x1f8a80, c2: 0x4b2a7a, pattern: 'camo', accent: 0x7ef0d4 },
   { id: 'sakura', name: 'Sakura', rarity: 'Epic', c1: 0xf2b8cd, c2: 0xfdf3f6, pattern: 'camo', accent: 0xe75480 },
   { id: 'voidwalker', name: 'Void Walker', rarity: 'Legendary', c1: 0x0a0812, c2: 0x3b1a63, pattern: 'pixel', accent: 0xa855f7 },
-  { id: 'supernova', name: 'Supernova', rarity: 'Mythic', c1: 0xe83e8c, c2: 0xf97316, pattern: 'stripes', accent: 0xffe08a }
+  { id: 'supernova', name: 'Supernova', rarity: 'Mythic', c1: 0xe83e8c, c2: 0xf97316, pattern: 'stripes', accent: 0xffe08a },
+  // v36 WS9: eight more crate skins (2 Common / 3 Rare / 2 Epic / 1 Legendary)
+  { id: 'desertstorm', name: 'Desert Storm', rarity: 'Common', c1: 0xd8c49c, c2: 0xa68d5f, pattern: 'camo', accent: 0xe8c96a },
+  { id: 'arcticwolf', name: 'Arctic Wolf', rarity: 'Common', c1: 0xf2f7fb, c2: 0xc3d9ea, pattern: 'solid', accent: 0x7dd3fc },
+  { id: 'midnightops', name: 'Midnight Ops', rarity: 'Rare', c1: 0x101a30, c2: 0x060a16, pattern: 'solid', accent: 0x64748b },
+  { id: 'solarflare', name: 'Solar Flare', rarity: 'Rare', c1: 0xf97316, c2: 0xf5c542, pattern: 'stripes', accent: 0xffd9a0 },
+  { id: 'venom', name: 'Venom', rarity: 'Rare', c1: 0x22401c, c2: 0x08130a, pattern: 'camo', accent: 0x84cc16 },
+  { id: 'sakuradrift', name: 'Sakura Drift', rarity: 'Epic', c1: 0xf7c8d8, c2: 0xffffff, pattern: 'stripes', accent: 0xe75480 },
+  { id: 'royalguard', name: 'Royal Guard', rarity: 'Epic', c1: 0x4c1d95, c2: 0x2a1065, pattern: 'solid', accent: 0xfbbf24 },
+  { id: 'carbonfang', name: 'Carbon Fang', rarity: 'Legendary', c1: 0x0a0a0c, c2: 0x1e1e24, pattern: 'stripes', accent: 0xef4444 }
 ];
+// ---- v36 WS9: PLANE TRAILS — a second collectible cosmetic line ----
+// Data shape parallels SKINS (id / name / rarity / color). 'standard' is
+// owned by everyone and means "no trail item": the vapor keeps the WS5c
+// skin-tint behavior. Any other equipped trail overrides the tint.
+// Specials: rainbow cycles hue per puff spawn; phantom puffs run larger;
+// starlight carries the v35 tracer-style HDR glow (spawnSmokePuff hdr).
+const TRAILS = [
+  { id: 'standard', name: 'Standard', rarity: 'Common', color: null },
+  { id: 'crimson', name: 'Crimson Streak', rarity: 'Common', color: 0xef4444 },
+  { id: 'iceblue', name: 'Ice Blue', rarity: 'Common', color: 0x7dd3fc },
+  { id: 'venomtrail', name: 'Venom Green', rarity: 'Rare', color: 0x84cc16 },
+  { id: 'solargold', name: 'Solar Gold', rarity: 'Rare', color: 0xfbbf24 },
+  { id: 'violet', name: 'Violet Surge', rarity: 'Rare', color: 0xa855f7 },
+  { id: 'hotpink', name: 'Hot Pink', rarity: 'Epic', color: 0xec4899 },
+  { id: 'starlight', name: 'Starlight', rarity: 'Epic', color: 0xffe9a8, glow: true },
+  { id: 'phantom', name: 'Phantom Smoke', rarity: 'Legendary', color: 0x3a3f46, big: true },
+  { id: 'rainbow', name: 'Rainbow', rarity: 'Mythic', color: 0xffffff, rainbow: true }
+];
+function getTrailById(id) { return TRAILS.find(function(t) { return t.id === id; }) || TRAILS[0]; }
+function getEquippedTrail() { return getTrailById(state.equippedTrail); }
+// The player's live trail style, resolved per emit call: an equipped
+// trail item wins; 'standard' falls back to the equipped skin's accent.
+function playerTrailStyle() {
+  const tr = getEquippedTrail();
+  if (!tr || tr.id === 'standard') return { color: (getEquippedSkin() || {}).accent || 0xffffff, size: 1.6, opacity: 0.36, hdr: 0 };
+  if (tr.rainbow) { const c = new THREE.Color().setHSL((performance.now() / 2400) % 1, 0.85, 0.62); return { color: c.getHex(), size: 1.6, opacity: 0.4, hdr: 0 }; } // hue cycles as puffs spawn -> a rainbow gradient behind the jet
+  return { color: tr.color, size: tr.big ? 2.7 : 1.6, opacity: tr.big ? 0.42 : 0.38, hdr: tr.glow ? 1.5 : 0 };
+}
 function getSkinById(id) { return SKINS.find(function(s) { return s.id === id; }) || SKINS[0]; }
 function getEquippedSkin() { return getSkinById(state.equippedSkin); }
 // ---- Supply crates (v10): roll a rarity by the odds, then a random skin of that rarity ----
@@ -2588,23 +2628,16 @@ function buildCityGrid(theme, radius) {
     ][idx] || { color: 0xffffff, roughness: 0.6, metalness: 0.25 };
     return new THREE.MeshStandardMaterial({ map: ft, emissiveMap: ft, emissive: 0xffd9a0, emissiveIntensity: theme === 'neon' ? 0.95 : 0.3, color: look.color, roughness: look.roughness, metalness: look.metalness }); // v16: brighter lit windows in day city too
   });
-  const roofMat = new THREE.MeshStandardMaterial({ color: theme === 'neon' ? 0x11141c : 0x3c4654, roughness: 0.9 });
   const core = Math.min(radius * 0.95, 1450);
   const n = Math.floor(core / CITY_PITCH);
-  const roofXforms = [], towerXforms = [], treePts = [], lightPts = [], helipadXforms = [];
-  // v20: tall towers (>90) get a setback crown — a second box at 60% footprint and 18%
-  // of the tower's height — and ~10% of them (deterministic hash) get a rooftop
-  // helipad, instanced after the grid loop from helipadXforms. Returns the roof top Y.
-  function addRoofDetail(bx, bz, w, d, hh, seedA, seedB) {
-    let topY = hh;
-    if (hh > 90) {
-      const cw = w * 0.6, cd = d * 0.6, chh = hh * 0.18;
-      const crown = new THREE.Mesh(_boxGeo, roofMat); crown.scale.set(cw, chh, cd); crown.position.set(bx, hh + chh / 2, bz); crown.castShadow = true; crown.receiveShadow = true; worldGroup.add(crown);
-      topY = hh + chh;
-      if (hash2(seedA, seedB) < 0.10) helipadXforms.push([bx, topY, bz, Math.min(w, d) * 0.34]);
-    }
-    return topY;
-  }
+  const treePts = [], lightPts = [];
+  // v36: ROOFTOPS ARE CLEAN. Jayce: "the buildings have weird boxes on the
+  // top of them" — so the v20 setback crowns, the rooftop helipads, the
+  // instanced AC/detail boxes, the water towers and the landmark spires
+  // are ALL gone. Every roof is now the flat top of its own building box.
+  // Nothing here touched collision: crowns/helipads/props never added
+  // obstacle entries, and the building footprint obstacles below are
+  // exactly as they were.
   for (let gi = -n; gi < n; gi++) {
     for (let gj = -n; gj < n; gj++) {
       const cx = (gi + 0.5) * CITY_PITCH, cz = (gj + 0.5) * CITY_PITCH;
@@ -2624,8 +2657,6 @@ function buildCityGrid(theme, radius) {
           const bx = cx + off[0], bz = cz + off[1];
           const mesh = new THREE.Mesh(_boxGeo, mat); mesh.scale.set(w, hh, d); mesh.position.set(bx, hh / 2, bz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
           obstacles.push({ x: bx, z: bz, r: Math.max(w, d) * 0.62, h: hh });
-          if (hash2(bx, bz) < 0.5) roofXforms.push([bx, hh, bz, w * 0.4, 4 + hash2(bz, bx) * 3, d * 0.4]);
-          addRoofDetail(bx, bz, w, d, hh, bx * 1.31 + oi * 7, bz * 0.77 - oi * 3);
         });
       } else { // one main building, occasionally a landmark tower
         const w = 48 + h1 * 34, d = 48 + h2v * 34;
@@ -2633,10 +2664,6 @@ function buildCityGrid(theme, radius) {
         const hh = landmark ? 230 + h1 * 130 : 55 + h3 * 120 + (Math.hypot(cx, cz) < 500 ? 40 : 0);
         const mesh = new THREE.Mesh(_boxGeo, landmark ? mats[0] : mat); mesh.scale.set(w, hh, d); mesh.position.set(cx, hh / 2, cz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh); // v28: landmark towers always wear the glass-blue hero facade
         obstacles.push({ x: cx, z: cz, r: Math.max(w, d) * 0.60, h: hh });
-        if (landmark) { const spire = new THREE.Mesh(_boxGeo, roofMat); spire.scale.set(6, 26, 6); spire.position.set(cx, hh + 13, cz); worldGroup.add(spire); }
-        if (!landmark) addRoofDetail(cx, cz, w, d, hh, cx * 0.91 - 51, cz * 1.13 + 33);
-        if (hash2(cx, cz) < 0.55) roofXforms.push([cx + (h1 - 0.5) * w * 0.4, hh, cz + (h2v - 0.5) * d * 0.4, 8 + h1 * 8, 4 + h3 * 4, 8 + h2v * 8]);
-        if (hash2(cz, cx) < 0.22) towerXforms.push([cx - (h1 - 0.5) * w * 0.4, hh, cz - (h3 - 0.5) * d * 0.4]);
       }
       if (h2v > 0.68) treePts.push([cx - 52, cz - 52, 0.85 + h1 * 0.5]); // sidewalk corner trees
       if (h3 > 0.68) treePts.push([cx + 52, cz + 52, 0.85 + h2v * 0.5]);
@@ -2660,31 +2687,6 @@ function buildCityGrid(theme, radius) {
     lightPts.push([lx, lz]);
   }
   const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _pos = new THREE.Vector3(), _scl = new THREE.Vector3();
-  if (roofXforms.length) { // rooftop AC / detail boxes, one instanced mesh
-    const im = new THREE.InstancedMesh(_boxGeo, roofMat, roofXforms.length);
-    roofXforms.forEach(function(rf, i) { _pos.set(rf[0], rf[1] + rf[4] / 2, rf[2]); _scl.set(rf[3], rf[4], rf[5]); _m4.compose(_pos, _q, _scl); im.setMatrixAt(i, _m4); });
-    im.castShadow = true; worldGroup.add(im);
-  }
-  if (towerXforms.length) { // rooftop water towers, one instanced mesh
-    const wtGeo = new THREE.CylinderGeometry(4.5, 4.5, 9, 8);
-    const wtMat = new THREE.MeshStandardMaterial({ color: 0x7a5c40, roughness: 0.85 });
-    const im2 = new THREE.InstancedMesh(wtGeo, wtMat, towerXforms.length);
-    towerXforms.forEach(function(tf, i) { _pos.set(tf[0], tf[1] + 8.5, tf[2]); _scl.set(1, 1, 1); _m4.compose(_pos, _q, _scl); im2.setMatrixAt(i, _m4); });
-    im2.castShadow = true; worldGroup.add(im2);
-  }
-  if (helipadXforms.length) { // v20: rooftop helipads — dark disc + emissive ring, one instanced mesh each
-    const padGeo = new THREE.CylinderGeometry(1, 1, 0.7, 20);
-    const padMat = new THREE.MeshStandardMaterial({ color: 0x151a22, roughness: 0.85 });
-    const pads = new THREE.InstancedMesh(padGeo, padMat, helipadXforms.length);
-    const ringGeo = new THREE.TorusGeometry(0.82, 0.045, 6, 28);
-    const rings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }), helipadXforms.length);
-    const _qFlat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
-    helipadXforms.forEach(function(hp, i) {
-      _pos.set(hp[0], hp[1] + 0.35, hp[2]); _scl.set(hp[3], 1, hp[3]); _m4.compose(_pos, _q, _scl); pads.setMatrixAt(i, _m4);
-      _pos.y = hp[1] + 0.78; _scl.set(hp[3], hp[3], hp[3]); _m4.compose(_pos, _qFlat, _scl); rings.setMatrixAt(i, _m4);
-    });
-    worldGroup.add(pads); worldGroup.add(rings);
-  }
   if (treePts.length) { // trees: instanced trunks + foliage
     const trunkGeo = new THREE.CylinderGeometry(0.55, 0.8, 4.5, 6);
     const folGeo = new THREE.IcosahedronGeometry(3.6, 0);
@@ -2760,11 +2762,12 @@ function addThemeProps(theme, radius) {
     // Harbor dressing: simple boats on the water, dock cranes on the shore
     const boatMat = new THREE.MeshStandardMaterial({ color: 0xdde3ea, roughness: 0.55, metalness: 0.25 });
     const boatDark = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 });
-    [[radius * 1.15, -320, 0.4], [radius * 1.62, 170, -0.7], [radius * 1.30, 430, 1.2]].forEach(function(bp2) {
+    [[radius * 1.15, -320, 0.4], [radius * 1.62, 170, -0.7], [radius * 1.30, 430, 1.2]].forEach(function(bp2, bi2) {
       const boat = new THREE.Group();
       const hull = new THREE.Mesh(_boxGeo, boatMat); hull.scale.set(7, 3.5, 20); hull.position.y = 1.4; boat.add(hull);
       const cab2 = new THREE.Mesh(_boxGeo, boatDark); cab2.scale.set(5, 3, 6); cab2.position.set(0, 4.4, -2); boat.add(cab2);
       boat.position.set(bp2[0], 0.8, bp2[1]); boat.rotation.y = bp2[2]; worldGroup.add(boat);
+      ambient.boats.push({ grp: boat, ax: bp2[0], az: bp2[1], phase: bi2 * 2.1, speed: 0.055 + bi2 * 0.012 }); // v36: the harbor boats MOVE now — slow elliptical patrols around their anchor, driven by updateAmbientLife
     });
     const craneMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.55, metalness: 0.45 });
     [[radius * 0.70, -210], [radius * 0.70, 250]].forEach(function(cp) {
@@ -3218,11 +3221,269 @@ function buildMapBorder(theme, radius) {
     worldGroup.add(ring);
   }
 }
+// ---- v36 LIVING WORLDS: ambient life, themed per map ----
+// One registry (reset at the top of every buildEnvironment), one update
+// function ticked from animate(). Everything is visual only — no
+// obstacles, no gameplay contact — and every mesh lives in worldGroup,
+// so mission cleanup is automatic. City/neon get street traffic + people
+// on the sidewalks; the city harbor boats (placed by addThemeProps) now
+// patrol; canyon gets a freight train on its flattest verified corridor;
+// mountain gets lit cabins around the frozen lake; nebula gets mining
+// drones orbiting asteroids; orbit gets cargo haulers circling the station.
+let ambient = null;
+const _ambM4 = (typeof THREE !== 'undefined') ? new THREE.Matrix4() : null;
+const _ambQ = (typeof THREE !== 'undefined') ? new THREE.Quaternion() : null;
+const _ambEuler = (typeof THREE !== 'undefined') ? new THREE.Euler() : null;
+const _ambPos = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _ambScl = (typeof THREE !== 'undefined') ? new THREE.Vector3(1, 1, 1) : null;
+const _ambOff = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+// Traffic geometry is read straight off the ground painter's grid: streets
+// run along the tile edges (world lines x = k*CITY_PITCH, z = k*CITY_PITCH),
+// the road is ~15 wide centred on the line, the sidewalk ring sits 7.6-9.7
+// units out. Cars loop whole blocks on the street centrelines with a
+// 3.2-unit right-hand lane offset; people walk the 8.6-offset sidewalk.
+function carSegGeom(r, seg) {
+  const cs = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]];
+  const A = cs[seg], B = cs[(seg + 1) % 4];
+  let dx = B[0] - A[0], dz = B[1] - A[1]; const len = Math.hypot(dx, dz); dx /= len; dz /= len;
+  const rx = dz * 3.2, rz = -dx * 3.2; // right of travel for a (dx, dz) heading is (dz, -dx)
+  return { ax: A[0] + rx, az: A[1] + rz, bx: B[0] + rx, bz: B[1] + rz, dx: dx, dz: dz, len: len };
+}
+function buildTraffic(theme) {
+  const neon = theme === 'neon';
+  const rects = [];
+  for (let gi = -8; gi < 8; gi++) for (let gj = -8; gj < 8; gj++) {
+    const x0 = gi * CITY_PITCH, z0 = gj * CITY_PITCH, x1 = x0 + CITY_PITCH, z1 = z0 + CITY_PITCH;
+    if (Math.hypot(x0 + CITY_PITCH / 2, z0 + CITY_PITCH / 2) > 1180) continue;
+    if (x0 < 180 && x1 > -180 && z0 < 180 && z1 > -180) continue; // spawn clearing stays empty
+    if (x0 < 660 && x1 > 340 && z0 < 800 && z1 > -800) continue; // airstrip corridor (runway at x=500)
+    rects.push([x0, z0, x1, z1]);
+  }
+  const N = Math.min(36, rects.length);
+  const bodyIM = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 1.0, 4.8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.4 }), N);
+  const cabIM = new THREE.InstancedMesh(new THREE.BoxGeometry(2.0, 0.7, 2.4), new THREE.MeshStandardMaterial({ color: neon ? 0x0e2a3a : 0x141a22, roughness: 0.25, metalness: 0.6, emissive: neon ? 0x0b3a4a : 0x000000, emissiveIntensity: 0.9 }), N);
+  const lightIM = new THREE.InstancedMesh(new THREE.BoxGeometry(1.7, 0.26, 0.16), new THREE.MeshBasicMaterial({ color: 0xffffff }), N * 2); // one white headlight bar + one red tail bar per car, told apart by instance color
+  const paint = neon ? [0x22d3ee, 0xe879f9, 0xfacc15, 0x94a3b8, 0x38bdf8, 0xf8fafc] : [0xb8bec9, 0x7a4a3a, 0x3a5a7a, 0x59616e, 0x8a8f7a, 0x2e2e33, 0xa33b3b, 0xd8d8d8];
+  const _c = new THREE.Color();
+  const cars = [];
+  for (let i = 0; i < N; i++) {
+    const car = { rect: rects[(i * 7) % rects.length], seg: i % 4, speed: 8 + hash2(i, 47) * 8, heading: 0, x: 0, z: 0, tx: 0, tz: 0 };
+    const g = carSegGeom(car.rect, car.seg), frac = 0.1 + hash2(i, 31) * 0.8;
+    car.x = g.ax + g.dx * g.len * frac; car.z = g.az + g.dz * g.len * frac; car.heading = Math.atan2(g.dx, g.dz); car.tx = g.bx; car.tz = g.bz;
+    cars.push(car);
+    bodyIM.setColorAt(i, _c.setHex(paint[i % paint.length]));
+    lightIM.setColorAt(i * 2, _c.setHex(0xfff3b0)); lightIM.setColorAt(i * 2 + 1, _c.setHex(0xff2222));
+  }
+  worldGroup.add(bodyIM); worldGroup.add(cabIM); worldGroup.add(lightIM);
+  ambient.cars = { list: cars, bodyIM: bodyIM, cabIM: cabIM, lightIM: lightIM };
+}
+function updateTraffic(dt) {
+  const C = ambient.cars;
+  for (let i = 0; i < C.list.length; i++) {
+    const car = C.list[i];
+    const dx = car.tx - car.x, dz = car.tz - car.z;
+    if (Math.hypot(dx, dz) < 7) { car.seg = (car.seg + 1) % 4; const g = carSegGeom(car.rect, car.seg); car.tx = g.bx; car.tz = g.bz; }
+    const desH = Math.atan2(dx, dz);
+    car.heading = angleWrap(car.heading + clampNum(angleWrap(desH - car.heading), -2.4 * dt, 2.4 * dt));
+    car.x += Math.sin(car.heading) * car.speed * dt; car.z += Math.cos(car.heading) * car.speed * dt;
+    _ambQ.setFromEuler(_ambEuler.set(0, car.heading, 0));
+    _ambPos.set(car.x, 0.7, car.z); _ambScl.set(1, 1, 1); _ambM4.compose(_ambPos, _ambQ, _ambScl); C.bodyIM.setMatrixAt(i, _ambM4);
+    _ambOff.set(0, 0, -0.35).applyQuaternion(_ambQ); _ambPos.set(car.x + _ambOff.x, 1.52, car.z + _ambOff.z); _ambM4.compose(_ambPos, _ambQ, _ambScl); C.cabIM.setMatrixAt(i, _ambM4);
+    _ambOff.set(0, 0, 2.42).applyQuaternion(_ambQ); _ambPos.set(car.x + _ambOff.x, 0.78, car.z + _ambOff.z); _ambM4.compose(_ambPos, _ambQ, _ambScl); C.lightIM.setMatrixAt(i * 2, _ambM4);
+    _ambOff.set(0, 0, -2.42).applyQuaternion(_ambQ); _ambPos.set(car.x + _ambOff.x, 0.78, car.z + _ambOff.z); _ambM4.compose(_ambPos, _ambQ, _ambScl); C.lightIM.setMatrixAt(i * 2 + 1, _ambM4);
+  }
+  C.bodyIM.instanceMatrix.needsUpdate = true; C.cabIM.instanceMatrix.needsUpdate = true; C.lightIM.instanceMatrix.needsUpdate = true;
+}
+function buildPeople() {
+  const N = 70;
+  const im = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.34, 1.05, 3, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), N);
+  const palette = [0x8a8f98, 0x5a6a8a, 0x7a5a4a, 0x4a5d43, 0x9a8a6a, 0x6a4a5a, 0xb0b3b8, 0x3f4a5a];
+  const _c = new THREE.Color();
+  const folks = [];
+  let placed = 0, guard = 0;
+  while (placed < N && guard++ < N * 30) {
+    const vert = Math.random() < 0.5;
+    const k = Math.floor(Math.random() * 17) - 8, j = Math.floor(Math.random() * 16) - 8;
+    const fixed = k * CITY_PITCH + (Math.random() < 0.5 ? 8.6 : -8.6); // mid-sidewalk
+    const from = j * CITY_PITCH + 14, to = j * CITY_PITCH + CITY_PITCH - 14, mid = (from + to) / 2;
+    const px = vert ? fixed : mid, pz = vert ? mid : fixed;
+    if (Math.hypot(px, pz) > 1200) continue;
+    if (Math.abs(px) < 165 && Math.abs(pz) < 165) continue; // spawn clearing
+    if (Math.abs(px - 500) < 130 && Math.abs(pz) < 790) continue; // airstrip corridor
+    folks.push({ vert: vert, fixed: fixed, from: from, to: to, pos: from + Math.random() * (to - from), dir: Math.random() < 0.5 ? 1 : -1, speed: 0.9 + Math.random() * 0.7, phase: Math.random() * 6.28, trav: Math.random() * 10 });
+    im.setColorAt(placed, _c.setHex(palette[placed % palette.length]));
+    placed++;
+  }
+  im.count = placed;
+  worldGroup.add(im);
+  ambient.people = { im: im, list: folks };
+}
+function updatePeople(dt) {
+  const P = ambient.people;
+  for (let i = 0; i < P.list.length; i++) {
+    const f = P.list[i];
+    f.pos += f.dir * f.speed * dt; f.trav += f.speed * dt;
+    if (f.pos > f.to) { f.pos = f.to; f.dir = -1; } else if (f.pos < f.from) { f.pos = f.from; f.dir = 1; }
+    const bob = Math.abs(Math.sin(f.trav * 2.4 + f.phase)) * 0.1;
+    _ambQ.setFromEuler(_ambEuler.set(0, f.vert ? (f.dir > 0 ? 0 : Math.PI) : (f.dir > 0 ? Math.PI / 2 : -Math.PI / 2), 0));
+    _ambPos.set(f.vert ? f.fixed : f.pos, 0.88 + bob, f.vert ? f.pos : f.fixed); _ambScl.set(1, 1, 1); _ambM4.compose(_ambPos, _ambQ, _ambScl);
+    P.im.setMatrixAt(i, _ambM4);
+  }
+  P.im.instanceMatrix.needsUpdate = true;
+}
+function updateBoats() {
+  const t = ambient.t;
+  for (let i = 0; i < ambient.boats.length; i++) {
+    const b = ambient.boats[i], a = b.phase + t * b.speed;
+    b.grp.position.set(b.ax + Math.cos(a) * 120, 0.8 + Math.sin(t * 0.9 + b.phase) * 0.25, b.az + Math.sin(a) * 65);
+    b.grp.rotation.y = Math.atan2(-Math.sin(a) * 120, Math.cos(a) * 65); // heading follows the ellipse velocity
+    b.grp.rotation.z = Math.sin(t * 0.7 + b.phase) * 0.02;
+  }
+}
+// Canyon train: the x = -275 line along Z is the gentlest straight corridor
+// in the heightmap — verified by sampling terrainHeightAt on a grid in
+// Node before building this (height range 9.2..41.7 over z -1100..1100,
+// worst step 2.09 per 8 units ≈ 0.26/unit). Each car still samples the
+// terrain under itself every frame and smooths toward it, so the train
+// hugs the valley floor instead of floating or clipping.
+function buildTrain() {
+  const terrFn = worldGroup.userData.terrainHeightAt; if (!terrFn) return;
+  const TX = -275, Z0 = -1050, Z1 = 1050;
+  const trackMat = new THREE.MeshStandardMaterial({ color: 0x2e2620, roughness: 0.95 });
+  for (let s = Z0; s < Z1; s += 50) {
+    const h1 = terrFn(TX, s), h2 = terrFn(TX, s + 50);
+    const seg = new THREE.Mesh(_boxGeo, trackMat); seg.scale.set(3.6, 0.35, 54);
+    seg.position.set(TX, (h1 + h2) / 2 + 0.3, s + 25);
+    seg.rotation.x = -Math.atan2(h2 - h1, 50);
+    worldGroup.add(seg);
+  }
+  const wagonCols = [0x8a4a2e, 0x5a6470, 0x2e4a6a, 0x6a5a2e];
+  const cars = [];
+  for (let i = 0; i < 5; i++) {
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(_boxGeo, i === 0 ? new THREE.MeshStandardMaterial({ color: 0x1f3a2e, roughness: 0.6, metalness: 0.4 }) : new THREE.MeshStandardMaterial({ color: wagonCols[i - 1], roughness: 0.8, metalness: 0.2 }));
+    body.scale.set(3.2, 3.4, i === 0 ? 13 : 12); body.position.y = 2.6; body.castShadow = true; grp.add(body);
+    if (i === 0) {
+      const win = new THREE.Mesh(_boxGeo, new THREE.MeshBasicMaterial({ color: 0xffca7a })); win.scale.set(3.3, 1.0, 2.2); win.position.set(0, 3.6, 4.6); grp.add(win); // lit cab window
+      const stack = new THREE.Mesh(_boxGeo, new THREE.MeshStandardMaterial({ color: 0x14181d, roughness: 0.7 })); stack.scale.set(1.2, 1.1, 1.2); stack.position.set(0, 4.8, -3); grp.add(stack);
+    }
+    const y0 = terrFn(TX, -300) + 2.1;
+    grp.position.set(TX, y0, -300);
+    worldGroup.add(grp);
+    cars.push({ mesh: grp, y: y0, pitch: 0, heading: 0, roll: 0 }); // shaped like a flight object so orientFlight drives it
+  }
+  ambient.train = { cars: cars, s: -300, dir: 1, speed: 22, x: TX, z0: Z0, z1: Z1 };
+}
+function updateTrain(dt) {
+  const T = ambient.train, terrFn = worldGroup.userData.terrainHeightAt; if (!terrFn) return;
+  T.s += T.dir * T.speed * dt;
+  if (T.s > T.z1 - 40) { T.s = T.z1 - 40; T.dir = -1; } else if (T.s < T.z0 + 40) { T.s = T.z0 + 40; T.dir = 1; }
+  for (let i = 0; i < T.cars.length; i++) {
+    const c = T.cars[i], z = T.s - T.dir * i * 16.5;
+    const targetY = terrFn(T.x, z) + 2.1;
+    c.y += (targetY - c.y) * Math.min(1, 3.5 * dt);
+    c.mesh.position.set(T.x, c.y, z);
+    c.heading = T.dir > 0 ? 0 : Math.PI;
+    c.pitch = Math.atan2(terrFn(T.x, z + T.dir * 15) - terrFn(T.x, z - T.dir * 15), 30);
+    orientFlight(c);
+  }
+}
+function buildCabins() {
+  const terrFn = worldGroup.userData.terrainHeightAt; if (!terrFn) return;
+  const N = 10, LX = -450, LZ = 380; // scattered around the frozen lake addThemeProps plants at (-450, 380)
+  const bodyIM = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 4, 6), new THREE.MeshStandardMaterial({ color: 0x4a3826, roughness: 0.9 }), N);
+  const roofIM = new THREE.InstancedMesh(new THREE.ConeGeometry(5.6, 2.8, 4), new THREE.MeshStandardMaterial({ color: 0x35302b, roughness: 0.95 }), N);
+  const winIM = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.1, 1.1), new THREE.MeshBasicMaterial({ color: 0xffca7a }), N * 2); // warm lit windows
+  let placed = 0, guard = 0;
+  while (placed < N && guard++ < 200) {
+    const a = Math.random() * Math.PI * 2, d = 175 + Math.random() * 150;
+    const x = LX + Math.cos(a) * d, z = LZ + Math.sin(a) * d, gy = terrFn(x, z);
+    if (Math.abs(terrFn(x + 6, z) - gy) > 5 || Math.abs(terrFn(x, z + 6) - gy) > 5) continue; // needs a flat-ish pad
+    const rot = Math.random() * Math.PI * 2, cr = Math.cos(rot), sr = Math.sin(rot);
+    _ambQ.setFromEuler(_ambEuler.set(0, rot, 0)); _ambScl.set(1, 1, 1);
+    _ambPos.set(x, gy + 1.7, z); _ambM4.compose(_ambPos, _ambQ, _ambScl); bodyIM.setMatrixAt(placed, _ambM4);
+    _ambQ.setFromEuler(_ambEuler.set(0, rot + Math.PI / 4, 0));
+    _ambPos.set(x, gy + 5.1, z); _ambM4.compose(_ambPos, _ambQ, _ambScl); roofIM.setMatrixAt(placed, _ambM4);
+    _ambQ.setFromEuler(_ambEuler.set(0, rot, 0));
+    for (let wn = 0; wn < 2; wn++) {
+      const lx2 = wn === 0 ? -1.6 : 1.6;
+      _ambPos.set(x + lx2 * cr + 3.02 * sr, gy + 2.0, z - lx2 * sr + 3.02 * cr); _ambM4.compose(_ambPos, _ambQ, _ambScl);
+      winIM.setMatrixAt(placed * 2 + wn, _ambM4);
+    }
+    placed++;
+  }
+  bodyIM.count = roofIM.count = placed; winIM.count = placed * 2;
+  worldGroup.add(bodyIM); worldGroup.add(roofIM); worldGroup.add(winIM);
+}
+function buildDrones() {
+  const spin = worldGroup.userData.spin || [], rocks = [];
+  for (let i = 0; i < spin.length; i++) { const o = spin[i]; if (o.isMesh && o.scale && o.scale.x >= 6) rocks.push(o); }
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0x8a93a3, roughness: 0.4, metalness: 0.7 });
+  for (let i = 0; i < Math.min(8, rocks.length); i++) {
+    const rock = rocks[(i * 3) % rocks.length];
+    const grp = new THREE.Group();
+    grp.add(new THREE.Mesh(new THREE.SphereGeometry(0.95, 10, 8), coreMat));
+    const sm = new THREE.SpriteMaterial({ map: getSmokeTexture(), color: i % 2 ? 0xffa63d : 0x22d3ee, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+    const light = new THREE.Sprite(sm); light.scale.setScalar(4.5); grp.add(light);
+    worldGroup.add(grp);
+    ambient.drones.push({ grp: grp, light: sm, cx: rock.position.x, cy: rock.position.y, cz: rock.position.z, r: rock.scale.x + 12 + (i % 3) * 5, speed: 0.16 + (i % 4) * 0.05, phase: i * 1.7 });
+  }
+}
+function updateDrones() {
+  const t = ambient.t;
+  for (let i = 0; i < ambient.drones.length; i++) {
+    const d = ambient.drones[i], a = d.phase + t * d.speed;
+    d.grp.position.set(d.cx + Math.cos(a) * d.r, d.cy + Math.sin(t * 0.6 + d.phase) * 3.5, d.cz + Math.sin(a) * d.r);
+    d.light.opacity = Math.sin(t * 4 + d.phase * 2) > 0.15 ? 0.95 : 0.07; // blinking work light
+  }
+}
+function buildHaulers() {
+  for (let i = 0; i < 2; i++) {
+    const grp = new THREE.Group();
+    const hull = new THREE.Mesh(_boxGeo, new THREE.MeshStandardMaterial({ color: 0x7d8797, roughness: 0.45, metalness: 0.7 })); hull.scale.set(6, 4.5, 30); grp.add(hull);
+    const cols = [0xb3543e, 0x3e6fb3, 0x4caf7d];
+    for (let cix = 0; cix < 3; cix++) { const box = new THREE.Mesh(_boxGeo, new THREE.MeshStandardMaterial({ color: cols[(cix + i) % 3], roughness: 0.7, metalness: 0.3 })); box.scale.set(6.6, 4.2, 7.5); box.position.set(0, 0.4, -9 + cix * 9); grp.add(box); }
+    const mkLight = function(color, x, y, z) { const sm = new THREE.SpriteMaterial({ map: getSmokeTexture(), color: color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }); const sp = new THREE.Sprite(sm); sp.scale.setScalar(3.6); sp.position.set(x, y, z); grp.add(sp); return sm; };
+    const lights = [mkLight(0xff4444, -3.4, 0, 10), mkLight(0x44ff88, 3.4, 0, 10), mkLight(0xffffff, 0, 1, -15.5)]; // port / starboard / tail
+    worldGroup.add(grp);
+    ambient.haulers.push({ grp: grp, lights: lights, phase: i * Math.PI });
+  }
+}
+function updateHaulers() {
+  const t = ambient.t;
+  for (let i = 0; i < ambient.haulers.length; i++) {
+    const h = ambient.haulers[i], a = h.phase + t * 0.03; // wide slow circuit around the station at (260, 240, -260)
+    const py = 250 + Math.sin(t * 0.11 + i * 2.1) * 16;
+    h.grp.position.set(260 + Math.cos(a) * 300, py, -260 + Math.sin(a) * 300);
+    _ambPos.set(260 + Math.cos(a + 0.02) * 300, py, -260 + Math.sin(a + 0.02) * 300);
+    h.grp.lookAt(_ambPos);
+    const blink = Math.sin(t * 3.2 + i * 1.9) > 0.3;
+    h.lights[0].opacity = blink ? 0.95 : 0.1; h.lights[1].opacity = blink ? 0.95 : 0.1; h.lights[2].opacity = blink ? 0.15 : 0.95;
+  }
+}
+function buildAmbientLife(theme) {
+  if (theme === 'city' || theme === 'neon') { buildTraffic(theme); buildPeople(); }
+  else if (theme === 'canyon') buildTrain();
+  else if (theme === 'mountain') buildCabins();
+  else if (theme === 'nebula') buildDrones();
+  else if (theme === 'orbit') buildHaulers();
+}
+function updateAmbientLife(dt) {
+  if (!ambient) return;
+  ambient.t += dt;
+  if (ambient.cars) updateTraffic(dt);
+  if (ambient.people) updatePeople(dt);
+  if (ambient.boats.length) updateBoats();
+  if (ambient.train) updateTrain(dt);
+  if (ambient.drones.length) updateDrones();
+  if (ambient.haulers.length) updateHaulers();
+}
 function buildEnvironment(theme, radius, densityScale) {
   if (!scene) return; radius = radius || 1400;
   const density = (typeof densityScale === 'number') ? densityScale : 1; // v15: Gun Game thins the asteroid field
   if (menuGroup) menuGroup.visible = false;
   scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
+  ambient = { t: 0, cars: null, people: null, boats: [], train: null, drones: [], haulers: [] }; // v36: living-world registry resets with every environment build (meshes all live in worldGroup, so cleanup is automatic)
   const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
   const isSpace = (theme === 'nebula' || theme === 'orbit');
   const _tl = THEME_LIGHTING[theme] || THEME_LIGHTING.city; // v17: fog density is theme-driven (earth 0.00038 x1.15, space unchanged)
@@ -3313,7 +3574,7 @@ function buildEnvironment(theme, radius, densityScale) {
     // v19: mountain/canyon — the heightmap terrain built below IS the ground now. This
     // flat sheet drops to y=-3 UNDER the terrain, tinted like the valley floor, purely
     // to seal the horizon beyond the terrain's edges (it is larger than the terrain).
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, map: makeDetailNoiseTexture(140), roughness: 1 })); // v28: finer grain repeat on the flat valley sheet (it had a plain color material)
+    ground = new THREE.Mesh(new THREE.CircleGeometry(2750, 48), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, map: makeDetailNoiseTexture(140), roughness: 1 })); // v28: finer grain repeat on the flat valley sheet (it had a plain color material) // v36: a 2750-radius disc (was a 4550 square) — reaches past the extended terrain edge (2500) and the 2400 border in every direction, while every point of it stays inside the 3770 sky dome (the old square's corners did not)
     ground.position.y = -3;
   }
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
@@ -3324,7 +3585,7 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
   if (!isSpace) {
-  const ringR = Math.min(radius * 1.85, 3700);
+  const ringR = (theme === 'mountain' || theme === 'canyon') ? 3400 : Math.min(radius * 1.85, 3700); // v36: on terrain themes the silhouette ring moves OUT past the new 2400 border (its 520-900-wide cones would otherwise straddle the fence; inner edge now >= 2500)
   const ringCol = new THREE.Color(cfg.fog); ringCol.lerp(new THREE.Color(cfg.ground), 0.38);
   const ringMat = new THREE.MeshBasicMaterial({ color: ringCol });
   for (let ri = 0; ri < 16; ri++) {
@@ -3382,10 +3643,24 @@ function buildEnvironment(theme, radius, densityScale) {
       // Airstrip corridor (runway at x=500, |z|<700, tower/hangars to x~605): flatten to ~5%
       const corr = 0.05 + 0.95 * Math.max(tSmooth(130, 200, Math.abs(x - 500)), tSmooth(800, 920, Math.abs(z)));
       const spawn = tSmooth(150, 260, dist); // flat spawn disc at origin
-      return h * corr * spawn;
+      // v36: rim melt — past terrHalf + 50 the surface eases down to the flat
+      // sealing sheet, fully flat by terrHalf + 250 (= the v36 border radius
+      // + 50). The terrain PLANE is square (half 2200) but the border is a
+      // CIRCLE: without this melt the four corner wedges (which reach
+      // 2200 x sqrt(2) = 3111) poked through the v35 fence at 1300 and would
+      // still poke at any circular radius under 3111. With the melt, ALL
+      // terrain is inside the 2400 fence and the draped base ring sits on
+      // real ground everywhere. Peak mass is untouched (the mask peaks live
+      // at dist <= 2090, well inside the melt's 2250 start).
+      const melt = 1 - tSmooth(terrHalf + 50, terrHalf + 250, dist);
+      return h * corr * spawn * melt;
     }
     worldGroup.userData.terrainHeightAt = terrainHeightAt; // addThemeProps sits its dressing on the terrain via this
-    const terrGeo = new THREE.PlaneGeometry(terrSize, terrSize, 150, 150);
+    // v36: the MESH spans 5000x5000 (170x170 segments = the same ~29-unit
+    // density as the old 4400/150) so real terrain reaches the 2400 border
+    // in every direction; terrHalf stays 2200 for the height function/mask,
+    // and the rim melt in terrainHeightAt flattens the last 200 units.
+    const terrGeo = new THREE.PlaneGeometry(5000, 5000, 170, 170);
     terrGeo.rotateX(-Math.PI / 2);
     const tp = terrGeo.attributes.position;
     for (let vi = 0; vi < tp.count; vi++) tp.setY(vi, terrainHeightAt(tp.getX(vi), tp.getZ(vi)));
@@ -3450,7 +3725,17 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   if (!isSpace) addAirstrip(); // a runway makes no sense floating in deep space (and its fixed obstacles would be invisible traps)
   addThemeProps(theme, radius);
-  buildMapBorder(theme, radius); // v35: every map gets its visible energy-fence border at the combat radius (added to worldGroup, so it is created/removed with the environment per mission — never in the menu scene)
+  // v36: the border radius is per-theme. Flat and space themes keep the
+  // combat radius (1300, Royale 2400 — storm-driven, unchanged). Terrain
+  // themes move the fence OUTSIDE the mountains: terrHalf (2200) + 200 =
+  // 2400, with the rim melt (see terrainHeightAt) guaranteeing no peak —
+  // corner wedges included — reaches it. The fence, its draped base ring
+  // and BOTH enforcement loops (player + bots, via activeGame.borderR)
+  // all read this one number.
+  const borderR = (theme === 'mountain' || theme === 'canyon') ? (Math.max(4400, radius * 2.4) / 2 + 200) : radius;
+  worldGroup.userData.borderR = borderR;
+  buildMapBorder(theme, borderR); // v35: every map gets its visible energy-fence border at the combat radius (added to worldGroup, so it is created/removed with the environment per mission — never in the menu scene)
+  buildAmbientLife(theme); // v36: traffic, people, the train, cabins, drones, haulers — registered into `ambient`, ticked by updateAmbientLife in animate
   scene.add(worldGroup);
 }
 // ---- v35 ground impact: what surface can a jet die on this mission? ----
@@ -3526,11 +3811,12 @@ function startMission() {
   const onlineRoyale = mmCfg ? true : (currentMode === 'royale' && royalePeerReady && conn && conn.open);
   if (mmCfg) royalePeerReady = false; // v25: the matchmade path supersedes any stale room pairing for this drop
   royaleRemoteRef = null;
+  if (activeGame && activeGame.wingman && activeGame.wingman.mesh) scene.remove(activeGame.wingman.mesh); // v36: GHOST's airframe never outlives its mission
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], mapRadius: mapRadius, zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 }; // v35: mapRadius rides along for border enforcement (the v35 energy fence)
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], mapRadius: mapRadius, borderR: (worldGroup.userData && worldGroup.userData.borderR) || mapRadius, zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 }; // v35: mapRadius rides along for border enforcement (the v35 energy fence) // v36: borderR is the per-theme fence radius buildEnvironment just built (2400 on terrain themes, = mapRadius elsewhere)
   activeGame.playerTopSpeed = activeGame.player.spd * (currentMode === 'gungame' ? GUN_GAME_TIERS[activeGame.player.ggTier].spd : 1); // v31: bot speed anchor — the player's sustained top speed this mission, derived exactly as the flight update derives curSpd (p.spd already carries jet spd x speed-upgrade multiplier; the tier spd is the Gun Game mode multiplier)
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (currentMode === 'waves' ? 0 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49)))); // v30: waves spawn through the wave system below, not this loop // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
@@ -3545,7 +3831,7 @@ function startMission() {
     const botBaseHp = currentMode === 'campaign' ? (170 + 30 * ch.num) : (currentMode === 'gungame' ? 230 : 380);
     const botHp = botHpMul ? Math.round(380 * botHpMul) : Math.round(botBaseHp * (0.9 + 0.2 * skill));
     const spdAnchor = anchoredBotSpd(skill); // v31: anchored to the player's top speed (Gun Game tier ratios still multiply on top via applyBotTier; Royale hp/fire multipliers untouched)
-    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, spdBase: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   }
   if (currentMode === 'campaign' && ch.ace) {
     // v30 ACE boss (Ch.15): one extra bot flagged ace — hull x3.2, skill at the top
@@ -3558,7 +3844,7 @@ function startMission() {
     aceMesh.scale.setScalar(1.15);
     aceMesh.position.set(0, 260, -700); scene.add(aceMesh);
     const aceHp = Math.round((170 + 30 * ch.num) * (0.9 + 0.2 * aceSkill) * 3.2);
-    activeGame.entities.push({ id: botCount, name: '★ ACE', ace: true, mesh: aceMesh, hp: aceHp, maxHp: aceHp, spd: anchoredBotSpd(aceSkill, 1.05) || 68 * aceSkill, skill: aceSkill, fireMul: 1, fireCd: 1, rocketCd: 6, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-aceMesh.position.x, -aceMesh.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    activeGame.entities.push({ id: botCount, name: '★ ACE', ace: true, mesh: aceMesh, hp: aceHp, maxHp: aceHp, spd: anchoredBotSpd(aceSkill, 1.05) || 68 * aceSkill, spdBase: anchoredBotSpd(aceSkill, 1.05) || 68 * aceSkill, skill: aceSkill, fireMul: 1, fireCd: 1, rocketCd: 6, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-aceMesh.position.x, -aceMesh.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
     showBanner('⚠ ENEMY ACE DETECTED', 4200);
   }
   if (currentMode === 'waves') {
@@ -3600,6 +3886,7 @@ function startMission() {
     mmMatchStarted(mmCfg);
     showBanner(`ONLINE ROYALE — ${mmCfg.matchPlayers.length} real pilots + ${botCount} ranked bots. Last pilot standing wins!`, 4200);
   }
+  if (currentMode === 'campaign' || currentMode === 'waves') spawnWingman(); // v36 WS5a: GHOST flies Campaign + Wave Defense only — never Gun Game / Royale / Online (FFA + PvP fairness)
   SFX.engineStart(); // v20: engine hum fades in with the mission
   paused = false;
 }
@@ -3629,11 +3916,11 @@ let _playerShotCount = 0;
 // 700), a non-locked shot is bent exactly onto the target's predicted
 // intercept point (bullet speed 360, the same lead math as the v5 auto-aim).
 // Outside the cone nothing changes. Player only — bots never come through here.
-const PLAYER_GUN_SPREAD = 0.006; // v35: was 0.015 * 0.8 * 0.75 = 0.009 — tightened again so assisted shots land where the assist points them
-const AIM_ASSIST_CONE = 14 * Math.PI / 180; // v35: full-bend cone, was 9°
-const AIM_ASSIST_CONE_PARTIAL = 22 * Math.PI / 180; // v35 NEW: 14°–22° is the partial-bend zone
-const AIM_ASSIST_PARTIAL_BEND = 0.45; // v35: a partial-zone shot bends 45% of the angular way toward the intercept
-const AIM_ASSIST_RANGE = 1200; // v35: was 950
+const PLAYER_GUN_SPREAD = 0.0075; // v36: v35's 0.006 trimmed back a touch at Jayce's word ("a little less on the aim but its perfect") — everything in this block eases off ~15-20%, nothing else about the funnel changes
+const AIM_ASSIST_CONE = 11.5 * Math.PI / 180; // v36: full-bend cone, was 14° in v35
+const AIM_ASSIST_CONE_PARTIAL = 18 * Math.PI / 180; // v36: 11.5°–18° is the partial-bend zone (v35: 14°–22°)
+const AIM_ASSIST_PARTIAL_BEND = 0.40; // v36: a partial-zone shot bends 40% of the angular way toward the intercept (v35: 45%)
+const AIM_ASSIST_RANGE = 1100; // v36: was 1200 in v35 (player bullet reach is 450 x 2.8s = 1260, still comfortably past it)
 const PLAYER_BULLET_SPEED = 450; // v35: player rounds fly faster (was 360, shared with bots) — the assist AND locked auto-aim lead math use this; bot rounds stay 360
 let _muzzleLight = null, _muzzleFlash = null, _botFlash = null, _botFlashT = 0;
 function ensureMuzzleFx() {
@@ -3719,8 +4006,8 @@ function spawnRocket(pos, dir, ownerId, targetObj, dmg) {
     const d = new THREE.Mesh(_rkGeos.disc, _rkMats.disc); d.rotation.y = Math.PI; d.position.z = dp[0]; d.scale.setScalar(dp[1]); d.userData.baseS = dp[1]; wrap.add(d); discs.push(d);
   });
   wrap.userData.discs = discs;
-  wrap.position.copy(pos); scene.add(wrap);
-  activeGame.rockets.push({ mesh: wrap, dir: dir.clone().normalize(), ownerId: ownerId, target: targetObj, dmg: dmg, hp: 10, life: 9.5, _smokeAcc: 0, _lastDist: Infinity, _riseT: 0, _wasClose: false, _reattack: false, _reattackT: 0, _turnAcc: 0, _roll: 0 }); // v34: guidance state — overshoot/re-attack bookkeeping, cumulative turn (anti-orbit), visual roll
+  wrap.position.copy(pos); wrap.lookAt(pos.clone().add(dir)); scene.add(wrap); // v36 WS10: spawn already aligned to the launch direction, so the update loop's slerp starts from truth (no first-frame snap)
+  activeGame.rockets.push({ mesh: wrap, dir: dir.clone().normalize(), ownerId: ownerId, target: targetObj, dmg: dmg, hp: 10, life: 9.5, _smokeAcc: 0, _smokeDist: 0, _age: 0, _wantS: null, _lastDist: Infinity, _riseT: 0, _wasClose: false, _reattack: false, _reattackT: 0, _turnAcc: 0, _roll: 0 }); // v34: guidance state — overshoot/re-attack bookkeeping, cumulative turn (anti-orbit), visual roll // v36 WS10: _age drives the ejection phase; _wantS is the damped steering direction; _smokeDist drives distance-based smoke
   // Launch effect (v8): a burst of smoke and a flash as the missile leaves the rail
   for (let lp = 0; lp < 6; lp++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 2, pos.y + (Math.random() - 0.5) * 2, pos.z + (Math.random() - 0.5) * 2, { color: lp < 3 ? 0xffffff : 0xb9bfc9, size: 1.6, grow: 4, life: 0.55, opacity: 0.5, vx: -dir.x * 10 + (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, vz: -dir.z * 10 + (Math.random() - 0.5) * 6 });
   spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.6, grow: 3, life: 0.14, opacity: 0.95, vx: 0, vy: 0, vz: 0 });
@@ -3776,6 +4063,7 @@ function togglePause(forceOpen) {
   if (paused) renderKeybinds();
 }
 function endMatch(victory, title, summary) {
+  if (activeGame) activeGame.streak = 0; // v36 WS5b: streaks die with the match — every non-Gun-Game player death funnels through here
   const modeAtEnd = currentMode; const chapterAtEnd = activeGame ? activeGame.chapter : Number(chSel.value);
   // v22: fold this match into the signed-in pilot's career stats (kills/deaths live on
   // activeGame.player; campaign/royale/1v1 defeats are player deaths — quitting to home
@@ -3807,7 +4095,7 @@ function endMatch(victory, title, summary) {
   if (typeof MUS !== 'undefined') MUS.update(); // v29: the results screen is lobby again — music fades back in
 }
 function nextChapter() { chSel.value = Math.min(CHAPTERS.length, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; releaseStick(); clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); applyPendingUpdate(); } // v34: back at the menu — a waiting update applies now // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
+function returnHome() { if (activeGame && activeGame.wingman && activeGame.wingman.mesh) scene.remove(activeGame.wingman.mesh); if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; releaseStick(); clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); applyPendingUpdate(); } // v34: back at the menu — a waiting update applies now // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -3825,11 +4113,14 @@ function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
 // ---- Bot AI helpers (v4): damage tracking, targeting, target info ----
 const _botTmpFwd = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _botTmpVel = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null; // v36 WS7: scratch for campaign gunnery lead math
 // v34 rocket guidance scratch vectors (shared, never retained across frames)
 const _rkVel = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 const _rkAim = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 const _rkWant = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 const _rkAxis = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _rkLook = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null; // v36 WS10: slerp orientation scratch
+const _rkDummy = (typeof THREE !== 'undefined') ? new THREE.Object3D() : null; // v36 WS10: holds the target orientation the rocket mesh slerps toward
 function isRemoteId(id) { return typeof id === 'string' && id.indexOf('remote') === 0; } // v25: 'remote' (v18 room rival) and 'remote_<peerId>' (v25 matchmade puppets) are both network-driven, never AI
 function noteBotHit(ent, ownerId) {
   ent.lastHitAt = gameTime; ent.lastAttacker = ownerId;
@@ -3838,6 +4129,50 @@ function noteBotHit(ent, ownerId) {
   }
 }
 function botIsAliveTarget(t) { return t === 'player' || (!!t && !!activeGame && activeGame.entities.indexOf(t) !== -1); }
+// ---- v36 WS8: Gun Game freeze hunt — structural bot-lifecycle fixes ----
+// ggRespawnPoint: respawns used to be a blind ring point (angle x 650,
+// y=200). In the nebula arena, asteroid obstacles reach that ring with
+// tops past y=200 — a bot could materialize INSIDE a rock, where the
+// scrape push-out fights its thrust every frame and pins it in place
+// (too little net travel for the movement watchdog to notice quickly).
+// Now: the clearest of 8 ring candidates, clear = no obstacle column
+// within r + 26 while its top is near/above respawn height.
+function ggRespawnPoint() {
+  let best = null, bestScore = -Infinity;
+  for (let k = 0; k < 8; k++) {
+    const a = Math.random() * Math.PI * 2, x = Math.cos(a) * 650, z = Math.sin(a) * 650;
+    let clear = Infinity;
+    for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; if (o.h > 190) { const d = Math.hypot(x - o.x, z - o.z) - o.r; if (d < clear) clear = d; } }
+    if (clear > 26) return new THREE.Vector3(x, 200, z);
+    if (clear > bestScore) { bestScore = clear; best = { x: x, z: z }; }
+  }
+  return new THREE.Vector3(best ? best.x : 650, 200, best ? best.z : 0);
+}
+// botCruiseSpd: a bot's cruise speed is DERIVED, never accumulated — the
+// spawn anchor (spdBase, captured at creation) x its Gun Game tier ratio.
+// Tier swaps SET from this (applyBotTier), the retarget-tick floor and
+// the watchdog restore to it. The pre-v36 code multiplied the tier ratio
+// into the live value: arithmetically telescoping ONLY while nothing
+// else touched spd — but the v33 watchdog restores an absolute anchor
+// value (silently stripping the tier factor, compounding loss every
+// cycle), and a zeroed spd was absorbing (0 x ratio = 0 forever).
+function botCruiseSpd(bot) {
+  const base = (bot && bot.spdBase) || (bot && bot.spd) || 68 * ((bot && bot.skill) || 0.85);
+  if (activeGame && activeGame.mode === 'gungame') return base * (GUN_GAME_TIERS[bot.ggTier || 0].spd / GUN_GAME_TIERS[0].spd);
+  return base;
+}
+function resetBotToSpawn(bot) { // v36 WS8: full reset for a NaN-poisoned bot (non-finite position/heading fails EVERY downstream comparison, watchdog included)
+  if (!bot || !bot.mesh) return;
+  let px, pz, py;
+  if (activeGame && activeGame.mode === 'gungame') { const rp = ggRespawnPoint(); px = rp.x; pz = rp.z; py = rp.y; }
+  else { const a = Math.random() * Math.PI * 2, d = 380 + Math.random() * 480; px = Math.cos(a) * d; pz = Math.sin(a) * d; py = 150 + Math.random() * 220; }
+  bot.mesh.position.set(px, py, pz);
+  bot.heading = Math.atan2(-px, -pz); bot.pitch = 0; bot.roll = 0;
+  bot.spd = botCruiseSpd(bot);
+  bot.tgt = null; bot.retargetT = 0; bot.aiState = 'engage'; bot.stateT = 0; bot.closeT = 0; bot.engageT = 0; bot.waypoint = null; bot.slot = false;
+  bot._wdPos = null; bot._wdT = 0; // watchdog re-samples from the new position
+  orientFlight(bot);
+}
 function pickBotTarget(bot) {
   const p = activeGame.player;
   // Campaign (v21): bots ONLY ever hunt the player — the old 65/35 player/bot split
@@ -3849,12 +4184,12 @@ function pickBotTarget(bot) {
   if (bot.lastAttacker != null && (gameTime - bot.lastHitAt) < 6 && Math.random() < 0.5) {
     if (bot.lastAttacker === 'player' && !(activeGame.player.respawnT > 0)) return 'player';
     const atk = activeGame.entities.find(function(e) { return e.id === bot.lastAttacker; });
-    if (atk && atk !== bot) return atk;
+    if (atk && atk !== bot && atk.hp > 0) return atk; // v36 WS8: never return a dead target
   }
   let best = null, bestD = Infinity;
   const includePlayer = !(activeGame.player.respawnT > 0);
   if (includePlayer) { best = 'player'; bestD = bot.mesh.position.distanceTo(p.mesh.position); }
-  for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || isRemoteId(e.id)) continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } }
+  for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || isRemoteId(e.id) || e.hp <= 0) continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } } // v36 WS8: candidates are live bots only — never self, never dead, never a network puppet
   return best || ((activeGame.player.respawnT > 0) ? null : 'player');
 }
 // ---- Campaign engagement slots (v21) ----
@@ -3868,8 +4203,23 @@ function pickBotTarget(bot) {
 // Freed slots are handed to the nearest patrolling bot. Runs once per frame
 // before the bot loop; a no-op in every FFA mode.
 function campaignSlotCap() { return (activeGame && (activeGame.chapter || 1) >= 6) ? 4 : 3; }
-function pickPatrolWaypoint() { const a = Math.random() * Math.PI * 2, d = 320 + Math.random() * 520; return { x: Math.cos(a) * d, y: 170 + Math.random() * 150, z: Math.sin(a) * d }; }
-function sendBotPatrol(bot) { bot.aiState = 'patrol'; bot.stateT = 0; if (!bot.waypoint) bot.waypoint = pickPatrolWaypoint(); }
+function pickPatrolWaypoint(bot) {
+  // v36 WS7 flanking (campaign): a patrolling bot no longer wanders a
+  // random circuit — it stages at a per-bot offset 150-300 units to the
+  // SIDE of the player (flankAng/flankDist per bot, re-rolled on 35% of
+  // picks), so when assignCampaignSlots frees a slot, the pressure
+  // arrives from a different angle per bot. Clamped inside the border.
+  if (bot && activeGame && activeGame.mode === 'campaign') {
+    if (bot.flankAng === undefined || Math.random() < 0.35) { bot.flankAng = Math.random() * Math.PI * 2; bot.flankDist = 150 + Math.random() * 150; }
+    const pp = activeGame.player.mesh.position;
+    let fx = pp.x + Math.cos(bot.flankAng) * bot.flankDist, fz = pp.z + Math.sin(bot.flankAng) * bot.flankDist;
+    const bR = (activeGame.borderR || activeGame.mapRadius || 1300) * 0.92, fd = Math.hypot(fx, fz);
+    if (fd > bR) { fx *= bR / fd; fz *= bR / fd; }
+    return { x: fx, y: Math.max(120, Math.min(380, pp.y + (Math.random() - 0.5) * 120)), z: fz };
+  }
+  const a = Math.random() * Math.PI * 2, d = 320 + Math.random() * 520; return { x: Math.cos(a) * d, y: 170 + Math.random() * 150, z: Math.sin(a) * d };
+}
+function sendBotPatrol(bot) { bot.aiState = 'patrol'; bot.stateT = 0; if (!bot.waypoint) bot.waypoint = pickPatrolWaypoint(bot); }
 function assignCampaignSlots() {
   if (!activeGame || activeGame.mode !== 'campaign') return;
   const ents = activeGame.entities, cap = campaignSlotCap();
@@ -3966,7 +4316,7 @@ function emitDamageSmoke(ent, dt) {
 }
 // ---- Wingtip contrails (v8): vapor streaming off the tips in hard, fast turns ----
 const _trailTip = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
-function emitContrails(ent, spd, turnAmt, dt) {
+function emitContrails(ent, spd, turnAmt, dt, style) { // v36 WS9: style = { color, size, opacity, hdr } from playerTrailStyle() for the player; bots/wingman pass nothing and keep plain white vapor
   if (!ent.mesh || turnAmt <= 0.55 || spd <= 55) { ent._trailAcc = 0; return; }
   const span = (ent.mesh.userData && ent.mesh.userData.span) || ent.span || 10;
   ent.span = span;
@@ -3976,7 +4326,7 @@ function emitContrails(ent, spd, turnAmt, dt) {
     for (let s = -1; s <= 1; s += 2) {
       _trailTip.set(s * span / 2, 0, -0.5);
       ent.mesh.localToWorld(_trailTip);
-      spawnSmokePuff(_trailTip.x, _trailTip.y, _trailTip.z, { color: 0xffffff, size: 1.6, grow: 2, life: 0.45, opacity: 0.36, vx: 0, vy: 0, vz: 0 }); // v35: slightly larger/brighter so the vapor reads at combat distance (hook itself is v8 — player + bots already share it)
+      spawnSmokePuff(_trailTip.x, _trailTip.y, _trailTip.z, { color: style ? style.color : 0xffffff, size: style ? style.size : 1.6, grow: 2, life: 0.45, opacity: style ? style.opacity : 0.36, hdr: style ? style.hdr : 0, vx: 0, vy: 0, vz: 0 }); // v35: slightly larger/brighter so the vapor reads at combat distance (hook itself is v8 — player + bots already share it) // v36 WS5c+WS9: the player's puffs carry the equipped trail style (trail item, else skin accent); bots pass nothing and stay white
     }
   }
 }
@@ -4073,8 +4423,7 @@ function animate(now) {
   if (activeGame.mode === 'gungame' && p.respawnT > 0) {
     p.respawnT -= dt;
     if (p.respawnT <= 0) {
-      const ra = Math.random() * Math.PI * 2;
-      p.mesh.position.set(Math.cos(ra) * 650, 200, Math.sin(ra) * 650);
+      p.mesh.position.copy(ggRespawnPoint()); // v36 WS8: obstacle-clear respawn (was a blind ring point — could materialize inside an asteroid)
       p.heading = Math.atan2(-p.mesh.position.x, -p.mesh.position.z); p.pitch = 0; p.roll = 0; p.yawIn = 0; p.pitchIn = 0;
       p.hp = p.maxHp; p.lastHitBy = null; p.lastHitAt = -99; p.mesh.visible = true; p.spawnProtT = 2.0;
       orientFlight(p);
@@ -4165,7 +4514,7 @@ function animate(now) {
     // arena center, and a hard radial cap at R + 60 so the jet can never
     // actually exit the cylinder. Royale's storm stays the lethal mechanic;
     // this only enforces the absolute map edge, in every mode.
-    const bR = activeGame.mapRadius || 1300;
+    const bR = activeGame.borderR || activeGame.mapRadius || 1300; // v36: per-theme fence radius (terrain themes sit outside the mountains)
     const bd = Math.hypot(p.mesh.position.x, p.mesh.position.z);
     if (bd > bR) {
       const over = bd - bR;
@@ -4195,14 +4544,15 @@ function animate(now) {
       shotDir.x += (Math.random() - 0.5) * 0.012; shotDir.y += (Math.random() - 0.5) * 0.012; shotDir.z += (Math.random() - 0.5) * 0.012;
       shotDir.normalize();
     } else {
-      // v31 soft aim assist (player only, non-locked shots), v35 widened:
+      // v31 soft aim assist (player only, non-locked shots), v35 widened,
+      // v36 trimmed ~15-20% at Jayce's word (v35 overshot slightly):
       // find the hostile whose PREDICTED intercept point lies closest to the
       // nose direction (smallest angle wins, so with two hostiles in the zone
-      // the one the crosshair is most centered on is chosen). v35 zones:
-      // within 14° of the nose the round bends exactly onto the intercept
-      // (full correction, half spread); between 14° and 22° it bends 45% of
+      // the one the crosshair is most centered on is chosen). v36 zones:
+      // within 11.5° of the nose the round bends exactly onto the intercept
+      // (full correction, half spread); between 11.5° and 18° it bends 40% of
       // the angular way toward the intercept (partial correction, full
-      // spread); beyond 22° or past 1200 units the shot flies the nose true.
+      // spread); beyond 18° or past 1100 units the shot flies the nose true.
       // The lead math uses the player bullet speed (450). Bots never come
       // through this path — their funnel, spread and lead are untouched.
       let spreadAmt = PLAYER_GUN_SPREAD;
@@ -4219,7 +4569,7 @@ function animate(now) {
         if (aAng < assistAng) { assistAng = aAng; assistDir = aDir; }
       }
       if (assistDir && assistAng <= AIM_ASSIST_CONE) { shotDir = assistDir; spreadAmt = PLAYER_GUN_SPREAD * 0.5; } // full bend + half spread
-      else if (assistDir) { shotDir = fwd.clone().lerp(assistDir, AIM_ASSIST_PARTIAL_BEND).normalize(); } // partial bend (45% of the way), full spread
+      else if (assistDir) { shotDir = fwd.clone().lerp(assistDir, AIM_ASSIST_PARTIAL_BEND).normalize(); } // partial bend (40% of the way), full spread
       else shotDir = fwd.clone();
       shotDir.x += (Math.random() - 0.5) * spreadAmt; shotDir.y += (Math.random() - 0.5) * spreadAmt; shotDir.z += (Math.random() - 0.5) * spreadAmt;
       shotDir.normalize();
@@ -4260,12 +4610,19 @@ function animate(now) {
     const bot = activeGame.entities[i]; bot.fireCd -= dt; bot.rocketCd -= dt;
     if (isRemoteId(bot.id)) continue; // online puppets are driven by the network, not the AI
     if (bot.lastHitAt === undefined) { bot.lastHitAt = -99; bot.lastAttacker = null; bot.aiState = 'engage'; bot.stateT = 0; bot.retargetT = Math.random() * 2; bot.weaveSeed = Math.random() * 100; bot.tgt = null; bot.closeT = 0; bot.engageT = 0; bot.lastDealtHitAt = -99; bot.waypoint = null; bot.evadeDur = 3; bot._seenHitAt = -99; bot.lastEvadeEnd = -99; }
+    if (bot.lockT === undefined) { bot.lockT = 0; bot.lockCdT = 0; } // v36 WS7: campaign lock-on dwell + lock-break cooldown (lazy-init covers every spawn path)
+    if (bot.lockCdT > 0) bot.lockCdT -= dt;
     bot.stateT += dt; bot.retargetT -= dt; bot.wanderAng += dt * 1.4;
     const bp = bot.mesh.position;
+    // v36 WS8: NaN guard FIRST — a non-finite position/heading/speed fails
+    // every comparison downstream (steering, collisions AND the v33
+    // watchdog's distanceTo test, since NaN < 1.5 is false), so a poisoned
+    // bot would be frozen forever and invisible to recovery. Reset it whole.
+    if (!isFinite(bp.x) || !isFinite(bp.y) || !isFinite(bp.z) || !isFinite(bot.heading) || !isFinite(bot.spd)) { resetBotToSpawn(bot); continue; }
     const hpFrac = bot.hp / bot.maxHp;
 
     // ---- Targeting: re-validate every frame, re-pick every 2-4s ----
-    if (bot.retargetT <= 0 || !botIsAliveTarget(bot.tgt) || (bot.tgt === 'player' && p.respawnT > 0)) { bot.tgt = pickBotTarget(bot); bot.retargetT = 2 + Math.random() * 2; }
+    if (bot.retargetT <= 0 || !botIsAliveTarget(bot.tgt) || (bot.tgt === 'player' && p.respawnT > 0)) { bot.tgt = pickBotTarget(bot); bot.retargetT = 2 + Math.random() * 2; const cruise = botCruiseSpd(bot); if (!(bot.spd >= cruise * 0.5)) bot.spd = cruise; } // v36 WS8: speed floor rides the retarget tick — a decayed or absorbed speed is restored HERE (the !(>=) form also catches NaN), not by the movement watchdog seconds later
     const ti = botTargetInfo(bot);
     const dist = ti ? bp.distanceTo(ti.pos) : 9999;
 
@@ -4275,6 +4632,18 @@ function animate(now) {
       if (bot.aiState !== 'evade' && Math.random() < 0.35) { bot.aiState = 'evade'; bot.stateT = 0; bot.evadeDur = 2.5 + Math.random() * 1.5; }
     }
     if (bot.aiState !== 'evade' && hpFrac < 0.35 && (gameTime - bot.lastEvadeEnd) > 5) { bot.aiState = 'evade'; bot.stateT = 0; bot.evadeDur = 2.5 + Math.random() * 1.5; }
+
+    // ---- v36 WS7: a locked campaign bot breaks ----
+    // Being painted by the player's auto-aim lock, or having a player
+    // rocket homing in, triggers the same evade state as a fresh hit —
+    // a ~1.2s hard-bank jink — with a 4s per-bot cooldown so it can't be
+    // farmed into permanent evasion. assignCampaignSlots frees the slot.
+    if (activeGame.mode === 'campaign' && bot.lockCdT <= 0 && bot.aiState !== 'evade') {
+      const painted = (p.autoAimLeft > 0 && p.lockTarget === bot);
+      let rocketInbound = false;
+      if (!painted) { for (let ri = 0; ri < activeGame.rockets.length; ri++) { const rk = activeGame.rockets[ri]; if (rk.ownerId === 'player' && rk.target === bot) { rocketInbound = true; break; } } }
+      if (painted || rocketInbound) { bot.aiState = 'evade'; bot.stateT = 0; bot.evadeDur = 1.2; bot.lockCdT = 4; bot.slot = false; }
+    }
 
     // ---- State transitions ----
     if (bot.aiState === 'evade' && bot.stateT >= bot.evadeDur) {
@@ -4289,7 +4658,7 @@ function animate(now) {
       // v21 campaign patrol: circuit waypoint to waypoint until assignCampaignSlots
       // hands this bot a freed engagement slot (it flips the state back to 'engage')
       const wp2 = bot.waypoint; const wpDist2 = wp2 ? Math.hypot(wp2.x - bp.x, wp2.z - bp.z) : 0;
-      if (!wp2 || wpDist2 < 70 || bot.stateT > 25) { bot.waypoint = pickPatrolWaypoint(); bot.stateT = 0; }
+      if (!wp2 || wpDist2 < 70 || bot.stateT > 25) { bot.waypoint = pickPatrolWaypoint(bot); bot.stateT = 0; }
     } else if (bot.aiState === 'engage') {
       bot.engageT += dt;
       if (dist < 70) bot.closeT += dt; else bot.closeT = Math.max(0, bot.closeT - dt * 2);
@@ -4389,7 +4758,7 @@ function animate(now) {
     // v35 WS5: border for bots — the same soft radial push, center bend and
     // R + 60 cap as the player, so a chase or an evade run can never leave
     // the arena; a waypoint that somehow sits outside is pulled back inside.
-    { const bR = activeGame.mapRadius || 1300; const bd = Math.hypot(bp.x, bp.z);
+    { const bR = activeGame.borderR || activeGame.mapRadius || 1300; const bd = Math.hypot(bp.x, bp.z);
       if (bd > bR) { const over = bd - bR; const push = (30 + over * 1.2) * dt; bp.x -= (bp.x / bd) * push; bp.z -= (bp.z / bd) * push;
         const hC = Math.atan2(-bp.x, -bp.z); bot.heading = angleWrap(bot.heading + clampNum(angleWrap(hC - bot.heading), -botYawRate * dt * 1.5, botYawRate * dt * 1.5));
         const nd = Math.hypot(bp.x, bp.z); if (nd > bR + 60) { const bs = (bR + 60) / nd; bp.x *= bs; bp.z *= bs; }
@@ -4418,12 +4787,12 @@ function animate(now) {
     if (!bot._wdPos) { bot._wdPos = bp.clone(); bot._wdT = 0; }
     bot._wdT += dt;
     if (bot._wdT >= 1.5) {
-      if (bp.distanceTo(bot._wdPos) < 1.5) {
+      const wdMoved = bp.distanceTo(bot._wdPos);
+      if (!(wdMoved >= 1.5)) { // v36 WS8: NaN-safe — a NaN position yields a NaN distance, which now FAILS the >= test and recovers, instead of reading as "moved" forever (the top-of-loop finite guard should catch it first; this is the second net)
         bot.tgt = pickBotTarget(bot); bot.retargetT = 2 + Math.random() * 2;
         bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0; bot.closeT = 0; bot.slot = false; // campaign: hand the engagement slot back — assignCampaignSlots re-grants or re-patrols next frame
         bot.waypoint = { x: bp.x + Math.sin(bot.heading) * 300, y: Math.max(60, Math.min(400, bp.y)), z: bp.z + Math.cos(bot.heading) * 300 };
-        const wdAnchor = anchoredBotSpd(bot.skill);
-        const wdCruise = wdAnchor !== null ? wdAnchor : 68 * bot.skill;
+        const wdCruise = botCruiseSpd(bot); // v36 WS8: derived cruise (anchor x tier ratio) — the old absolute anchor restore silently stripped Gun Game tier speed
         if (!(bot.spd > 1) || bot.spd < wdCruise * 0.5) bot.spd = wdCruise;
       }
       bot._wdPos.copy(bp); bot._wdT = 0;
@@ -4435,18 +4804,61 @@ function animate(now) {
     if (bot.aiState === 'engage' && ti) {
       const toT = ti.pos.clone().sub(bp).normalize();
       const aimAng = Math.acos(clampNum(bFwd.dot(toT), -1, 1));
-      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill * (bot.fireMul || 1) * (activeGame.mode === 'gungame' ? (GUN_GAME_TIERS[bot.ggTier].dmg / GUN_GAME_TIERS[0].dmg) : 1), 0xf87171); bot.fireCd = 0.45 / bot.skill; }
-      if (dist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35 * (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[bot.ggTier].rocketDmg : 1)); bot.rocketCd = 11 / bot.skill; }
+      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) {
+        let shotDir = bFwd;
+        if (activeGame.mode === 'campaign' && bot.tgt === 'player') {
+          // v36 WS7 gunnery (campaign only): bots finally shoot with REAL
+          // lead — the same intercept math as the player's assist, at bot
+          // bullet speed: aim point = player pos + player velocity x
+          // (dist / 360). Until now the round simply flew down the nose
+          // and only the steering weave led the target. Over the lead, a
+          // random per-axis error whose cap shrinks as skill rises:
+          // errMax = 0.16 x max(0.05, 1.25 - skillEff) rad per axis, with
+          // skillEff = min(1.2, skill + (chapter - 1) x 0.015). Numbers:
+          // rookie Ch.1 (0.55) ~6.4 deg, standard Ch.1 (0.85) ~3.7 deg,
+          // standard Ch.8 (0.955) ~2.7 deg, Ch.15 ACE (1.2) ~0.5 deg.
+          // The lead uses CURRENT velocity, so a hard player jink — a
+          // velocity change after the trigger pull — still spoils it.
+          const skillEff = Math.min(1.2, bot.skill + ((activeGame.chapter || 1) - 1) * 0.015);
+          const errMax = 0.16 * Math.max(0.05, 1.25 - skillEff);
+          const tVel = _botTmpVel.copy(p.fwdVec || bFwd).multiplyScalar(curSpd);
+          shotDir = ti.pos.clone().addScaledVector(tVel, dist / 360).sub(bp).normalize();
+          shotDir.x += (Math.random() - 0.5) * 2 * errMax; shotDir.y += (Math.random() - 0.5) * 2 * errMax; shotDir.z += (Math.random() - 0.5) * 2 * errMax;
+          shotDir.normalize();
+        }
+        spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), shotDir, bot.id, 7 * bot.skill * (bot.fireMul || 1) * (activeGame.mode === 'gungame' ? (GUN_GAME_TIERS[bot.ggTier].dmg / GUN_GAME_TIERS[0].dmg) : 1), 0xf87171); bot.fireCd = 0.45 / bot.skill;
+      }
+      if (activeGame.mode === 'campaign') {
+        // v36 WS7: campaign rockets — locked, dwelled, bounded. A bot with
+        // skill >= 0.85 (standard-difficulty opposition and up) must hold
+        // the player roughly in front (aimAng < 0.5) and within 800 for a
+        // 0.8s dwell before firing; then ONE rocket on the existing v34
+        // guided path (predicted intercept, proximity fuze — shoot-down-
+        // able per v29, out-flyable), max 1 live rocket per bot, and a
+        // 9-14s cooldown. Engage-state only, so the engagement-slot cap
+        // still bounds simultaneous rocket pressure. Warning: the rocket
+        // loop already flags any rocket with target 'player' in every
+        // mode, so the HUD MISSILE LOCK text + lock beep fire unchanged.
+        if (bot.skill >= 0.85 && bot.tgt === 'player' && p.respawnT <= 0 && dist < 800 && aimAng < 0.5) {
+          bot.lockT += dt;
+          if (bot.lockT >= 0.8 && bot.rocketCd <= 0) {
+            let liveMine = 0; for (let ri2 = 0; ri2 < activeGame.rockets.length; ri2++) if (activeGame.rockets[ri2].ownerId === bot.id) liveMine++;
+            if (liveMine === 0) { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, 'player', 35); bot.rocketCd = 9 + Math.random() * 5; bot.lockT = 0; }
+          }
+        } else bot.lockT = Math.max(0, bot.lockT - dt * 2); // the dwell decays fast once the lock breaks
+      }
+      else if (dist < 520 && bot.rocketCd <= 0) { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35 * (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[bot.ggTier].rocketDmg : 1)); bot.rocketCd = 11 / bot.skill; } // every non-campaign mode: the pre-v36 line, unchanged (Gun Game / Royale / Waves keep their exact old rocket path)
     }
   }
+  updateWingman(dt); // v36 WS5a: GHOST flies and fires before ordnance resolves
   for (let i = activeGame.bullets.length - 1; i >= 0; i--) {
     const b = activeGame.bullets[i]; b.life -= dt; b.mesh.position.addScaledVector(b.dir, b.spd * dt); // v35: per-bullet speed (player 450 / bots 360)
     if (b.life <= 0) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
-    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg * playerDamageMul(); p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < (b.ownerId === 'player' ? 10.5 : 6.5)) { /* v35: player rounds get +4 hit radius vs bot jets (10.5 vs 6.5) — near-misses that read as hits now connect; bot rounds unchanged */ if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    if (b.ownerId !== 'player' && b.ownerId !== 'wingman' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg * playerDamageMul(); p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < (b.ownerId === 'player' ? 9.5 : 6.5)) { /* v36: player rounds get +3 hit radius vs bot jets (9.5 vs 6.5) — v35's +4 trimmed with the rest of the aim pass; bot rounds unchanged */ if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player' && b.ownerId !== 'wingman') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly (v36: the wingman is exempt — his rounds are player-side and DO damage bots) — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -4473,6 +4885,7 @@ function animate(now) {
   for (let rd = activeGame.rockets.length - 1; rd >= 0; rd--) { const rkD = activeGame.rockets[rd]; if (rkD._dead) { scene.remove(rkD.mesh); activeGame.rockets.splice(rd, 1); } }
   for (let i = activeGame.rockets.length - 1; i >= 0; i--) {
     const rk = activeGame.rockets[i]; rk.life -= dt;
+    rk._age = (rk._age || 0) + dt; const gPhase = clampNum(rk._age / 0.3, 0, 1); const guideMul = gPhase * gPhase; // v36 WS10: ejection phase — the first ~0.3s the rocket flies the rail line while guidance authority fades in quadratically (no wild first-frame turns at the wing)
     // v34 homing — proportional guidance to the PREDICTED intercept point with a
     // turn-rate cap (rad/s) that stiffens as the rocket closes. This replaces the
     // v5 position-lerp (dir.lerp toward the target's CURRENT position): pure
@@ -4489,12 +4902,15 @@ function animate(now) {
       const dist = rp.distanceTo(rkTgtPos);
       _rkAim.copy(rkTgtPos).addScaledVector(rkTgtVel, dist / 205); // one-iteration intercept prediction (timeToGo = distance / rocket speed)
       _rkWant.copy(_rkAim).sub(rp).normalize();
+      if (!rk._wantS) rk._wantS = rk.dir.clone();
+      rk._wantS.lerp(_rkWant, 1 - Math.exp(-10 * dt)).normalize(); // v36 WS10: the steering target is DAMPED (exponential approach, ~10/s) — the raw intercept heading jumps as the target maneuvers, and chasing it raw made the path zigzag; steering chases this smoothed heading instead, so paths are curves
       let cap = (rk.ownerId === 'player' ? 4.2 : 3.4) * (1 + 0.6 * (1 - clampNum(dist / 600, 0, 1))); // closing factor: full base rate far away, up to x1.6 in the terminal phase
       if (rk._reattackT > 0) { cap *= 1.6; rk._reattackT -= dt; } // v34: overshoot re-attack window (below) stacks on top
-      const ang = rk.dir.angleTo(_rkWant);
+      cap *= guideMul; // v36 WS10: ejection fade-in scales the v34 caps — the numbers themselves are unchanged
+      const ang = rk.dir.angleTo(rk._wantS);
       if (ang > 0.0001) {
         const turn = Math.min(ang, cap * dt);
-        _rkAxis.copy(rk.dir).cross(_rkWant);
+        _rkAxis.copy(rk.dir).cross(rk._wantS);
         if (_rkAxis.lengthSq() < 1e-8) _rkAxis.set(0, 1, 0).cross(rk.dir); // near-opposite vectors: any perpendicular axis will do
         if (_rkAxis.lengthSq() < 1e-8) _rkAxis.set(1, 0, 0);
         _rkAxis.normalize();
@@ -4515,15 +4931,31 @@ function animate(now) {
       // means this missile is boring circles — it burns out and pops harmlessly.
       if ((rk._turnAcc || 0) > 11.0) { spawnImpactFx(rp); for (let sp3 = 0; sp3 < 3; sp3++) spawnSmokePuff(rp.x, rp.y, rp.z, { color: 0xcfd6de, size: 2.0, grow: 5, life: 0.6, opacity: 0.5, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, vz: (Math.random() - 0.5) * 6 }); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     } else { rk._lastDist = Infinity; rk._wasClose = false; rk._riseT = 0; }
-    rk.mesh.position.addScaledVector(rk.dir, 205 * dt); rk.mesh.lookAt(rk.mesh.position.clone().add(rk.dir));
+    const rkSpd = 205 * (0.45 + 0.55 * gPhase); // v36 WS10: ejection push — off the rail at ~92, ramping to the full v34 205 as guidance fades in
+    rk.mesh.position.addScaledVector(rk.dir, rkSpd * dt);
+    // v36 WS10: orientation is SLERPED toward the velocity heading (~14/s),
+    // never snapped — the old per-frame lookAt teleport-rotated the airframe
+    // whenever the steering direction swung (at spawn, at the re-attack
+    // trigger, in terminal corrections). Now the body visibly banks into
+    // the turn. The v34 corkscrew roll rides on top exactly as before.
+    _rkDummy.position.copy(rk.mesh.position); _rkDummy.lookAt(_rkLook.copy(rk.mesh.position).add(rk.dir)); rk.mesh.quaternion.slerp(_rkDummy.quaternion, Math.min(1, 1 - Math.exp(-14 * dt)));
     rk._roll = (rk._roll || 0) + 3 * dt; rk.mesh.rotateZ(rk._roll); // v34: slow corkscrew roll around the flight axis (visual only — real AAMs roll in flight)
+    // v36 WS10: terrain detonation — rockets used to clip through
+    // mountainsides (no surface test existed anywhere in this loop). The
+    // v35 surface function decides; space themes return null and skip it.
+    { const rkSurf = surfaceHeightAt(rk.mesh.position.x, rk.mesh.position.z); if (rkSurf !== null && rk.mesh.position.y <= rkSurf + 1.5) { spawnJetExplosion(rk.mesh.position); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; } }
+    // v36 WS10: smoke by DISTANCE — one puff every ~3 units travelled,
+    // walked back along the flight direction. The old per-second
+    // accumulator clumped several puffs onto a single spot at low fps and
+    // changed density whenever speed changed; spacing is now identical at
+    // 30fps and 120fps (~33 puffs per 100 units at full speed).
+    rk._smokeDist = (rk._smokeDist || 0) + rkSpd * dt;
+    while (rk._smokeDist >= 3) { rk._smokeDist -= 3; spawnSmokePuff(rk.mesh.position.x - rk.dir.x * rk._smokeDist, rk.mesh.position.y - rk.dir.y * rk._smokeDist, rk.mesh.position.z - rk.dir.z * rk._smokeDist, { color: 0xf1f5f9, size: 1.5, grow: 2.4, life: 0.75, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
     if (rk.mesh.userData.flame) { const fs = 0.8 + Math.random() * 0.5; rk.mesh.userData.flame.scale.set(fs, 0.9 + Math.random() * 0.5, fs); }
     if (rk.mesh.userData.glow) { const gs = 2.3 + Math.random() * 1.0; rk.mesh.userData.glow.scale.set(gs, gs, 1); } // v34: exhaust glow breathes with the flame
     if (rk.mesh.userData.discs) rk.mesh.userData.discs.forEach(function(d) { d.scale.setScalar(d.userData.baseS * (0.8 + Math.random() * 0.45)); });
     if (rk.mesh.userData.blink) rk.mesh.userData.blink.material.opacity = Math.sin(gameTime * 18 + i * 1.7) > 0 ? 0.9 : 0.12;
-    // Visible white smoke trail so pilots can see missiles coming
-    rk._smokeAcc = (rk._smokeAcc || 0) + 30 * dt; // v34: denser trail (20 -> 30 puffs/s), slightly larger puffs, longer fade — a real missile smoke column
-    while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.5, grow: 2.4, life: 0.75, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
+    // (v36 WS10: the visible smoke trail is emitted by distance above, next to the movement code — the per-second accumulator that used to live here is gone)
     if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < (rk.target === 'player' ? 13 : 8)) { p.hp -= rk.dmg * playerDamageMul(); p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; } // v34 proximity fuze: a rocket locked on the player detonates within 13 units (a near-pass is lethal, like a real missile's fuze) — dumbfire rockets keep the 8-unit direct-hit radius
     let rHit = false;
     for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < (rk.target === ent ? 13 : 8.5)) { if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && rk.ownerId !== 'player') { rHit = true; spawnImpactFx(rk.mesh.position); break; } /* v34: campaign/waves bot-on-bot ROCKET skip — mirrors the v21 bullet rule above. This path previously had NO skip: a bot rocket in Wave Defense homing on the player would damage (and could kill, with kill credit) any bot within 8.5 units of its flight path, and noteBotHit would record that bot as the victim's attacker. Now the rocket detonates harmlessly on the bot — no damage, no noteBotHit, no kill credit — so in campaign/waves a bot's health can only ever be moved by the player. (Campaign bots never fire rockets at all — the mode gate in the weapons block — so in practice this hole was waves-only; the skip covers both modes symmetrically.) */ ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); if (rk.ownerId === 'player') showHitmarker(ent.hp <= 0); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } } // v34 proximity fuze: 13 units vs the rocket's locked target, 8.5 direct-hit radius vs everything else
@@ -4554,6 +4986,7 @@ function animate(now) {
   // Afterburner flicker + cloud drift (visual life, no allocations)
   updateSmoke(dt);
   updateFxRings(dt); // v35: shockwave rings from jet-kill explosions
+  updateAmbientLife(dt); // v36: living world — traffic/people/boats/train/drones/haulers tick with the mission
   // Muzzle flash decay (v6): fast exponential falloff of the shared light + flash sprites
   if (_muzzleLight) {
     if (_muzzleLight.intensity > 0.05) { _muzzleLight.intensity *= Math.pow(0.0001, dt); if (_muzzleFlash) { _muzzleFlash.material.opacity = Math.min(0.95, _muzzleLight.intensity / 26); _muzzleFlash.visible = _muzzleLight.intensity > 0.4; } }
@@ -4565,7 +4998,7 @@ function animate(now) {
   flickerFlames(p.mesh, boosting, dt);
   SFX.engineUpdate(clampNum(curSpd / Math.max(1, p.spd * 1.45), 0, 1), boosting); // v20: engine hum tracks speed/boost
   if (p.mesh.userData.burnerLight) p.mesh.userData.burnerLight.intensity = (boosting ? 30 : 8) * (0.85 + Math.random() * 0.3);
-  if (p.respawnT <= 0) emitContrails(p, curSpd, Math.abs(p.yawIn || 0), dt);
+  if (p.respawnT <= 0) emitContrails(p, curSpd, Math.abs(p.yawIn || 0), dt, playerTrailStyle()); // v36 WS5c+WS9: vapor style = the equipped TRAIL item; on 'standard' it resolves to the equipped skin's accent (stock = cyan 0x38bdf8). Bots keep white
   for (let fi = 0; fi < activeGame.entities.length; fi++) flickerFlames(activeGame.entities[fi].mesh, false, dt);
   if (worldGroup && worldGroup.userData.clouds) {
     const cb = worldGroup.userData.cloudBound || 2600;
@@ -4614,7 +5047,8 @@ function applyBotTier(bot) {
   if (newTier === oldTier) return;
   const nt = GUN_GAME_TIERS[newTier], ot = GUN_GAME_TIERS[oldTier];
   const hpGain = nt.hpBonus - ot.hpBonus; bot.maxHp += hpGain; bot.hp += hpGain;
-  bot.spd *= (nt.spd / ot.spd); // ratios telescope: base spd x (tier spd / tier-1 spd)
+  if (!bot.spdBase) bot.spdBase = bot.spd / (ot.spd / GUN_GAME_TIERS[0].spd); // one-time recovery of the base from the live value (spawn paths set spdBase directly)
+  bot.spd = bot.spdBase * (nt.spd / GUN_GAME_TIERS[0].spd); // v36 WS8: SET from the spawn anchor x tier ratio — never multiplied into the live value again (see botCruiseSpd for why the old *= decayed)
   const tierJetCfg = JETS.find(function(j) { return j.id === tierJetId(newTier); });
   const swapMesh = buildJetMesh(nt.color, tierJetCfg ? tierJetCfg.accent : 0xf87171, { hull: 1, damage: 1, agility: 1, speed: 1 }, tierJetId(newTier));
   swapMesh.position.copy(bot.mesh.position); swapMesh.quaternion.copy(bot.mesh.quaternion);
@@ -4628,7 +5062,7 @@ function gungamePlayerDown(cause) {
   if (!activeGame || activeGame.mode !== 'gungame') return;
   const p = activeGame.player;
   if (p.respawnT > 0) return;
-  p.deaths++; // v22: counted up-front — the killer-credit path below can end the match (15th kill) before the old late increment ran
+  p.deaths++; activeGame.streak = 0; // v36 WS5b: death ends the kill streak // v22: counted up-front — the killer-credit path below can end the match (15th kill) before the old late increment ran
   // Killer credit: a 'shot' death credits the last bot that hit the player (the only way hp
   // reaches 0 in Gun Game); a 'crash' credits that bot ONLY if it hit the player within the
   // last 5 seconds — flying into a rock on your own credits nobody.
@@ -4680,7 +5114,7 @@ function spawnWaveBot() {
   let botHp = Math.round(200 * Math.pow(1.11, wave - 1) * (0.9 + 0.2 * baseSkill));
   if (isElite) botHp = Math.round(botHp * 2.2);
   const spdAnchor = anchoredBotSpd(skill, isElite ? 1.02 : undefined);
-  g.entities.push({ id: g.nextBotId++, name: isElite ? '★ ELITE' : 'Hostile-' + (100 + g.waveSpawned), elite: isElite, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: 1, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+  g.entities.push({ id: g.nextBotId++, name: isElite ? '★ ELITE' : 'Hostile-' + (100 + g.waveSpawned), elite: isElite, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, spdBase: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: 1, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   g.waveSpawned++;
 }
 function spawnWaveBatch() { const g = activeGame; if (!g || g.mode !== 'waves') return; while (g.entities.length < 8 && g.waveSpawned < g.waveQuota) spawnWaveBot(); }
@@ -4690,7 +5124,7 @@ function updateWaves(dt) {
   const p = g.player;
   if (g.waveState === 'breather') {
     g.waveTimer -= dt;
-    if (g.waveTimer <= 0) { g.wave++; g.waveQuota = waveQuotaFor(g.wave); g.waveSpawned = 0; g.waveState = 'combat'; spawnWaveBatch(); showBanner(`WAVE ${g.wave} INBOUND!`, 2600); }
+    if (g.waveTimer <= 0) { g.wave++; g.waveQuota = waveQuotaFor(g.wave); g.waveSpawned = 0; g.waveState = 'combat'; spawnWaveBatch(); if (g.wingman && !g.wingman.alive) respawnWingman(); showBanner(`WAVE ${g.wave} INBOUND!`, 2600); } // v36 WS5a: GHOST returns at the next wave start if he ejected
     return;
   }
   spawnWaveBatch(); // reinforcements: refill freed slots until the wave quota is out
@@ -4840,14 +5274,146 @@ function pickWavePerk(idx) {
   paused = false;
   showBanner(`${perk.name.toUpperCase()} ACQUIRED`, 2000);
 }
+// ---- v36 WS5a: WINGMAN "GHOST" (Campaign + Wave Defense only) ----
+// A friendly F-16 that flies your wing. Design invariant: GHOST is NOT in
+// activeGame.entities — he lives on activeGame.wingman — so no bot
+// targeting (pickBotTarget iterates entities), no bot bullet or rocket
+// hit test (both loop entities / the player only), no aim-assist or
+// auto-aim lock (entities only) and no mission kill counting can ever
+// touch him, and campaign bots keep their player-only rule untouched.
+// His own bullets fly with ownerId 'wingman': the bullet loop treats
+// that as a player-side owner (never hits the player — see the intake
+// guards), damages bots normally, and handleEntityEliminated translates
+// his kills to 'player' so quota, coins, XP and streaks credit the pilot.
+const _wmTmp = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+function ghostSay(line, force) {
+  const g = activeGame; if (!g || !g.wingman) return;
+  if (!force && gameTime - (g.wingman.radioT || -99) < 8) return; // radio discipline: key lines only, >= 8s apart unless forced
+  g.wingman.radioT = gameTime;
+  showBanner(line, 2400);
+}
+function spawnWingman() {
+  const g = activeGame; if (!g) return;
+  const p = g.player;
+  const mesh = buildJetMesh(0xe8f1f8, 0x22d3ee, { hull: 1, damage: 1, agility: 1, speed: 1 }, 'f16', false); // white + cyan — reads friendly at a glance
+  const rx = Math.cos(p.heading), rz = -Math.sin(p.heading), fx = Math.sin(p.heading), fz = Math.cos(p.heading);
+  mesh.position.set(p.mesh.position.x - rx * 20 - fx * 26, p.mesh.position.y + 4, p.mesh.position.z - rz * 20 - fz * 26); // behind-left of the player
+  scene.add(mesh);
+  g.wingman = { name: 'GHOST', mesh: mesh, hp: p.maxHp, maxHp: p.maxHp, spd: 70, heading: p.heading, pitch: 0, roll: 0, fireCd: 1, alive: true, radioT: -99, helloT: gameTime + 2.5, _hello: false, _tally: false, _lowHp: false, engaging: null, turning: 0, fwdVec: null };
+  orientFlight(g.wingman);
+}
+function respawnWingman() { // Waves: GHOST returns at the next wave start if he was lost
+  const g = activeGame; if (!g || !g.wingman) return;
+  if (g.wingman.mesh) scene.remove(g.wingman.mesh);
+  spawnWingman();
+  g.wingman._hello = true; // the respawn line replaces the hello
+  ghostSay('GHOST: Back on your wing.', true);
+}
+function ejectWingman() {
+  const g = activeGame; if (!g || !g.wingman || !g.wingman.alive) return;
+  const w = g.wingman; w.alive = false;
+  spawnJetExplosion(w.mesh.position); SFX.explosion();
+  scene.remove(w.mesh);
+  ghostSay("GHOST: I'm hit — ejecting!", true);
+}
+function updateWingman(dt) {
+  const g = activeGame; if (!g) return;
+  const w = g.wingman; if (!w || !w.alive) return;
+  const p = g.player, wp = w.mesh.position;
+  if (!w._hello && gameTime >= (w.helloT || 0)) { w._hello = true; ghostSay("GHOST: On your wing. Let's get to work.", true); }
+  if (!w._lowHp && p.hp > 0 && p.hp < p.maxHp * 0.3) { w._lowHp = true; ghostSay("GHOST: You're smoking — watch your six."); }
+  // Target: the player's lockTarget first, else the hostile nearest the PLAYER (within 700)
+  let tgt = null;
+  if (p.lockTarget && g.entities.indexOf(p.lockTarget) !== -1 && p.lockTarget.mesh.position.distanceTo(p.mesh.position) < 900) tgt = p.lockTarget;
+  else { let bd = 700; for (let i = 0; i < g.entities.length; i++) { const e = g.entities[i]; const d = e.mesh.position.distanceTo(p.mesh.position); if (d < bd) { bd = d; tgt = e; } } }
+  if (tgt && !w._tally) { w._tally = true; ghostSay('GHOST: Tally — engaging your target.'); }
+  let desH = w.heading, desP = 0;
+  const anchor = anchoredBotSpd(0.95), cruise = anchor !== null ? anchor : 68 * 0.95;
+  if (tgt) {
+    const tp = tgt.mesh.position, dist = wp.distanceTo(tp), lead = dist * 0.02;
+    const ix = tp.x + (tgt.fwdVec ? tgt.fwdVec.x : 0) * lead, iy = tp.y, iz = tp.z + (tgt.fwdVec ? tgt.fwdVec.z : 0) * lead; // same intercept steering the bots fly
+    desH = Math.atan2(ix - wp.x, iz - wp.z);
+    desP = clampNum(Math.atan2(iy - wp.y, Math.max(1, Math.hypot(ix - wp.x, iz - wp.z))), -0.92, 0.92);
+    w.spd = cruise * (dist > 450 ? 1.2 : 1.0);
+    w.engaging = tgt;
+  } else {
+    const rx = Math.cos(p.heading), rz = -Math.sin(p.heading), fx = Math.sin(p.heading), fz = Math.cos(p.heading);
+    const gx = p.mesh.position.x - rx * 20 - fx * 26, gy = p.mesh.position.y + 4, gz = p.mesh.position.z - rz * 20 - fz * 26;
+    const dx = gx - wp.x, dy = gy - wp.y, dz = gz - wp.z, dh = Math.hypot(dx, dz), distP = Math.hypot(dh, dy);
+    if (distP < 25) { desH = p.heading; desP = p.pitch; }
+    else { desH = Math.atan2(dx, dz); desP = clampNum(Math.atan2(dy, Math.max(1, dh)), -0.92, 0.92); }
+    w.spd = (g.playerTopSpeed || 75) * (distP > 120 ? 1.28 : 0.97);
+    w.engaging = null;
+  }
+  // Building avoidance — the bots' threat model, verbatim logic
+  let threat = null, threatScore = Infinity;
+  for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const od = Math.hypot(wp.x - o.x, wp.z - o.z) - o.r; if (od < 130 && wp.y < o.h + 25 && od < threatScore) { threatScore = od; threat = o; } }
+  if (threat) {
+    const rightX = Math.cos(w.heading), rightZ = -Math.sin(w.heading);
+    let bestSide = 1, bestClear = -Infinity;
+    for (let s = -1; s <= 1; s += 2) { const cx = threat.x + rightX * s * (threat.r + 55), cz = threat.z + rightZ * s * (threat.r + 55); let clear = Infinity; for (let oj = 0; oj < obstacles.length; oj++) { const o2 = obstacles[oj]; const cd = Math.hypot(cx - o2.x, cz - o2.z) - o2.r; if (cd < clear) clear = cd; } if (clear > bestClear) { bestClear = clear; bestSide = s; } }
+    const avoidH = Math.atan2((threat.x + rightX * bestSide * (threat.r + 55)) - wp.x, (threat.z + rightZ * bestSide * (threat.r + 55)) - wp.z);
+    desH = desH + angleWrap(avoidH - desH) * 0.55;
+    const toThreatH = Math.atan2(threat.x - wp.x, threat.z - wp.z);
+    if (Math.abs(angleWrap(toThreatH - w.heading)) < 0.5 && threatScore < 120) desP = Math.max(desP, clampNum((threat.h + 30 - wp.y) * 0.01, 0, 0.6));
+  }
+  const tSurfHere = surfaceHeightAt(wp.x, wp.z); // terrain climb-out, same as the bots
+  if (tSurfHere !== null && tSurfHere > 0 && wp.y < tSurfHere + 45) desP = Math.max(desP, clampNum((tSurfHere + 45 - wp.y) * 0.02, 0, 0.65));
+  const yawDiff = angleWrap(desH - w.heading);
+  const yawRate = 1.15 * 0.95 * 0.8, pitchRate = 0.9 * 0.95;
+  w.heading = angleWrap(w.heading + clampNum(yawDiff, -yawRate * dt, yawRate * dt));
+  w.pitch = clampNum(w.pitch + clampNum(desP - w.pitch, -pitchRate * dt, pitchRate * dt), -1.0, 1.0);
+  w.roll = THREE.MathUtils.lerp(w.roll || 0, -clampNum(yawDiff, -1, 1) * 0.55, Math.min(1, 5 * dt));
+  w.turning = clampNum(Math.abs(yawDiff), 0, 1);
+  orientFlight(w);
+  const wFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(w.mesh.quaternion);
+  w.fwdVec = wFwd;
+  wp.addScaledVector(wFwd, w.spd * dt);
+  // Terrain impact is the only way GHOST goes down (nothing shoots at him): he ejects
+  const wSurf = surfaceHeightAt(wp.x, wp.z);
+  if (wSurf !== null && wp.y <= wSurf + 2) { ejectWingman(); return; }
+  wp.y = Math.max(12, Math.min(950, wp.y));
+  { const bR = g.borderR || g.mapRadius || 1300; const bd = Math.hypot(wp.x, wp.z); // border: same soft push as the bots
+    if (bd > bR) { const over = bd - bR; const push = (30 + over * 1.2) * dt; wp.x -= (wp.x / bd) * push; wp.z -= (wp.z / bd) * push; const hC = Math.atan2(-wp.x, -wp.z); w.heading = angleWrap(w.heading + clampNum(angleWrap(hC - w.heading), -yawRate * dt * 1.5, yawRate * dt * 1.5)); const nd = Math.hypot(wp.x, wp.z); if (nd > bR + 60) { const bs = (bR + 60) / nd; wp.x *= bs; wp.z *= bs; } } }
+  for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = wp.x - o.x, dz = wp.z - o.z; const d2 = dx * dx + dz * dz; if (wp.y < o.h && d2 < o.r * o.r && d2 > 0.01) { const d = Math.sqrt(d2); wp.x = o.x + (dx / d) * o.r; wp.z = o.z + (dz / d) * o.r; } } // building scrape: push out, no damage (the bot rule)
+  w.fireCd -= dt;
+  if (w.engaging) {
+    const tp = w.engaging.mesh.position, dist = wp.distanceTo(tp);
+    const toT = _wmTmp.copy(tp).sub(wp).normalize();
+    const aimAng = Math.acos(clampNum(wFwd.dot(toT), -1, 1));
+    if (dist < 420 && aimAng < 0.35 && w.fireCd <= 0) { spawnBullet(wp.clone().add(wFwd.clone().multiplyScalar(5)), wFwd, 'wingman', 7 * 0.95 * 0.5, 0x67e8f9); w.fireCd = 0.45 / 0.95; } // bot cadence, half a comparable bot's damage (7 x 0.95 x 0.5)
+  }
+  if (wp.distanceTo(p.mesh.position) < 500) emitContrails(w, w.spd, w.turning || 0, dt);
+  updateStrobe(w.mesh); flickerFlames(w.mesh, false, dt);
+}
+// ---- v36 WS5b: KILL-STREAK CALLOUTS (player-credited kills, any mode) ----
+// 6-second decay window refreshed by every kill; death (endMatch /
+// gungamePlayerDown) and window expiry reset the count. The banner rides
+// the one kill funnel — handleEntityEliminated's player branch — so Gun
+// Game, Royale, Waves and GHOST's translated kills all count the same way.
+function registerKillStreak() {
+  const g = activeGame; if (!g) return;
+  if (gameTime - (g.streakT === undefined ? -99 : g.streakT) > 6) g.streak = 0; // (explicit undefined check — a streakT of exactly 0 must not read as "unset")
+  g.streak = (g.streak || 0) + 1; g.streakT = gameTime;
+  if (g.streak >= 2) {
+    const label = g.streak === 2 ? 'DOUBLE KILL' : g.streak === 3 ? 'TRIPLE KILL' : g.streak === 4 ? 'RAMPAGE' : 'UNSTOPPABLE';
+    showBanner('🔥 ' + label + (g.streak > 5 ? ' x' + g.streak : ''), 1600);
+    const base = 520 + Math.min(5, g.streak) * 90; // the confirm tone climbs with the streak
+    SFX._tone(base, 0.09, 0.13, 'triangle'); SFX._tone(base * 1.5, 0.11, 0.13, 'triangle', null, 0.07);
+  }
+}
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
+  let _wmKill = false;
+  if (killerId === 'wingman') { _wmKill = true; killerId = 'player'; } // v36 WS5a: GHOST's kills ARE player kills — one translation at the funnel covers quota, coins, XP, streaks and the Gun Game crash-credit path (bots killed by his fire or by terrain he herded them into)
+  for (let bi = 0; bi < activeGame.entities.length; bi++) { const bb = activeGame.entities[bi]; if (bb !== victim && bb.tgt === victim) { bb.tgt = null; bb.retargetT = 0; } } // v36 WS8: a victim's hunters re-pick NEXT FRAME — nobody keeps steering to a corpse or a just-teleported respawn
   if (victim.mesh && p && p.mesh && victim.mesh.position.distanceTo(p.mesh.position) < 900) SFX.explosion(); // v20: deaths are audible when they happen near you
   if (victim.mesh) spawnJetExplosion(victim.mesh.position); // v35: every jet kill gets the full explosion (fireball + shockwave ring + debris + smoke column) — captured before the gungame respawn teleport / mesh removal below
   if (killerId === 'player') {
     SFX.kill(); // v20: kill-confirm blip
     if (activeGame.waveMods && activeGame.waveMods.lifesteal > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + activeGame.waveMods.lifesteal); // v31: Vampire Plating (waves draft) — kills feed the hull, hooked at the one kill funnel
-    p.kills++; const coinGain = Math.round((activeGame.mode === 'campaign' ? 20 : 6) * 0.6); const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain); // v15: kill coins x0.6 (12 campaign / 4 other)
+    p.kills++; registerKillStreak(); if (_wmKill) ghostSay('GHOST: Splash one. You\'re welcome.'); // v36 WS5b streak + WS5a wingman kill line (radio-throttled)
+    const coinGain = Math.round((activeGame.mode === 'campaign' ? 20 : 6) * 0.6); const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain); // v15: kill coins x0.6 (12 campaign / 4 other)
     if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); SFX.promotion(); }
   } else {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
@@ -4855,7 +5421,7 @@ function handleEntityEliminated(eIdx, killerId) {
   }
   if (victim.mmPeerId && activeGame.mmMatch) { activeGame.puppets.delete(victim.mmPeerId); if (!victim._silentElim) showBanner(`${victim.name} ELIMINATED!`, 3000); mmNotifyPuppetDead(victim.mmPeerId); } // v25: a matchmade human's puppet died on this client — report it to the match (first reporter wins via the dead set)
   if (victim.id === 'remote' && activeGame.mode === 'royale') { royaleRemoteRef = null; showBanner('RIVAL ELIMINATED!', 3000); } // v18: the Online Royale puppet died (any killer) — out of this client's storm; the rival's own client stays authoritative for their real death ('rdead')
-  if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); victim.heading = Math.atan2(-victim.mesh.position.x, -victim.mesh.position.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
+  if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const rp = ggRespawnPoint(); victim.mesh.position.copy(rp); victim.heading = Math.atan2(-rp.x, -rp.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
   else {
     scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
     if (activeGame.entities.length === 0) {
@@ -4878,6 +5444,8 @@ function updateHUD(curSpd) {
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
   activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign' || activeGame.mode === 'waves') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = (e.ace || e.elite) ? '#ef4444' : (pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444')); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
+  const wm = activeGame.wingman; // v36 WS5a: GHOST's friendly nameplate — cyan name + bar, drawn like the hostile plates but unmistakably friendly
+  if (wm && wm.alive && wm.mesh) { const v = wm.mesh.position.clone().project(camera); if (v.z <= 1) { const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) { const div = document.createElement('div'); div.className = 't-box'; div.style.left = x + 'px'; div.style.top = y + 'px'; const pct = Math.max(0, Math.min(100, Math.round((wm.hp / wm.maxHp) * 100))); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#a5f3fc;text-shadow:0 1px 3px #000;white-space:nowrap;">GHOST</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:#22d3ee;"></div></div>'; boxWrap.appendChild(div); } } }
 }
 function drawMinimap() {
   const c = document.getElementById('minimap'); if (!c || !activeGame) return; const ctx = c.getContext('2d'); ctx.clearRect(0, 0, 110, 110); const scale = 50 / 2400;
@@ -4966,10 +5534,10 @@ let lastCrateResult = '';
 function skinSwatches(s) { const c1 = '#' + s.c1.toString(16).padStart(6, '0'); const c2 = '#' + s.c2.toString(16).padStart(6, '0'); return `<span class="swatch" style="background:${c1}"></span> <span class="swatch" style="background:${c2}"></span>`; }
 function renderCustomization() {
   const body = document.getElementById('customBody'); if (!body) return;
-  let html = '<div class="section-label">Supply Crates — Win a Random Jet Skin</div><div class="card-grid">';
+  let html = '<div class="section-label">Supply Crates — Win a Random Skin or Trail</div><div class="card-grid">';
   html += CRATES.map(function(cr) {
     const oddsTxt = Object.keys(cr.odds).map(function(r) { return `${r} ${cr.odds[r]}%`; }).join(' • ');
-    return `<div class="item-card"><h3>📦 ${cr.name}</h3><p>${oddsTxt}</p><p>Duplicates refund ${cr.refund} Coins.</p><button class="btn btn-gold btn-sm" onclick="openCrate('${cr.id}')">Open (${cr.cost} Coins)</button></div>`;
+    return `<div class="item-card"><h3>📦 ${cr.name}</h3><p>${oddsTxt}</p><p>No duplicates — stuff you own leaves the drop pool.</p><button class="btn btn-gold btn-sm" onclick="openCrate('${cr.id}')">Open (${cr.cost} Coins)</button></div>`;
   }).join('') + '</div>';
   if (lastCrateResult) html += `<div style="margin:12px 0;padding:14px;border:1px solid rgba(245,158,11,0.55);border-radius:12px;background:rgba(245,158,11,0.08);text-align:center;">${lastCrateResult}</div>`;
   html += '<div class="section-label" style="margin-top:10px;">My Skins</div><div class="card-grid">';
@@ -4978,37 +5546,67 @@ function renderCustomization() {
     const btn = eq ? '<button class="btn btn-sec btn-sm" disabled>Equipped</button>' : `<button class="btn btn-play btn-sm" onclick="equipSkin('${s.id}')">Equip</button>`;
     return `<div class="item-card"><h3>${skinSwatches(s)} ${s.name}</h3><p>${rarityBadge(s.rarity)} <span style="color:#94a3b8;">Pattern: ${s.pattern}</span></p>${btn}</div>`;
   }).join('') + '</div>';
-  html += '<p style="color:#94a3b8;font-size:0.8rem;">Skins re-paint your equipped jet everywhere — including the home-screen showcase. Win more from crates!</p>';
+  html += '<div class="section-label" style="margin-top:10px;">My Trails</div><div class="card-grid">';
+  html += TRAILS.filter(function(t) { return state.ownedTrails.includes(t.id); }).map(function(t) {
+    const eq = state.equippedTrail === t.id;
+    const btn = eq ? '<button class="btn btn-sec btn-sm" disabled>Equipped</button>' : `<button class="btn btn-play btn-sm" onclick="equipTrail('${t.id}')">Equip</button>`;
+    return `<div class="item-card"><h3>${trailSwatch(t)} ${t.name}</h3><p>${rarityBadge(t.rarity)} <span style="color:#94a3b8;">Wingtip vapor trail</span></p>${btn}</div>`;
+  }).join('') + '</div>';
+  html += '<p style="color:#94a3b8;font-size:0.8rem;">Skins re-paint your equipped jet everywhere — including the home-screen showcase. Trails color your wingtip vapor in flight (Standard = your skin\'s accent color). Win more of both from crates!</p>';
   body.innerHTML = html;
 }
+function trailSwatch(t) { const bg = t.rainbow ? 'linear-gradient(90deg,#ef4444,#f59e0b,#22c55e,#38bdf8,#a855f7)' : ('#' + (t.color === null || t.color === undefined ? 0x38bdf8 : t.color).toString(16).padStart(6, '0')); return `<span class="swatch" style="background:${bg}"></span>`; }
 function openCrate(crateId) {
   const cr = CRATES.find(function(c) { return c.id === crateId; }); if (!cr) return;
   if (state.coins < cr.cost) { alert('Not enough coins!'); return; }
   state.coins -= cr.cost; SFX.crate();
-  // Roll a rarity by the crate odds, then a random skin of that rarity
-  let roll = Math.random() * 100, rarity = 'Common', acc = 0;
+  // v36 WS9: crates roll across BOTH cosmetic pools (skins + trails), and
+  // OWNED ITEMS LEAVE THE POOL — no duplicates, ever (the old duplicate-
+  // refund path is gone). Roll a rarity by the crate odds; within it, the
+  // unowned skins and unowned trails of that rarity form ONE pool, so the
+  // drop is a skin or a trail at roughly 50/50 whenever both sides still
+  // have unowned items. Rolled rarity exhausted -> re-roll once across
+  // every rarity that still has unowned items. Own literally everything
+  // -> the crate pays coins instead (300 standard / 900 elite).
   const order = ['Common', 'Rare', 'Epic', 'Legendary', 'Mythic'];
+  function unownedAt(rarity) {
+    const sk = SKINS.filter(function(s) { return s.rarity === rarity && s.id !== 'stock' && !state.ownedSkins.includes(s.id); }).map(function(s) { return { kind: 'skin', item: s }; });
+    const tr = TRAILS.filter(function(t) { return t.rarity === rarity && t.id !== 'standard' && !state.ownedTrails.includes(t.id); }).map(function(t) { return { kind: 'trail', item: t }; });
+    return sk.concat(tr);
+  }
+  let roll = Math.random() * 100, rarity = 'Common', acc = 0;
   for (let oi = 0; oi < order.length; oi++) { acc += (cr.odds[order[oi]] || 0); if (roll < acc) { rarity = order[oi]; break; } }
-  let pool = SKINS.filter(function(s) { return s.rarity === rarity && s.id !== 'stock'; });
-  if (!pool.length) pool = SKINS.filter(function(s) { return s.id !== 'stock'; });
-  const won = pool[Math.floor(Math.random() * pool.length)];
-  if (state.ownedSkins.includes(won.id)) {
-    state.coins += cr.refund;
-    lastCrateResult = `<div style="font-size:1.05rem;">You got: <strong>${won.name}</strong> ${rarityBadge(won.rarity)}</div><div style="margin-top:6px;">${skinSwatches(won)}</div><p style="color:#fbbf24;margin-top:6px;">Duplicate — refunded ${cr.refund} Coins</p>`;
+  let pool = unownedAt(rarity);
+  if (!pool.length) {
+    const open = order.filter(function(r) { return unownedAt(r).length > 0; });
+    if (open.length) { rarity = open[Math.floor(Math.random() * open.length)]; pool = unownedAt(rarity); }
+  }
+  if (!pool.length) {
+    const payout = cr.id === 'elite' ? 900 : 300;
+    state.coins += payout;
+    lastCrateResult = `<div style="font-size:1.1rem;">🏆 COLLECTION COMPLETE — coin payout</div><p style="color:#fbbf24;margin-top:6px;">You own every skin and trail in the game. This crate pays out <strong>${payout} Coins</strong> instead.</p>`;
   } else {
-    state.ownedSkins.push(won.id);
-    lastCrateResult = `<div style="font-size:1.15rem;">🎉 You got: <strong>${won.name}</strong> ${rarityBadge(won.rarity)}!</div><div style="margin-top:6px;">${skinSwatches(won)}</div><p style="color:#94a3b8;margin-top:6px;">Equip it below to see it on your jet.</p>`;
-    refreshMenuJet();
+    const won = pool[Math.floor(Math.random() * pool.length)];
+    if (won.kind === 'skin') {
+      state.ownedSkins.push(won.item.id);
+      lastCrateResult = `<div style="font-size:1.15rem;">🎉 You got: <strong>${won.item.name}</strong> ${rarityBadge(won.item.rarity)}!</div><div style="margin-top:6px;">${skinSwatches(won.item)}</div><p style="color:#94a3b8;margin-top:6px;">Equip it below to see it on your jet.</p>`;
+      refreshMenuJet();
+    } else {
+      state.ownedTrails.push(won.item.id);
+      lastCrateResult = `<div style="font-size:1.15rem;">🎉 New TRAIL: <strong>${won.item.name}</strong> ${rarityBadge(won.item.rarity)}!</div><div style="margin-top:6px;">${trailSwatch(won.item)}</div><p style="color:#94a3b8;margin-top:6px;">Equip it below — your wingtip vapor flies in its color.</p>`;
+    }
   }
   saveState(); renderCustomization();
 }
 function equipSkin(id) { state.equippedSkin = id; saveState(); refreshMenuJet(); renderCustomization(); }
+function equipTrail(id) { state.equippedTrail = id; saveState(); renderCustomization(); } // v36 WS9: trails apply in-flight immediately (playerTrailStyle reads state per emit call) — no menu jet to refresh
 // ---- Collection (v11): every jet + skin in the game, owned or locked ----
 function renderCollection() {
   const body = document.getElementById('collectionBody'); if (!body) return;
   const jetsOwned = JETS.filter(function(j) { return state.ownedJets.includes(j.id); }).length;
   const skinsOwned = SKINS.filter(function(s) { return state.ownedSkins.includes(s.id); }).length;
-  let html = `<p style="color:#e2e8f0;font-size:0.95rem;margin-bottom:12px;">Jets owned: <strong>${jetsOwned} / ${JETS.length}</strong> · Skins owned: <strong>${skinsOwned} / ${SKINS.length}</strong></p>`;
+  const trailsOwned = TRAILS.filter(function(t) { return state.ownedTrails.includes(t.id); }).length; // v36 WS9
+  let html = `<p style="color:#e2e8f0;font-size:0.95rem;margin-bottom:12px;">Jets owned: <strong>${jetsOwned} / ${JETS.length}</strong> · Skins owned: <strong>${skinsOwned} / ${SKINS.length}</strong> · Trails owned: <strong>${trailsOwned} / ${TRAILS.length}</strong></p>`;
   html += '<div class="section-label">Fighter Jets</div><div class="card-grid">';
   html += JETS.map(function(j) {
     const owned = state.ownedJets.includes(j.id);
@@ -5028,9 +5626,18 @@ function renderCollection() {
     const btn = eq ? '<button class="btn btn-sec btn-sm" disabled>Equipped</button>' : `<button class="btn btn-play btn-sm" onclick="equipSkinFromCollection('${s.id}')">Equip</button>`;
     return `<div class="item-card"><h3>${skinSwatches(s)} ${s.name}</h3><p>${rarityBadge(s.rarity)} <span style="color:#94a3b8;">Pattern: ${s.pattern}</span></p>${btn}</div>`;
   }).join('') + '</div>';
+  html += '<div class="section-label" style="margin-top:10px;">Plane Trails</div><div class="card-grid">';
+  html += TRAILS.map(function(t) {
+    const owned = state.ownedTrails.includes(t.id);
+    if (!owned) return `<div class="item-card" style="opacity:0.55;"><h3>${trailSwatch(t)} ${t.name}</h3><p>${rarityBadge(t.rarity)} <span style="color:#94a3b8;">Wingtip vapor trail</span></p><p>Locked — open crates in Customization</p></div>`;
+    const eq = state.equippedTrail === t.id;
+    const btn = eq ? '<button class="btn btn-sec btn-sm" disabled>Equipped</button>' : `<button class="btn btn-play btn-sm" onclick="equipTrailFromCollection('${t.id}')">Equip</button>`;
+    return `<div class="item-card"><h3>${trailSwatch(t)} ${t.name}</h3><p>${rarityBadge(t.rarity)} <span style="color:#94a3b8;">Wingtip vapor trail</span></p>${btn}</div>`;
+  }).join('') + '</div>';
   body.innerHTML = html;
 }
 function equipSkinFromCollection(id) { state.equippedSkin = id; saveState(); refreshMenuJet(); renderCollection(); }
+function equipTrailFromCollection(id) { state.equippedTrail = id; saveState(); renderCollection(); } // v36 WS9
 function simulateIAP(title, coins, jetId) {
   // v26: jets are NEVER granted by the simulated flow anymore — a jet id routes to
   // the real premium purchase flow (payment link + redeem code). Coin bundles
@@ -6355,6 +6962,7 @@ window.buyPremiumJet = buyPremiumJet;
 window.openRedeem = openRedeem;
 window.openCrate = openCrate;
 window.equipSkin = equipSkin;
+window.equipTrail = equipTrail; window.equipTrailFromCollection = equipTrailFromCollection; // v36 WS9: inline onclick handlers in the Customization / Collection renders
 window.equipSkinFromCollection = equipSkinFromCollection;
 window.startRebind = startRebind;
 window.cancelOnline = cancelOnline;
