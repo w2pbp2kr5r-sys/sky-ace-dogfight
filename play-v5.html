@@ -85,7 +85,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ MAX REALISM v8 ★</div></div>
+    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ YOUR JET v9 — HOME SHOWCASE ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -725,15 +725,16 @@ function getJetGeos(spec, key) {
   const canard = planformGeo({ rl: 0.50, rt: -0.55, tl: 0.18, tt: -0.48 }, 1.85, 0.10);
   const lerx = planformGeo({ rl: 1.20, rt: -1.20, tl: 0.60, tt: -0.80 }, 2.15, 0.10);
   const geos = {
-    fuse: new THREE.LatheGeometry(fusePts, 28),
-    radome: new THREE.LatheGeometry(radPts, 28),
-    canopy: new THREE.LatheGeometry(canPts, 20),
+    fuse: new THREE.LatheGeometry(fusePts, 48),
+    radome: new THREE.LatheGeometry(radPts, 48),
+    canopy: new THREE.LatheGeometry(canPts, 48),
     wingR: wing.r, wingL: wing.l,
     stabR: stab.r, stabL: stab.l,
     canardR: canard.r, canardL: canard.l,
     lerxR: lerx.r, lerxL: lerx.l,
     fin: finShapeGeo(spec.finH),
     fairing: new THREE.CylinderGeometry(0.62, 0.80, 1, 14),
+    spine: new THREE.CylinderGeometry(0.12, 0.30, 1, 12),
     intake: new THREE.BoxGeometry(0.55, 0.62, 2.4),
     intakeFace: new THREE.PlaneGeometry(0.46, 0.52),
     chinFace: new THREE.PlaneGeometry(0.94, 0.38),
@@ -782,7 +783,13 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight) {
   const paintColor = upg.hull >= 3 ? 0x232b38 : baseColor;
   const hullTex = getHullTexture(paintColor, jetId);
   const hullMaps = getHullMaps(paintColor, jetId);
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide });
+  const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide };
+  // Hero jets (player + home-screen showcase, flagged via withBurnerLight) get a premium
+  // clearcoat physical material; bots keep the standard material for performance (v9).
+  const hullMat = (withBurnerLight && THREE.MeshPhysicalMaterial)
+    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: 0.3, clearcoatRoughness: 0.25, envMapIntensity: 1.0 }))
+    : new THREE.MeshStandardMaterial(hullProps);
+  const armorMat = new THREE.MeshStandardMaterial({ color: 0x1c222c, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.6 });
   // Control surfaces (v8): same paint, darkened ~15% so the hinge gaps read as separate panels
   const surfMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.8, side: THREE.DoubleSide });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x141a24, metalness: 0.8, roughness: 0.45, envMapIntensity: 0.7 });
@@ -825,6 +832,12 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight) {
   const visor = new THREE.Mesh(geos.helmet, glassMat); visor.scale.set(0.82, 0.72, 0.82); visor.position.set(0, canopyY + 0.45, spec.canopyZ - 0.50); g.add(visor); noShadow.push(visor);
   const hudGlass = new THREE.Mesh(geos.box, new THREE.MeshBasicMaterial({ color: 0x39ff88, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   hudGlass.scale.set(0.36, 0.28, 0.02); hudGlass.position.set(0, canopyY + 0.30, spec.canopyZ + 0.52); hudGlass.rotation.x = -0.35; g.add(hudGlass); noShadow.push(hudGlass);
+  // Spine fairing (v9): a tapered dorsal hump running from behind the canopy to the
+  // tail, blending the canopy into the fuselage like a real fighter's spine.
+  const spine = new THREE.Mesh(geos.spine, hullMat);
+  spine.rotation.x = -Math.PI / 2;
+  spine.scale.set(spec.width * 1.05, spec.len * 0.40, 0.55);
+  spine.position.set(0, spec.rad * spec.flat * 0.70, spec.canopyZ - 1.1 - spec.len * 0.20); g.add(spine);
   // Anti-glare panel on top of the nose, ahead of the canopy
   const glare = new THREE.Mesh(geos.box, glareMat);
   glare.scale.set(0.52 * spec.width, 0.05, 1.5); glare.position.set(0, spec.rad * spec.flat * 0.86, spec.canopyZ + 1.95); glare.rotation.x = -0.10; g.add(glare);
@@ -933,10 +946,19 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight) {
   engXs.forEach(function(ex) {
     const noz = new THREE.Mesh(geos.nozzle, darkMat); noz.rotation.x = Math.PI / 2; noz.position.set(ex, 0, -spec.len * 0.50); g.add(noz);
     const petal = new THREE.Mesh(geos.petal, petalMat); petal.rotation.x = Math.PI / 2; petal.position.set(ex, 0, -spec.len * 0.50 - 0.42); g.add(petal);
+    // Turkey feathers (v9): six thin metallic plates fanned radially at the nozzle exit
+    for (let fk = 0; fk < 6; fk++) {
+      const fa2 = (fk / 6) * Math.PI * 2;
+      const feather = new THREE.Mesh(geos.box, petalMat);
+      feather.scale.set(0.17, 0.36, 0.045);
+      feather.position.set(ex + Math.cos(fa2) * 0.30, Math.sin(fa2) * 0.30, -spec.len * 0.50 - 0.66);
+      feather.rotation.z = fa2; feather.rotation.x = 0.12;
+      g.add(feather);
+    }
     const glow = new THREE.Mesh(geos.glowDisc, glowMat); glow.position.set(ex, 0, -spec.len * 0.50 - 0.18); glow.rotation.y = Math.PI; g.add(glow);
     const flame = new THREE.Mesh(geos.flame, new THREE.MeshBasicMaterial({ color: 0x66c7ff, transparent: true, opacity: 0.85 }));
     flame.rotation.x = -Math.PI / 2; flame.scale.set(nozzleScale, nozzleScale, nozzleScale);
-    flame.position.set(ex, 0, -spec.len * 0.50 - 1.55); g.add(flame); flames.push(flame);
+    flame.position.set(ex, 0, -spec.len * 0.50 - 1.55); flame.userData.baseLen = (upg.speed || 1) >= 3 ? 1.2 : 1; g.add(flame); flames.push(flame);
     // Afterburner shock diamonds (v8): bright mach discs standing in the exhaust plume
     [[0.78, 0.72], [1.16, 0.52], [1.52, 0.34]].forEach(function(dp) {
       const disc = new THREE.Mesh(geos.glowDisc, diamondMat);
@@ -957,6 +979,64 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight) {
       const m1 = buildSidewinder(geos); m1.position.set(side * wingSpan * 0.30, -0.48, 0.15); g.add(m1);
       const m2 = buildSidewinder(geos); m2.position.set(side * wingSpan * 0.45, -0.44, -0.35); g.add(m2);
     });
+  }
+  // ---- Upgrade showcase (v9): every hangar track visibly changes the airframe ----
+  // Applies to any jet built with these upgrades (player + home-screen hero jet).
+  const upgRocket = upg.rocket || 1, upgAuto = upg.autoaim || 1;
+  if ((upg.hull || 1) >= 3) {
+    // Bolted armor plates: two per fuselage side + one on the nose spine
+    [-1, 1].forEach(function(side) {
+      [1.15, -1.55].forEach(function(pz) {
+        const plate = new THREE.Mesh(geos.box, armorMat);
+        plate.scale.set(0.07, 0.62, 1.7);
+        plate.position.set(side * (spec.rad * spec.width + 0.27), 0.05, pz); g.add(plate);
+      });
+    });
+    const nosePlate = new THREE.Mesh(geos.box, armorMat);
+    nosePlate.scale.set(0.55 * spec.width, 0.07, 1.25);
+    nosePlate.position.set(0, spec.rad * spec.flat * 0.88, spec.len * 0.30); g.add(nosePlate);
+  }
+  if ((upg.hull || 1) >= 5) {
+    // Reinforced canopy frame: a second, thicker arch over the rear of the glass
+    const arch2 = new THREE.Mesh(geos.box, armorMat);
+    arch2.scale.set(spec.width * 1.16, 0.17, 0.27); arch2.position.set(0, canopyY + 0.31, spec.canopyZ - 1.02); arch2.rotation.x = 0.38; g.add(arch2);
+  }
+  if (upg.damage >= 4) {
+    // Second, larger missile pair on the outer pylons
+    [-1, 1].forEach(function(side) {
+      const m3 = buildSidewinder(geos); m3.scale.setScalar(1.25); m3.position.set(side * wingSpan * 0.52, -0.52, -0.10); g.add(m3);
+    });
+  }
+  if ((upg.agility || 1) >= 3) {
+    // Winglets: small vertical plates at the wingtips
+    const tipZ2 = (spec.wing.tl + spec.wing.tt) / 2;
+    [-1, 1].forEach(function(side) {
+      const wl = new THREE.Mesh(geos.box, surfMat);
+      wl.scale.set(0.06, 0.85, 0.95);
+      wl.position.set(side * halfSpan, 0.30, tipZ2); wl.rotation.z = -side * 0.15; g.add(wl);
+    });
+  }
+  if (upgRocket >= 2) {
+    // Rocket pods under the wings (Lv.4+: a second pod per wing further out)
+    const podXs = upgRocket >= 4 ? [0.36, 0.52] : [0.36];
+    [-1, 1].forEach(function(side) {
+      podXs.forEach(function(fx) {
+        const pod = new THREE.Group();
+        const podBody = new THREE.Mesh(geos.tank, _mslBodyMat);
+        podBody.rotation.x = Math.PI / 2; podBody.scale.set(0.78, 0.68, 0.78); pod.add(podBody);
+        [[0.15, 0.15], [-0.15, 0.15], [0.15, -0.15], [-0.15, -0.15]].forEach(function(off) {
+          const cap = new THREE.Mesh(geos.glowDisc, darkMat);
+          cap.scale.setScalar(0.5); cap.position.set(off[0], off[1], 1.10); pod.add(cap);
+        });
+        pod.position.set(side * wingSpan * fx, -0.66, 0.30); g.add(pod);
+      });
+    });
+  }
+  if (upgAuto >= 3) {
+    // Target-lock sensor dome on the spine, ahead of the canopy
+    const dome = new THREE.Mesh(geos.helmet, glassMat);
+    dome.scale.set(1.35, 0.85, 1.35);
+    dome.position.set(0, spec.rad * spec.flat * 0.92, spec.canopyZ + 1.55); g.add(dome); noShadow.push(dome);
   }
   // Centerline drop tank on the carrier/light jets
   if (jetId === 'f16' || jetId === 'fa18' || jetId === 'f35') {
@@ -1046,6 +1126,16 @@ function buildMenuScene() {
     isle.position.set(Math.cos(ia) * 3350, ih / 2 - 24, Math.sin(ia) * 3350);
     menuGroup.add(isle);
   }
+  // Hero-jet lighting (v9): warm key light from the sun side + cool rim light from
+  // behind — these live in menuGroup, so they vanish with it during missions.
+  const keyLight = new THREE.DirectionalLight(0xffd9a8, 1.2);
+  keyLight.position.set(-120, 260, -180);
+  keyLight.target.position.set(26, 160, 0);
+  menuGroup.add(keyLight); menuGroup.add(keyLight.target);
+  const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.7);
+  rimLight.position.set(180, 120, 240);
+  rimLight.target.position.set(26, 160, 0);
+  menuGroup.add(rimLight); menuGroup.add(rimLight.target);
   scene.add(menuGroup);
 }
 function refreshMenuJet() {
@@ -1054,7 +1144,7 @@ function refreshMenuJet() {
   if (!menuGroup) return;
   if (menuJet) { menuGroup.remove(menuJet); menuJet = null; }
   const jc = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
-  menuJet = buildJetMesh(jc.color, jc.accent, state.upgrades, jc.id);
+  menuJet = buildJetMesh(jc.color, jc.accent, state.upgrades, jc.id, true);
   menuJet.scale.setScalar(1.25); // hero jet reads big and detailed on the home screen
   menuJet.position.set(MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 26, 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12), 0);
   menuGroup.add(menuJet);
@@ -1079,11 +1169,15 @@ function animateMenuScene(dt) {
     // Camera sits slightly right of the jet and aims left of / below it, which pushes
     // the jet into the open right-center of the frame, clear of the menu panel.
     const ox = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 26, oy = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
-    mj.position.set(ox + Math.cos(t * 0.10) * 22, oy + Math.sin(t * 0.65) * 3.5, Math.sin(t * 0.10) * 22);
+    mj.position.set(ox + Math.cos(t * 0.10) * 11, oy + Math.sin(t * 0.65) * 3.5, Math.sin(t * 0.10) * 11);
     mj.rotation.set(Math.sin(t * 0.55) * 0.05, 0.55 + Math.sin(t * 0.18) * 0.25, Math.sin(t * 0.42) * 0.36);
     flickerFlames(mj, false, dt);
-    camera.position.set(mj.position.x - 13 + Math.sin(t * 0.13) * 5, mj.position.y + 5 + Math.sin(t * 0.21) * 2.5, mj.position.z - 37);
-    camera.lookAt(mj.position.x - 20, mj.position.y - 9, mj.position.z);
+    // v9 framing fix: the camera stays close and looks essentially AT the jet
+    // (look offset <= 5 units, zero on narrow windows), so the hero jet can never
+    // drift out of frame — worst case it sits ~7 degrees off-axis (see report math).
+    camera.position.set(mj.position.x - 11 + Math.sin(t * 0.13) * 3, mj.position.y + 4.5 + Math.sin(t * 0.21) * 1.5, mj.position.z - 32);
+    const lookOffX = (camera.aspect >= 1.35) ? -5 : 0;
+    camera.lookAt(mj.position.x + lookOffX, mj.position.y - 2, mj.position.z);
   }
 }
 
@@ -1617,7 +1711,7 @@ function flickerFlames(mesh, boost, dt) {
   if (mesh.userData.glowMat) mesh.userData.glowMat.opacity = (boost ? 0.95 : 0.6) + Math.random() * 0.3;
   if (!mesh.userData.flames) return;
   const s = boost ? 1.55 : 1.0;
-  mesh.userData.flames.forEach(function(f) { const fl = (0.82 + Math.random() * 0.38) * s; f.scale.y = fl; f.scale.x = f.scale.z = 0.9 + Math.random() * 0.2; });
+  mesh.userData.flames.forEach(function(f) { const fl = (0.82 + Math.random() * 0.38) * s * (f.userData.baseLen || 1); f.scale.y = fl; f.scale.x = f.scale.z = 0.9 + Math.random() * 0.2; });
   if (mesh.userData.diamonds) mesh.userData.diamonds.forEach(function(d) { d.scale.setScalar(d.userData.baseS * (0.82 + Math.random() * 0.36) * (boost ? 1.3 : 1.0)); });
 }
 // ---- Damage smoke system (v5): the more health lost, the heavier/darker the smoke ----
@@ -1741,7 +1835,7 @@ function animate(now) {
   if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
   if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
   rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
-  const smoothK = Math.min(1, 7 * dt);
+  const smoothK = Math.min(1, 8.5 * dt);
   p.yawIn = THREE.MathUtils.lerp(p.yawIn || 0, rawYaw, smoothK);
   p.pitchIn = THREE.MathUtils.lerp(p.pitchIn || 0, rawPitch, smoothK);
   if (p.autoAimLeft > 0 && activeGame.entities.length > 0) {
@@ -1761,8 +1855,8 @@ function animate(now) {
       p.pitchIn = clampNum((desPitch - p.pitch) * 3.2, -1, 1);
     }
   }
-  const yawRate = 0.8 * (p.turn / 1.45) * sens;
-  const pitchRate = 0.75 * (p.turn / 1.45) * sens;
+  const yawRate = 0.95 * (p.turn / 1.45) * sens;
+  const pitchRate = 0.88 * (p.turn / 1.45) * sens;
   p.heading = angleWrap(p.heading + p.yawIn * yawRate * dt);
   p.pitch = clampNum(p.pitch + p.pitchIn * pitchRate * dt, -1.05, 1.05);
   if (rawPitch === 0 && p.autoAimLeft <= 0) p.pitch += (0 - p.pitch) * Math.min(1, 0.8 * dt); // gentle auto-level when hands off the pitch controls
@@ -2077,7 +2171,7 @@ function switchHangarTab(tab, btnEl) {
 function openModalsShop() { closeModals(); renderShop(); document.getElementById('shopModal').classList.remove('hidden'); }
 function equipJet(id) { state.selectedJet = id; saveState(); refreshMenuJet(); switchHangarTab('jets'); }
 function buyJet(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j || typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); refreshMenuJet(); switchHangarTab('jets'); }
-function buyUpgrade(key, cost) { if (state.coins < cost) { alert('Not enough coins!'); return; } if (state.upgrades[key] >= 6) return; state.coins -= cost; state.upgrades[key]++; saveState(); switchHangarTab('upgrades'); }
+function buyUpgrade(key, cost) { if (state.coins < cost) { alert('Not enough coins!'); return; } if (state.upgrades[key] >= 6) return; state.coins -= cost; state.upgrades[key]++; saveState(); refreshMenuJet(); switchHangarTab('upgrades'); }
 function renderShop() {
   const packs = [ { name: 'Pilot Coin Pouch', coins: 600, price: '$0.99' }, { name: 'Squadron War Chest', coins: 1800, price: '$2.99' }, { name: 'Commander Vault', coins: 5000, price: '$6.99' } ];
   const premJets = JETS.filter(function(j) { return j.premium; });
@@ -2143,7 +2237,7 @@ function cancelOnline() { if (peerSyncTimer) clearInterval(peerSyncTimer); if (p
 document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
 document.getElementById('btnJoinRoom').onclick = function() { const c = document.getElementById('joinCodeInput').value.trim(); if (c) startOnlineMatchmaking(c, false); else startOnlineMatchmaking(); };
 // Idle background on menu: the v7 golden-hour home scene (hero jet over the ocean)
-if (renderer) { showMenuScene(); camera.position.set(13, 167, -37); camera.lookAt(6, 153, 0); }
+if (renderer) { showMenuScene(); camera.position.set(15, 166.5, -32); camera.lookAt(26 + (camera.aspect >= 1.35 ? -5 : 0), 160, 0); }
 requestAnimationFrame(animate);
 </script>
 </body>
