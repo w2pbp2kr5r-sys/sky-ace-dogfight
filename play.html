@@ -144,7 +144,7 @@
   #targetBoxes { position: fixed; inset: 0; pointer-events: none; z-index: 7; }
   .t-box { position: absolute; width: 38px; height: 38px; border: 2px solid #ef4444; transform: translate(-50%, -50%); border-radius: 4px; }
   .t-box.locked { border-color: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
-  #touchZone { position: fixed; bottom: 80px; left: 20px; width: 110px; height: 110px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; }
+  #touchZone { position: fixed; bottom: 80px; left: 20px; width: 110px; height: 110px; border-radius: 50%; clip-path: circle(50% at 50% 50%); border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; } /* v35: clip-path makes the HIT AREA the visible circle too — border-radius alone leaves the square's invisible corners clickable, and a thumb landing in a corner (near the stick, not on it) used to claim it */
   #touchKnob { position: absolute; top: 35px; left: 35px; width: 40px; height: 40px; border-radius: 50%; background: rgba(56,189,248,0.7); }
   /* ---- v33 mobile fit: play must not scroll-bounce or double-tap-zoom, and
      small / touch viewports get a layout that actually fits. Desktop rules
@@ -268,7 +268,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v34 — HOMING & UPDATES ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v35 — STICK & AIM ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -490,7 +490,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 34; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 35; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -1195,16 +1195,41 @@ function getCityGroundTexture(neon) {
   if (neon && _cgTexNeon) return _cgTexNeon;
   if (!neon && _cgTexDay) return _cgTexDay;
   const _aniso = (typeof renderer !== 'undefined' && renderer && renderer.capabilities) ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 1;
-  const t = makeCanvas(1024, 1024, function(ctx, w, h) {
-    // One texture tile = exactly one city block (CITY_PITCH world units); roads run along the tile edges
+  const t = makeCanvas(2048, 2048, function(ctx, w, h) {
+    // One texture tile = exactly one city block (CITY_PITCH world units); roads run along the tile edges.
+    // v35: canvas doubled 1024 -> 2048 for ground detail at low altitude. Every
+    // coordinate below is written in the original 1024 layout space and scaled
+    // by S, so the street grid (roads on the tile edges, sidewalk ring at 52,
+    // interior at 66) is unchanged — markings stay aligned with the real roads.
+    const S = w / 1024;
     ctx.fillStyle = neon ? '#05070f' : '#181d24'; ctx.fillRect(0, 0, w, h); // asphalt roads
-    ctx.fillStyle = neon ? '#0d1220' : '#39424e'; ctx.fillRect(52, 52, w - 104, h - 104); // sidewalk ring
-    ctx.fillStyle = neon ? '#10182b' : '#2b333e'; ctx.fillRect(66, 66, w - 132, h - 132); // block interior
+    for (let i = 0; i < 2600; i++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.16)'; ctx.fillRect(Math.random() * w, Math.random() * h, 3 * S, 3 * S); } // v35: asphalt grain (roads were flat color)
+    ctx.fillStyle = neon ? '#0d1220' : '#39424e'; ctx.fillRect(52 * S, 52 * S, w - 104 * S, h - 104 * S); // sidewalk ring
+    ctx.fillStyle = neon ? '#10182b' : '#2b333e'; ctx.fillRect(66 * S, 66 * S, w - 132 * S, h - 132 * S); // block interior
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 2 * S; ctx.beginPath(); // v35: sidewalk expansion-joint seams
+    for (let sj = 0; sj <= 4; sj++) { const p = (66 + sj * 223) * S; ctx.moveTo(p, 52 * S); ctx.lineTo(p, 66 * S); ctx.moveTo(p, h - 66 * S); ctx.lineTo(p, h - 52 * S); ctx.moveTo(52 * S, p); ctx.lineTo(66 * S, p); ctx.moveTo(w - 66 * S, p); ctx.lineTo(w - 52 * S, p); }
+    ctx.stroke();
+    // v35: subtle tint variation — quadrant washes inside the block interior.
+    // One tile repeats across the whole city, so true per-block variation is
+    // impossible; the quadrants at least break the tile's uniformity where
+    // four blocks meet at a junction.
+    const tintCols = neon ? ['rgba(55,224,255,0.05)', 'rgba(120,80,255,0.05)', 'rgba(255,255,255,0.03)', 'rgba(0,0,0,0.10)'] : ['rgba(255,214,120,0.05)', 'rgba(120,180,255,0.05)', 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.10)'];
+    const halfIn = (w - 132 * S) / 2;
+    ctx.fillStyle = tintCols[0]; ctx.fillRect(66 * S, 66 * S, halfIn, halfIn);
+    ctx.fillStyle = tintCols[1]; ctx.fillRect(66 * S + halfIn, 66 * S, halfIn, halfIn);
+    ctx.fillStyle = tintCols[2]; ctx.fillRect(66 * S, 66 * S + halfIn, halfIn, halfIn);
+    ctx.fillStyle = tintCols[3]; ctx.fillRect(66 * S + halfIn, 66 * S + halfIn, halfIn, halfIn);
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 2 * S; ctx.beginPath(); // v35: plaza paving grid inside the block
+    for (let pg = 1; pg < 6; pg++) { const p = (66 + pg * 148) * S; ctx.moveTo(p, 66 * S); ctx.lineTo(p, h - 66 * S); ctx.moveTo(66 * S, p); ctx.lineTo(w - 66 * S, p); }
+    ctx.stroke();
+    for (let i = 0; i < 26; i++) { ctx.fillStyle = 'rgba(0,0,0,' + (0.04 + Math.random() * 0.07).toFixed(3) + ')'; ctx.fillRect((80 + Math.random() * 834) * S, (80 + Math.random() * 834) * S, (24 + Math.random() * 90) * S, (18 + Math.random() * 60) * S); } // v35: worn/grime patches
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; // v35: solid edge lines framing each road, just inside the curb
+    ctx.fillRect(0, 40 * S, w, 3 * S); ctx.fillRect(0, h - 43 * S, w, 3 * S); ctx.fillRect(40 * S, 0, 3 * S, h); ctx.fillRect(w - 43 * S, 0, 3 * S, h);
     ctx.fillStyle = neon ? '#37e0ff' : '#e8c96a'; // dashed lane centre lines along each edge road
-    for (let d = 8; d < w; d += 42) { ctx.fillRect(d, 3, 22, 5); ctx.fillRect(d, h - 8, 22, 5); ctx.fillRect(3, d, 5, 22); ctx.fillRect(w - 8, d, 5, 22); }
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; // crosswalk stripes at the top junction
-    for (let s = 0; s < 5; s++) ctx.fillRect(72 + s * 76, 14, 40, 8);
-    for (let i = 0; i < 480; i++) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(66 + Math.random() * (w - 132), 66 + Math.random() * (h - 132), 5, 5); }
+    for (let d = 8; d < 1024; d += 42) { const dd = d * S; ctx.fillRect(dd, 3 * S, 22 * S, 5 * S); ctx.fillRect(dd, h - 8 * S, 22 * S, 5 * S); ctx.fillRect(3 * S, dd, 5 * S, 22 * S); ctx.fillRect(w - 8 * S, dd, 5 * S, 22 * S); }
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; // crosswalk stripes at ALL FOUR junctions (v35 — was top junction only)
+    for (let s = 0; s < 5; s++) { const sx = (72 + s * 76) * S; ctx.fillRect(sx, 14 * S, 40 * S, 8 * S); ctx.fillRect(sx, h - 22 * S, 40 * S, 8 * S); ctx.fillRect(14 * S, sx, 8 * S, 40 * S); ctx.fillRect(w - 22 * S, sx, 8 * S, 40 * S); }
+    for (let i = 0; i < 1500; i++) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect((66 + Math.random() * 892) * S, (66 + Math.random() * 892) * S, 5 * S, 5 * S); } // interior speckle (was 480 at 1024)
   });
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(32, 32);
   t.anisotropy = _aniso; // v15: sharper ground at grazing angles
@@ -3143,6 +3168,56 @@ function buildSpaceEnvironment(theme, radius, density) {
     buildGalaxyProps(worldGroup, radius, { crystals: 6, avoid: [{ x: 260, z: -260, d: 130 }] }); // v18: satellites, cargo pods, debris + crystal clusters join orbit
   }
 }
+// ---- v35 map border: the energy fence at the combat-zone radius ----
+// One shared white grid texture (tinted per theme by the material color):
+// vertical + horizontal lines whose alpha fades toward the top of the wall,
+// applied once vertically (repeat.y = 1) so the fade reads as the fence
+// dissolving into the sky. The wall material sets fog:false — the fence is
+// the landmark you navigate home by, so distance haze must never eat it.
+let _borderTex = null;
+function getBorderTexture() {
+  if (_borderTex) return _borderTex;
+  _borderTex = makeCanvas(256, 256, function(ctx, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.fillRect(0, 0, w, h); // faint membrane so the wall reads as a surface, not just lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 4;
+    for (let x = 0; x <= w; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+    ctx.lineWidth = 3;
+    for (let y = 0; y <= h; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(0, h - 14, w, 14); // bright base band where the wall meets the ground ring
+    const g = ctx.createLinearGradient(0, 0, 0, h); // canvas y=0 is the texture TOP (three.js flipY) — fade strongest there
+    g.addColorStop(0, 'rgba(0,0,0,0.92)'); g.addColorStop(0.45, 'rgba(0,0,0,0.35)'); g.addColorStop(0.75, 'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'source-over';
+  });
+  _borderTex.wrapS = THREE.RepeatWrapping;
+  return _borderTex;
+}
+const BORDER_ACCENTS = { city: 0x38bdf8, mountain: 0x7dd3fc, canyon: 0xfb923c, neon: 0x22d3ee, nebula: 0xa78bfa, orbit: 0x818cf8 }; // v35: theme accent per map (space themes' sky colors are near-black, so they get their own bright accents)
+function buildMapBorder(theme, radius) {
+  const accent = BORDER_ACCENTS[theme] || 0x22d3ee;
+  const tex = getBorderTexture().clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(Math.max(24, Math.round(radius / 42)), 1); // ~264-unit grid cells at any radius
+  const wallMat = new THREE.MeshBasicMaterial({ map: tex, color: accent, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false, fog: false });
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1100, 96, 1, true), wallMat);
+  wall.position.y = 400; // spans -150..950: from under the ground to the flight ceiling
+  worldGroup.add(wall);
+  // Base ring ON the surface: a flat ring on flat/space themes; on terrain
+  // themes a line loop draped over the heightmap (a flat ring would bury
+  // itself under the rim peaks).
+  const terrFn = worldGroup.userData && worldGroup.userData.terrainHeightAt;
+  if (terrFn) {
+    const pts = [];
+    for (let i = 0; i <= 128; i++) { const a = (i / 128) * Math.PI * 2; const px = Math.cos(a) * radius, pz = Math.sin(a) * radius; pts.push(new THREE.Vector3(px, terrFn(px, pz) + 1.5, pz)); }
+    const ring = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.95, fog: false }));
+    worldGroup.add(ring);
+  } else {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius - 7, radius + 7, 96), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 1.3;
+    worldGroup.add(ring);
+  }
+}
 function buildEnvironment(theme, radius, densityScale) {
   if (!scene) return; radius = radius || 1400;
   const density = (typeof densityScale === 'number') ? densityScale : 1; // v15: Gun Game thins the asteroid field
@@ -3244,7 +3319,7 @@ function buildEnvironment(theme, radius, densityScale) {
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
   if (theme === 'city') {
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), normalMap: getWaterNormalTexture(), normalScale: new THREE.Vector2(0.35, 0.35), color: 0xbfd9ea, roughness: 0.14, metalness: 0.85, envMapIntensity: 1.35, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water; v20: sharper sun glint (roughness down, env up) // v28: ripple normal map, offset-drifted in animate()
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), normalMap: getWaterNormalTexture(), normalScale: new THREE.Vector2(0.5, 0.5), color: 0xbfd9ea, roughness: 0.14, metalness: 0.85, envMapIntensity: 1.5, transparent: true, opacity: 0.88 })); // v35: stronger ripple relief + sun glint (normalScale 0.35 -> 0.5, envMapIntensity 1.35 -> 1.5) // v16: mirror-like harbor water; v20: sharper sun glint (roughness down, env up) // v28: ripple normal map, offset-drifted in animate()
     water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water); worldGroup.userData.water = water;
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
@@ -3375,8 +3450,17 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   if (!isSpace) addAirstrip(); // a runway makes no sense floating in deep space (and its fixed obstacles would be invisible traps)
   addThemeProps(theme, radius);
+  buildMapBorder(theme, radius); // v35: every map gets its visible energy-fence border at the combat radius (added to worldGroup, so it is created/removed with the environment per mission — never in the menu scene)
   scene.add(worldGroup);
 }
+// ---- v35 ground impact: what surface can a jet die on this mission? ----
+// Set by startMission right after buildEnvironment: the heightmap function on
+// mountain/canyon, a flat 0 on city/neon (streets, plaza, and the harbor
+// water at y=0.6 all sit at ~0), and null in space themes — orbit/nebula
+// have no ground plane at all, so there is nothing to hit and the v13
+// numeric floor stays their only floor (exactly as the game was designed).
+let _missionSurfaceAt = null;
+function surfaceHeightAt(x, z) { return _missionSurfaceAt ? _missionSurfaceAt(x, z) : null; }
 let activeGame = null, paused = false; const keys = {}; let touchVec = { x: 0, y: 0 };
 // ---- v33 device detection: mobile vs desktop, sampled at boot and kept live ----
 // DETECTED_TOUCH is the answer to "does this device have a touch screen right
@@ -3428,12 +3512,14 @@ function startMission() {
   document.getElementById('vignette').classList.remove('hidden'); // v17: cinematic vignette lives and dies with the HUD
   document.getElementById('touchZone').classList.toggle('hidden', !touchControlsVisible()); // v33: three-way mode — 'on' always, 'off' never, 'auto' when the device has touch
   applyTouchLayout(); // v32: position/scale the touch controls per the player's saved layout (no-op at defaults)
+  releaseStick(); // v35: every mission starts with NO stick claim and a zeroed vector — a claim orphaned by the previous mission's end can never steer this one
   document.getElementById('minimap').classList.toggle('hidden', currentMode !== 'royale');
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
   const mapRadius = currentMode === 'royale' ? 2400 : 1300;
   const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : (currentMode === 'waves' ? 'city' : ch.theme)); // v30: Wave Defense always flies Sunlit Harbor
   buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.22 : 1); // v15: Gun Game thins the asteroid field // v18: 0.38 -> 0.22 (~15 rocks — galaxy props fill the space instead)
+  _missionSurfaceAt = (worldGroup.userData && worldGroup.userData.terrainHeightAt) ? worldGroup.userData.terrainHeightAt : ((theme === 'city' || theme === 'neon') ? function() { return 0; } : null); // v35: this mission's lethal surface (heightmap / flat 0 / none in space)
   // v18 Online Royale: a peer that connected while Royale was selected turns this
   // drop into a 2-human match (48 bots + rival puppet). Solo Royale is untouched.
   const mmCfg = (currentMode === 'royale' && typeof mmPendingMatch !== 'undefined' && mmPendingMatch) ? mmPendingMatch : null; // v25: a formed matchmaking match waiting to drop
@@ -3444,7 +3530,7 @@ function startMission() {
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], mapRadius: mapRadius, zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 }; // v35: mapRadius rides along for border enforcement (the v35 energy fence)
   activeGame.playerTopSpeed = activeGame.player.spd * (currentMode === 'gungame' ? GUN_GAME_TIERS[activeGame.player.ggTier].spd : 1); // v31: bot speed anchor — the player's sustained top speed this mission, derived exactly as the flight update derives curSpd (p.spd already carries jet spd x speed-upgrade multiplier; the tier spd is the Gun Game mode multiplier)
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (currentMode === 'waves' ? 0 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49)))); // v30: waves spawn through the wave system below, not this loop // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
@@ -3543,9 +3629,12 @@ let _playerShotCount = 0;
 // 700), a non-locked shot is bent exactly onto the target's predicted
 // intercept point (bullet speed 360, the same lead math as the v5 auto-aim).
 // Outside the cone nothing changes. Player only — bots never come through here.
-const PLAYER_GUN_SPREAD = 0.015 * 0.8 * 0.75;
-const AIM_ASSIST_CONE = 9 * Math.PI / 180;
-const AIM_ASSIST_RANGE = 950;
+const PLAYER_GUN_SPREAD = 0.006; // v35: was 0.015 * 0.8 * 0.75 = 0.009 — tightened again so assisted shots land where the assist points them
+const AIM_ASSIST_CONE = 14 * Math.PI / 180; // v35: full-bend cone, was 9°
+const AIM_ASSIST_CONE_PARTIAL = 22 * Math.PI / 180; // v35 NEW: 14°–22° is the partial-bend zone
+const AIM_ASSIST_PARTIAL_BEND = 0.45; // v35: a partial-zone shot bends 45% of the angular way toward the intercept
+const AIM_ASSIST_RANGE = 1200; // v35: was 950
+const PLAYER_BULLET_SPEED = 450; // v35: player rounds fly faster (was 360, shared with bots) — the assist AND locked auto-aim lead math use this; bot rounds stay 360
 let _muzzleLight = null, _muzzleFlash = null, _botFlash = null, _botFlashT = 0;
 function ensureMuzzleFx() {
   if (!scene || _muzzleLight) return;
@@ -3567,8 +3656,9 @@ function spawnBullet(pos, dir, ownerId, dmg, color) {
   innerMat.color.setRGB(2, 2, 2); // v16: white-hot HDR centre
   const inner = new THREE.Mesh(_bulletInnerGeo, innerMat);
   inner.rotation.x = Math.PI / 2; grp.add(inner);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSmokeTexture(), color: col, transparent: true, opacity: isTracer ? 0.95 : 0.65, blending: THREE.AdditiveBlending, depthWrite: false }));
-  glow.scale.setScalar(isTracer ? 3.2 : 2.2); grp.add(glow);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSmokeTexture(), color: col, transparent: true, opacity: isTracer ? 0.98 : 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.material.color.multiplyScalar(1.4); // v35: HDR push so the glow halo blooms at range
+  glow.scale.setScalar(isTracer ? 4.2 : 3.0); grp.add(glow); // v35: bigger soft halo (was 3.2 / 2.2) — rounds read as glowing tracers at distance; same shared smoke texture, no lights, still cheap
   grp.position.copy(pos); grp.lookAt(pos.clone().add(dir));
   scene.add(grp);
   ensureMuzzleFx();
@@ -3578,7 +3668,7 @@ function spawnBullet(pos, dir, ownerId, dmg, color) {
   } else if (_botFlash) {
     _botFlash.position.copy(pos); _botFlash.scale.setScalar(1.5 + Math.random() * 0.6); _botFlash.material.opacity = 0.8; _botFlashT = 0.06;
   }
-  activeGame.bullets.push({ mesh: grp, dir: dir.clone().normalize(), ownerId: ownerId, dmg: dmg, life: 2.2 });
+  activeGame.bullets.push({ mesh: grp, dir: dir.clone().normalize(), ownerId: ownerId, dmg: dmg, spd: ownerId === 'player' ? PLAYER_BULLET_SPEED : 360, life: ownerId === 'player' ? 2.8 : 2.2 }); // v35: per-bullet speed — player rounds 450 with life 2.8 (reach 1260 ≥ the 1200 assist range); bot rounds unchanged (360, 2.2)
 }
 // ---- Rocket body markings (v8): stencilled live-round livery on a 256x64 canvas ----
 let _rkTex = null;
@@ -3717,7 +3807,7 @@ function endMatch(victory, title, summary) {
   if (typeof MUS !== 'undefined') MUS.update(); // v29: the results screen is lobby again — music fades back in
 }
 function nextChapter() { chSel.value = Math.min(CHAPTERS.length, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); applyPendingUpdate(); } // v34: back at the menu — a waiting update applies now // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
+function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; releaseStick(); clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); applyPendingUpdate(); } // v34: back at the menu — a waiting update applies now // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -3886,7 +3976,7 @@ function emitContrails(ent, spd, turnAmt, dt) {
     for (let s = -1; s <= 1; s += 2) {
       _trailTip.set(s * span / 2, 0, -0.5);
       ent.mesh.localToWorld(_trailTip);
-      spawnSmokePuff(_trailTip.x, _trailTip.y, _trailTip.z, { color: 0xffffff, size: 1.2, grow: 2, life: 0.5, opacity: 0.28, vx: 0, vy: 0, vz: 0 });
+      spawnSmokePuff(_trailTip.x, _trailTip.y, _trailTip.z, { color: 0xffffff, size: 1.6, grow: 2, life: 0.45, opacity: 0.36, vx: 0, vy: 0, vz: 0 }); // v35: slightly larger/brighter so the vapor reads at combat distance (hook itself is v8 — player + bots already share it)
     }
   }
 }
@@ -3896,6 +3986,45 @@ function spawnImpactFx(pos) {
   if (pos.distanceTo(activeGame.player.mesh.position) > 600 && pos.distanceTo(camera.position) > 600) return;
   for (let s = 0; s < 5; s++) spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xffa63d, size: 0.8, grow: 1.5, life: 0.25, opacity: 0.9, vx: (Math.random() - 0.5) * 22, vy: (Math.random() - 0.5) * 22, vz: (Math.random() - 0.5) * 22 });
   spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.2, grow: 3, life: 0.12, opacity: 0.95, vx: 0, vy: 0, vz: 0, hdr: 1.6 }); // v17: impact flash blooms
+}
+// ---- v35 jet-kill explosion: ONE shared helper for every jet death ----
+// Before v35 there was no shared kill explosion: a bot kill showed only the
+// 5-spark bullet impact flash and the mesh vanishing, and the one real puff
+// burst lived inline in gungamePlayerDown for the player's Gun Game death
+// alone. spawnJetExplosion(pos) is now the jet-death explosion everywhere:
+// a fat layered HDR fireball, a camera-facing shockwave ring that expands
+// and fades over ~0.35s, a burst of bright debris sparks, and a dark smoke
+// column that keeps rising for ~2.5s after the fireball is gone. Called from
+// handleEntityEliminated (every bot kill, every mode), gungamePlayerDown
+// (player death there) and the v35 ground-impact crash path.
+const fxRings = [];
+function spawnShockRing(pos) {
+  if (!scene || fxRings.length >= 8) return;
+  const mat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  mat.color.multiplyScalar(1.7); // HDR push so the ring blooms like the fireball core
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 48), mat);
+  m.position.copy(pos);
+  scene.add(m);
+  fxRings.push({ mesh: m, t: 0 });
+}
+function updateFxRings(dt) {
+  for (let i = fxRings.length - 1; i >= 0; i--) {
+    const r = fxRings[i]; r.t += dt;
+    const k = r.t / 0.35;
+    if (k >= 1) { scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); fxRings.splice(i, 1); continue; }
+    r.mesh.scale.setScalar(3 + k * 52);
+    r.mesh.material.opacity = 0.85 * (1 - k);
+    if (camera) r.mesh.lookAt(camera.position); // billboarded ring — reads as a spherical shock front from any angle
+  }
+}
+function spawnJetExplosion(pos) {
+  if (!pos) return;
+  const flameCols = [0xff5a1f, 0xff7a26, 0xffa63d, 0xfff2b0];
+  for (let i = 0; i < 12; i++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 4, pos.y + (Math.random() - 0.5) * 4, pos.z + (Math.random() - 0.5) * 4, { color: flameCols[i % 4], size: 4 + Math.random() * 3, grow: 5, life: 0.45 + Math.random() * 0.3, opacity: 0.95, vx: (Math.random() - 0.5) * 16, vy: (Math.random() - 0.5) * 16, vz: (Math.random() - 0.5) * 16, hdr: 1.7 }); // fireball: 12 layered HDR flame puffs (the old inline burst had 6)
+  for (let i = 0; i < 12; i++) spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xffcf7a, size: 0.6 + Math.random() * 0.5, grow: 0.5, life: 0.3 + Math.random() * 0.25, opacity: 0.95, vx: (Math.random() - 0.5) * 76, vy: (Math.random() - 0.5) * 76, vz: (Math.random() - 0.5) * 76, hdr: 1.8 }); // debris sparks: fast, small, bright
+  for (let i = 0; i < 8; i++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 5, pos.y + (Math.random() - 0.5) * 5, pos.z + (Math.random() - 0.5) * 5, { color: 0x14151a, size: 5 + Math.random() * 3, grow: 4, life: 0.9 + Math.random() * 0.4, opacity: 0.55, vx: (Math.random() - 0.5) * 10, vy: 2 + Math.random() * 3, vz: (Math.random() - 0.5) * 10 }); // dark body smoke (the old burst, kept)
+  for (let i = 0; i < 7; i++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 6, pos.y - 2 + Math.random() * 4, pos.z + (Math.random() - 0.5) * 6, { color: 0x1c1e24, size: 6 + Math.random() * 3, grow: 3.5, life: 2.2 + Math.random() * 0.6, opacity: 0.5, vx: (Math.random() - 0.5) * 3, vy: 7 + Math.random() * 4, vz: (Math.random() - 0.5) * 3 }); // lingering column: rises and drifts ~2.5s
+  spawnShockRing(pos);
 }
 // v16: tail-strobe blink — brief white flash every 1.2s, driven off a shared clock so
 // it works in the menu scene and in missions alike. Material is unique per jet.
@@ -3957,8 +4086,15 @@ function animate(now) {
   if (p.buffTimer > 0) { p.buffTimer -= dt; if (p.buffTimer <= 0) p.buff = null; }
   // --- Stable flight model (player): smoothed inputs -> capped rates -> clamped heading/pitch -> Euler YXZ orientation ---
   const sens = state.sensitivity * (p.buff === 'speed' ? 1.35 : 1.0);
-  let rawYaw = Math.abs(touchVec.x) > 0.08 ? -touchVec.x : 0;
-  let rawPitch = Math.abs(touchVec.y) > 0.08 ? -touchVec.y : 0;
+  // v35 WS1 hard gate: touch steering may ONLY contribute while a stick pointer
+  // is actively claimed (stickPointerId !== null, set solely by a press that
+  // began inside the stick's visible circle). In every other state — no touch,
+  // a finger on a button, a finger sliding elsewhere — the touch contribution
+  // is forced to exactly zero here at the merge, so no stray writer of
+  // touchVec (present or future) can ever steer the jet on its own.
+  const stickLive = stickPointerId !== null;
+  let rawYaw = stickLive && Math.abs(touchVec.x) > 0.08 ? -touchVec.x : 0;
+  let rawPitch = stickLive && Math.abs(touchVec.y) > 0.08 ? -touchVec.y : 0;
   if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
   if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
   rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
@@ -3997,8 +4133,52 @@ function animate(now) {
   const curSpd = p.spd * tierSpd * (boosting ? 1.45 : 1) * (p.buff === 'speed' ? 1.45 : 1) * (activeGame.waveMods ? activeGame.waveMods.spdMul : 1); // v31: Wave Defense speed perks multiply into the same top-speed derivation
   const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
   p.fwdVec = fwd;
-  if (p.respawnT <= 0) { p.mesh.position.addScaledVector(fwd, curSpd * dt); p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y)); }
+  if (p.respawnT <= 0) {
+    p.mesh.position.addScaledVector(fwd, curSpd * dt);
+    // v35 WS4: terrain / ground / water impact is a CRASH in every mode.
+    // Until now it could never happen, for two stacked reasons: (1) the v13
+    // clamp pinned the jet at y >= 12 — an invisible floor floating 12 units
+    // over the streets and harbor water, so flat-ground contact was
+    // impossible; (2) the v19 heightmap was never collision-checked for the
+    // player at all — only the obstacles array was (buildings plus up to 16
+    // peak-guard cylinders), so a jet flew straight through a mountainside
+    // anywhere else. The test below uses the PRE-clamp height against the
+    // real surface (surfaceHeightAt: heightmap on mountain/canyon, 0 on
+    // city/neon, null in space where there is no ground): reaching
+    // surface + 2 is death, routed EXACTLY like the building crash below —
+    // Gun Game respawns through gungamePlayerDown, every other mode ends
+    // the match as a crash. Skimming 10 units above the slope is untouched.
+    const surfH = surfaceHeightAt(p.mesh.position.x, p.mesh.position.z);
+    if (surfH !== null && p.mesh.position.y <= surfH + 2) {
+      p.mesh.position.y = surfH + 2;
+      if (activeGame.mode === 'gungame') { gungamePlayerDown('crash'); }
+      else { spawnJetExplosion(p.mesh.position); endMatch(false, 'AIRCRAFT DESTROYED', 'You crashed into the ground and exploded!'); }
+      return;
+    }
+    p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y));
+  }
   if (p.respawnT <= 0) for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { if (activeGame.mode === 'gungame') { gungamePlayerDown('crash'); } else { endMatch(false, 'AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); } return; } }
+  if (p.respawnT <= 0) {
+    // v35 WS5: border enforcement (player) — a push, never a wall, never
+    // death. Past the fence radius: a throttled warning banner, an inward
+    // nudge that grows with the overshoot, a gentle heading bend toward the
+    // arena center, and a hard radial cap at R + 60 so the jet can never
+    // actually exit the cylinder. Royale's storm stays the lethal mechanic;
+    // this only enforces the absolute map edge, in every mode.
+    const bR = activeGame.mapRadius || 1300;
+    const bd = Math.hypot(p.mesh.position.x, p.mesh.position.z);
+    if (bd > bR) {
+      const over = bd - bR;
+      if (gameTime - (activeGame._bwT || -99) > 3) { showBanner('⚠ TURN BACK — EDGE OF THE COMBAT ZONE', 1600); activeGame._bwT = gameTime; }
+      const push = (30 + over * 1.2) * dt;
+      p.mesh.position.x -= (p.mesh.position.x / bd) * push; p.mesh.position.z -= (p.mesh.position.z / bd) * push;
+      const hC = Math.atan2(-p.mesh.position.x, -p.mesh.position.z);
+      const bendRate = 1.6 * dt * (0.4 + Math.min(1, over / 90));
+      p.heading = angleWrap(p.heading + clampNum(angleWrap(hC - p.heading), -bendRate, bendRate));
+      const nd = Math.hypot(p.mesh.position.x, p.mesh.position.z);
+      if (nd > bR + 60) { const bs = (bR + 60) / nd; p.mesh.position.x *= bs; p.mesh.position.z *= bs; }
+    }
+  }
   if (p.respawnT <= 0) emitDamageSmoke(p, dt); // player always trails damage smoke when hurt
   const firing = keys[state.binds.fire] || p._touchFire;
   const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1) * (activeGame.waveMods ? 1 / activeGame.waveMods.fireMul : 1); // v31: Wave Defense fire-rate perks divide the interval at this funnel
@@ -4011,32 +4191,35 @@ function animate(now) {
       const lt = p.lockTarget;
       const tv = lt.fwdVec ? lt.fwdVec.clone().multiplyScalar(lt.spd || 0) : new THREE.Vector3();
       const distToT = lt.mesh.position.distanceTo(muzzle);
-      shotDir = lt.mesh.position.clone().add(tv.multiplyScalar(distToT / 360)).sub(muzzle).normalize();
+      shotDir = lt.mesh.position.clone().add(tv.multiplyScalar(distToT / PLAYER_BULLET_SPEED)).sub(muzzle).normalize(); // v35: lead at the new player bullet speed (450, was 360)
       shotDir.x += (Math.random() - 0.5) * 0.012; shotDir.y += (Math.random() - 0.5) * 0.012; shotDir.z += (Math.random() - 0.5) * 0.012;
       shotDir.normalize();
     } else {
-      // v31 soft aim assist (player only, non-locked shots; v33: cone widened
-      // to 9 degrees, reach extended to 950): find the hostile whose PREDICTED
-      // intercept point lies closest to the nose direction (smallest angle
-      // wins, so with two hostiles in the cone the one the crosshair is most
-      // centered on is chosen); inside the cone the round is bent exactly onto
-      // that intercept (full correction), then the tightened spread is applied
-      // at half strength. Out of cone / out of range the shot flies the nose
-      // with the full tightened spread. Bots never come through this path.
+      // v31 soft aim assist (player only, non-locked shots), v35 widened:
+      // find the hostile whose PREDICTED intercept point lies closest to the
+      // nose direction (smallest angle wins, so with two hostiles in the zone
+      // the one the crosshair is most centered on is chosen). v35 zones:
+      // within 14° of the nose the round bends exactly onto the intercept
+      // (full correction, half spread); between 14° and 22° it bends 45% of
+      // the angular way toward the intercept (partial correction, full
+      // spread); beyond 22° or past 1200 units the shot flies the nose true.
+      // The lead math uses the player bullet speed (450). Bots never come
+      // through this path — their funnel, spread and lead are untouched.
       let spreadAmt = PLAYER_GUN_SPREAD;
-      let assistDir = null, assistAng = AIM_ASSIST_CONE;
+      let assistDir = null, assistAng = AIM_ASSIST_CONE_PARTIAL;
       for (let ai = 0; ai < activeGame.entities.length; ai++) {
         const ae = activeGame.entities[ai];
         const aDist = ae.mesh.position.distanceTo(muzzle);
         if (aDist > AIM_ASSIST_RANGE || aDist < 1) continue;
         const atv = ae.fwdVec ? ae.fwdVec.clone().multiplyScalar(ae.spd || 0) : new THREE.Vector3();
-        const aDir = ae.mesh.position.clone().add(atv.multiplyScalar(aDist / 360)).sub(muzzle); // intercept lead at bullet speed 360 — the v5 auto-aim math
+        const aDir = ae.mesh.position.clone().add(atv.multiplyScalar(aDist / PLAYER_BULLET_SPEED)).sub(muzzle); // v35: intercept lead at the player bullet speed 450 (was 360)
         if (aDir.lengthSq() < 1) continue;
         aDir.normalize();
         const aAng = Math.acos(clampNum(fwd.dot(aDir), -1, 1));
         if (aAng < assistAng) { assistAng = aAng; assistDir = aDir; }
       }
-      if (assistDir) { shotDir = assistDir; spreadAmt = PLAYER_GUN_SPREAD * 0.5; }
+      if (assistDir && assistAng <= AIM_ASSIST_CONE) { shotDir = assistDir; spreadAmt = PLAYER_GUN_SPREAD * 0.5; } // full bend + half spread
+      else if (assistDir) { shotDir = fwd.clone().lerp(assistDir, AIM_ASSIST_PARTIAL_BEND).normalize(); } // partial bend (45% of the way), full spread
       else shotDir = fwd.clone();
       shotDir.x += (Math.random() - 0.5) * spreadAmt; shotDir.y += (Math.random() - 0.5) * spreadAmt; shotDir.z += (Math.random() - 0.5) * spreadAmt;
       shotDir.normalize();
@@ -4164,6 +4347,16 @@ function animate(now) {
       if (Math.abs(angleWrap(toThreatH - bot.heading)) < 0.5 && threatScore < 120) desP = Math.max(desP, clampNum((threat.h + 30 - bp.y) * 0.01, 0, 0.6));
     }
 
+    // ---- v35 terrain climb-out ----
+    // The heightmap is NOT in the obstacles array, so the building avoidance
+    // above never sees a mountainside coming. Bots get the same climb-over
+    // instinct for rising ground: when the surface under the belly is within
+    // 45 units, demand a climb. Without this, the lethal terrain below would
+    // turn the low evade band (35-110 units) into mass bot suicide on the
+    // rim terrain of mountain/canyon chapters.
+    const tSurfHere = surfaceHeightAt(bp.x, bp.z);
+    if (tSurfHere !== null && tSurfHere > 0 && bp.y < tSurfHere + 45) desP = Math.max(desP, clampNum((tSurfHere + 45 - bp.y) * 0.02, 0, 0.65));
+
     // ---- Apply capped steering through the stable flight model ----
     const yawDiff = angleWrap(desH - bot.heading);
     const botYawRate = 1.15 * bot.skill * 0.8, botPitchRate = 0.9 * bot.skill;
@@ -4174,7 +4367,34 @@ function animate(now) {
     orientFlight(bot);
     const bFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bot.mesh.quaternion);
     bot.fwdVec = bFwd;
-    bp.addScaledVector(bFwd, bot.spd * spdMul * dt); bp.y = Math.max(12, Math.min(950, bp.y));
+    bp.addScaledVector(bFwd, bot.spd * spdMul * dt);
+    // v35 WS4: terrain / ground / water impact kills bots too — tested on the
+    // PRE-clamp height against the same surfaceHeightAt the player uses, and
+    // routed through the one elimination funnel so every mode's counting
+    // treats it exactly like being shot down (Gun Game respawns the victim
+    // in place, Royale advances placements, Waves tick the quota). Building
+    // scrapes below keep their old non-lethal rule — only the SURFACE kills.
+    // Kill credit follows the Gun Game crash rule: the last attacker counts
+    // only if they hit this bot within the last 5 seconds; a bot that flies
+    // itself into a mountainside credits nobody.
+    const bSurf = surfaceHeightAt(bp.x, bp.z);
+    if (bSurf !== null && bp.y <= bSurf + 2) {
+      bp.y = bSurf + 2;
+      const crashKiller = (bot.lastAttacker != null && (gameTime - (bot.lastHitAt || -99)) <= 5) ? bot.lastAttacker : null;
+      handleEntityEliminated(i, crashKiller);
+      if (!activeGame) return; // the elimination ended the match (e.g. last Royale rival)
+      continue;
+    }
+    bp.y = Math.max(12, Math.min(950, bp.y));
+    // v35 WS5: border for bots — the same soft radial push, center bend and
+    // R + 60 cap as the player, so a chase or an evade run can never leave
+    // the arena; a waypoint that somehow sits outside is pulled back inside.
+    { const bR = activeGame.mapRadius || 1300; const bd = Math.hypot(bp.x, bp.z);
+      if (bd > bR) { const over = bd - bR; const push = (30 + over * 1.2) * dt; bp.x -= (bp.x / bd) * push; bp.z -= (bp.z / bd) * push;
+        const hC = Math.atan2(-bp.x, -bp.z); bot.heading = angleWrap(bot.heading + clampNum(angleWrap(hC - bot.heading), -botYawRate * dt * 1.5, botYawRate * dt * 1.5));
+        const nd = Math.hypot(bp.x, bp.z); if (nd > bR + 60) { const bs = (bR + 60) / nd; bp.x *= bs; bp.z *= bs; }
+        if (bot.waypoint) { const wd = Math.hypot(bot.waypoint.x, bot.waypoint.z); if (wd > bR * 0.95) { const ws = (bR * 0.95) / wd; bot.waypoint.x *= ws; bot.waypoint.z *= ws; } }
+      } }
 
     // ---- Building scrape: push out to the edge, 5 hp, can never kill ----
     for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = bp.x - o.x, dz = bp.z - o.z; const d2 = dx * dx + dz * dz; if (bp.y < o.h && d2 < o.r * o.r && d2 > 0.01) { const d = Math.sqrt(d2); bp.x = o.x + (dx / d) * o.r; bp.z = o.z + (dz / d) * o.r; bot.hp = Math.max(1, bot.hp - 5); } }
@@ -4220,13 +4440,13 @@ function animate(now) {
     }
   }
   for (let i = activeGame.bullets.length - 1; i >= 0; i--) {
-    const b = activeGame.bullets[i]; b.life -= dt; b.mesh.position.addScaledVector(b.dir, 360 * dt);
+    const b = activeGame.bullets[i]; b.life -= dt; b.mesh.position.addScaledVector(b.dir, b.spd * dt); // v35: per-bullet speed (player 450 / bots 360)
     if (b.life <= 0) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg * playerDamageMul(); p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < (b.ownerId === 'player' ? 10.5 : 6.5)) { /* v35: player rounds get +4 hit radius vs bot jets (10.5 vs 6.5) — near-misses that read as hits now connect; bot rounds unchanged */ if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -4333,6 +4553,7 @@ function animate(now) {
   }
   // Afterburner flicker + cloud drift (visual life, no allocations)
   updateSmoke(dt);
+  updateFxRings(dt); // v35: shockwave rings from jet-kill explosions
   // Muzzle flash decay (v6): fast exponential falloff of the shared light + flash sprites
   if (_muzzleLight) {
     if (_muzzleLight.intensity > 0.05) { _muzzleLight.intensity *= Math.pow(0.0001, dt); if (_muzzleFlash) { _muzzleFlash.material.opacity = Math.min(0.95, _muzzleLight.intensity / 26); _muzzleFlash.visible = _muzzleLight.intensity > 0.4; } }
@@ -4420,8 +4641,7 @@ function gungamePlayerDown(cause) {
     killer.kills++; applyBotTier(killer);
     if (killer.kills >= 15) { endMatch(false, 'DEFEAT', `${killer.name} reached 15 kills first!`); return; }
   }
-  for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
-  for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8, hdr: 1.6 }); // v17: fireball core blooms
+  spawnJetExplosion(p.mesh.position); // v35: the shared kill explosion replaces the old inline puff burst (18 dark + 6 flame) — same death, bigger show: fireball + shockwave ring + debris sparks + rising smoke column
   SFX.explosion(); // v20: your own death is loud
   shakeT = Math.max(shakeT, 0.6); // v15: your own explosion kicks the camera
   p.mesh.visible = false; p.respawnT = 2.0;
@@ -4623,6 +4843,7 @@ function pickWavePerk(idx) {
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (victim.mesh && p && p.mesh && victim.mesh.position.distanceTo(p.mesh.position) < 900) SFX.explosion(); // v20: deaths are audible when they happen near you
+  if (victim.mesh) spawnJetExplosion(victim.mesh.position); // v35: every jet kill gets the full explosion (fireball + shockwave ring + debris + smoke column) — captured before the gungame respawn teleport / mesh removal below
   if (killerId === 'player') {
     SFX.kill(); // v20: kill-confirm blip
     if (activeGame.waveMods && activeGame.waveMods.lifesteal > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + activeGame.waveMods.lifesteal); // v31: Vampire Plating (waves draft) — kills feed the hull, hooked at the one kill funnel
@@ -5098,14 +5319,53 @@ const tz = document.getElementById('touchZone'); const tk = document.getElementB
 // bindHold handlers and never touch this state, so thumb-on-stick +
 // thumb-on-buttons works simultaneously, the normal way people play. The
 // zone's CSS already sets touch-action: none, so no scroll/gesture hijack.
+// v35 WS1 audit + invariant hardening (Jayce, on a real phone: "the joystick
+// should only move the jet if you're touching the joystick"). Full audit of
+// every input path that can reach the player's pitch/roll: touchVec has
+// exactly TWO writers in the whole file — steerStick() and releaseStick() —
+// and steerStick is called only from the two tz handlers below. There is NO
+// legacy full-screen touch steering, NO drag-to-aim handler, NO mousemove
+// steering anywhere (so compatibility mouse events after a touch have no
+// steering listener to feed), and the HUD buttons are not descendants of
+// #touchZone (they live in #hud, which is pointer-events:none except the
+// button row). The v33 claim logic itself was sound — the real-device hole
+// was GEOMETRY: #touchZone's hit box is its 110x110 SQUARE (border-radius
+// does not clip hit-testing), so the invisible corners — about a fifth of
+// the box, more at the 1.4x layout scale — claimed the stick when a thumb
+// landed NEAR the visible circle but not on it, and the stick "moved when
+// touching another part of the screen". Fixes: (1) clip-path: circle() on
+// #touchZone so the hit area IS the visible circle, plus a radius test in
+// the claim handler itself (defense in depth for webviews that ignore
+// clip-path hit-testing); (2) a hard gate at the flight-input merge — touch
+// steering contributes only while stickPointerId is claimed; (3) stale-claim
+// cleanup: a mission that ends (or a tab that hides) while a thumb is down
+// can swallow the pointerup on some browsers, leaving a live claim + vector
+// for the next mission — startMission / returnHome / tab-hide now force
+// releaseStick(); (4) bindHold stops propagation so a button touch can
+// never bubble into any steering listener, present or future.
 let stickPointerId = null;
 function steerStick(clientX, clientY) { const rect = tz.getBoundingClientRect(); const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; } // v32: center/travel derived from the live rect so the stick stays correct when the layout editor moves/scales it (identical numbers at the default 110px)
 function releaseStick() { stickPointerId = null; tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; }
-tz.addEventListener('pointerdown', function(e) { if (stickPointerId !== null) return; stickPointerId = e.pointerId; try { tz.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); steerStick(e.clientX, e.clientY); });
+tz.addEventListener('pointerdown', function(e) {
+  if (stickPointerId !== null) return; // one claim at a time — a second finger NEVER takes the stick over
+  if (e.isPrimary === false) return;
+  if (typeof e.button === 'number' && e.button > 0) return; // mouse right/middle click is not a thumb
+  // v35: the press must begin ON the visible circle, not merely inside the
+  // element's square box (clip-path handles modern browsers; this radius
+  // test is the guarantee in webviews that hit-test the box). A touch that
+  // begins outside and slides in later can never claim — pointerdown only
+  // fires for the touch's starting point.
+  const rect = tz.getBoundingClientRect(), R = rect.width / 2;
+  const cdx = e.clientX - (rect.left + R), cdy = e.clientY - (rect.top + R);
+  if (cdx * cdx + cdy * cdy > R * R) return;
+  stickPointerId = e.pointerId; try { tz.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); steerStick(e.clientX, e.clientY);
+});
 tz.addEventListener('pointermove', function(e) { if (e.pointerId !== stickPointerId) return; e.preventDefault(); steerStick(e.clientX, e.clientY); });
 tz.addEventListener('pointerup', function(e) { if (e.pointerId === stickPointerId) releaseStick(); });
 tz.addEventListener('pointercancel', function(e) { if (e.pointerId === stickPointerId) releaseStick(); });
-function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) e.preventDefault(); if (activeGame) activeGame.player[prop] = true; }; const off = function() { if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); }
+tz.addEventListener('lostpointercapture', function(e) { if (stickPointerId !== null && e.pointerId === stickPointerId) releaseStick(); }); // v35: capture lost without an up (browser gesture, element hidden) — never leave a stale claim steering
+document.addEventListener('visibilitychange', function() { if (document.hidden) releaseStick(); }); // v35: tab hidden mid-press — the matching pointerup may never arrive
+function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); } if (activeGame) activeGame.player[prop] = true; }; const off = function(e) { if (e && e.stopPropagation) e.stopPropagation(); if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); } // v35: stopPropagation — a button touch is consumed by the button, full stop; it can never bubble into any steering listener
 bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindHold('btnFireRocket', '_touchRocket'); // v29: holding the touch rocket button now polls like holding R (its onclick tap still works too)
 // ---- v32 touch button layout editor ----
 // The mission touch controls: the FIXED-position joystick base (#touchZone,
