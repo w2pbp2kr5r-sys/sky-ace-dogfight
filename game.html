@@ -33,6 +33,9 @@
   .topnav .btn-sec { background: rgba(30,41,59,0.55); border: 1px solid transparent; }
   .topnav .btn:hover { border-color: rgba(56,189,248,0.65); box-shadow: inset 0 -2px 0 #38bdf8, 0 0 12px rgba(56,189,248,0.22); }
   .rarity-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.6px; color: #0b0f16; vertical-align: middle; }
+  .premium-tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.6px; color: #0b0f16; vertical-align: middle; background: linear-gradient(135deg, #fde68a, #f59e0b); box-shadow: 0 0 10px rgba(245,158,11,0.45); }
+  .premium-price { color: #fbbf24; font-weight: 800; font-size: 1.02rem; }
+  .premium-notice { margin-bottom: 12px; padding: 10px 14px; border-radius: 10px; background: rgba(245,158,11,0.10); border: 1px solid rgba(245,158,11,0.55); color: #fde68a; font-size: 0.88rem; font-weight: 600; text-align: center; }
   .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); vertical-align: middle; }
   .pill { background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
   .pill.coins { color: #fbbf24; border-color: rgba(251,191,36,0.4); }
@@ -207,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v25 — ONLINE ROYALE ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v26 — PREMIUM JETS ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -347,6 +350,21 @@
   </div>
 </div>
 
+<div id="redeemModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>🎟 Redeem Code</h2><button class="btn btn-sec btn-sm" id="btnCloseRedeem">Close</button></div>
+    <div class="modal-body">
+      <p style="font-size:1rem;">Unlock: <strong id="redeemJetName">???</strong> <span class="premium-tag">PREMIUM</span></p>
+      <p style="color:#94a3b8;font-size:0.85rem;margin-top:6px;">Enter the one-time code from your purchase email. Each code unlocks one jet, one time only.</p>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px;">
+        <input type="text" id="redeemCodeInput" placeholder="ENTER CODE" autocomplete="off" autocapitalize="characters" spellcheck="false" style="text-transform:uppercase;letter-spacing:2px;font-weight:700;text-align:center;" />
+        <div id="redeemMsg" class="cloud-msg hidden"></div>
+        <button class="btn btn-gold" id="btnRedeemUnlock">Unlock</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -443,15 +461,17 @@ const JETS = [
   { id: 'f35', name: 'F-35 Lightning', cost: 1200, premium: false, color: 0x475569, accent: 0xa855f7, hp: 185, spd: 1.14, turn: 1.12, dmg: 23, desc: 'Stealth airframe with upgraded sensors.' },
   { id: 'f22', name: 'F-22 Raptor', cost: 2000, premium: false, color: 0x334155, accent: 0xf59e0b, hp: 220, spd: 1.24, turn: 1.22, dmg: 28, desc: 'Air-superiority stealth twin-engine apex jet.' },
   { id: 'su57', name: 'Su-57 Felon', cost: 3000, premium: false, color: 0x1e293b, accent: 0xef4444, hp: 250, spd: 1.30, turn: 1.28, dmg: 33, desc: 'Super-maneuverable fifth-gen interceptor.' },
-  { id: 'x02', name: 'X-02 Wyvern Prototype', cost: '$2.99', premium: true, color: 0x0f172a, accent: 0x38bdf8, hp: 290, spd: 1.38, turn: 1.35, dmg: 38, desc: 'Exclusive switch-blade experimental fighter.' },
-  { id: 'adf11', name: 'ADF-11 Raven Darkstar', cost: '$6.99', premium: true, color: 0x111827, accent: 0xf43f5e, hp: 340, spd: 1.48, turn: 1.42, dmg: 45, desc: 'Exclusive hypersonic black-ops prototype.' },
-  // Mystery jets (v10): type hidden behind "???" until purchased; mesh reuses an existing silhouette
-  { id: 'mx1', name: 'YF-23 Black Widow', cost: 1800, premium: false, mystery: true, rarity: 'Rare', mesh: 'f22', color: 0x2f3742, accent: 0x94a3b8, hp: 225, spd: 1.25, turn: 1.20, dmg: 28, desc: 'Stealth competitor prototype with diamond wings and a ghost-grey finish.' },
-  { id: 'mx2', name: 'MiG-31 Foxhound', cost: 2200, premium: false, mystery: true, rarity: 'Rare', mesh: 'su57', color: 0x707a6a, accent: 0xef4444, hp: 245, spd: 1.31, turn: 1.18, dmg: 31, desc: 'Mach-3 interceptor built to hunt at extreme altitude.' },
-  { id: 'mx3', name: 'F-15EX Eagle II', cost: 3500, premium: false, mystery: true, rarity: 'Epic', mesh: 'fa18', color: 0x8b95a1, accent: 0xf59e0b, hp: 265, spd: 1.30, turn: 1.26, dmg: 34, desc: 'The ultimate Eagle: huge payload, modern sensors, relentless climb.' },
-  { id: 'mx4', name: 'J-20 Mighty Dragon', cost: 4200, premium: false, mystery: true, rarity: 'Epic', mesh: 'f35', color: 0x39434e, accent: 0x38bdf8, hp: 285, spd: 1.36, turn: 1.30, dmg: 37, desc: 'Long-range stealth dragon with canards and a dark splinter scheme.' },
-  { id: 'mx5', name: 'SR-72 Darkstar', cost: 6500, premium: false, mystery: true, rarity: 'Legendary', mesh: 'adf11', color: 0x0d1015, accent: 0xa855f7, hp: 330, spd: 1.50, turn: 1.38, dmg: 43, desc: 'Hypersonic shadow — the fastest airframe ever declassified.' },
-  { id: 'mx6', name: 'NGAD Spectre X', cost: 9000, premium: false, mystery: true, rarity: 'Mythic', mesh: 'x02', color: 0x1c1440, accent: 0x22d3ee, hp: 360, spd: 1.54, turn: 1.46, dmg: 48, desc: 'Sixth-generation phantom. Officially, it does not exist.' }
+  { id: 'x02', name: 'X-02 Wyvern Prototype', cost: '$2.99', premium: true, usd: 2.99, color: 0x0f172a, accent: 0x38bdf8, hp: 290, spd: 1.38, turn: 1.35, dmg: 38, desc: 'Exclusive switch-blade experimental fighter.' },
+  { id: 'adf11', name: 'ADF-11 Raven Darkstar', cost: '$6.99', premium: true, usd: 6.99, color: 0x111827, accent: 0xf43f5e, hp: 340, spd: 1.48, turn: 1.42, dmg: 45, desc: 'Exclusive hypersonic black-ops prototype.' },
+  // Mystery jets (v10; v26: REAL-MONEY premium — coins no longer buy them. Unlocked via
+  // payment link + redeem code; see PAYMENT_LINKS and the redeem_codes flow below.)
+  // Type hidden behind "???" until purchased; mesh reuses an existing silhouette.
+  { id: 'mx1', name: 'YF-23 Black Widow', cost: '$1.99', premium: true, usd: 1.99, mystery: true, rarity: 'Rare', mesh: 'f22', color: 0x2f3742, accent: 0x94a3b8, hp: 225, spd: 1.25, turn: 1.20, dmg: 28, desc: 'Stealth competitor prototype with diamond wings and a ghost-grey finish.' },
+  { id: 'mx2', name: 'MiG-31 Foxhound', cost: '$2.99', premium: true, usd: 2.99, mystery: true, rarity: 'Rare', mesh: 'su57', color: 0x707a6a, accent: 0xef4444, hp: 245, spd: 1.31, turn: 1.18, dmg: 31, desc: 'Mach-3 interceptor built to hunt at extreme altitude.' },
+  { id: 'mx3', name: 'F-15EX Eagle II', cost: '$3.99', premium: true, usd: 3.99, mystery: true, rarity: 'Epic', mesh: 'fa18', color: 0x8b95a1, accent: 0xf59e0b, hp: 265, spd: 1.30, turn: 1.26, dmg: 34, desc: 'The ultimate Eagle: huge payload, modern sensors, relentless climb.' },
+  { id: 'mx4', name: 'J-20 Mighty Dragon', cost: '$4.99', premium: true, usd: 4.99, mystery: true, rarity: 'Epic', mesh: 'f35', color: 0x39434e, accent: 0x38bdf8, hp: 285, spd: 1.36, turn: 1.30, dmg: 37, desc: 'Long-range stealth dragon with canards and a dark splinter scheme.' },
+  { id: 'mx5', name: 'SR-72 Darkstar', cost: '$6.99', premium: true, usd: 6.99, mystery: true, rarity: 'Legendary', mesh: 'adf11', color: 0x0d1015, accent: 0xa855f7, hp: 330, spd: 1.50, turn: 1.38, dmg: 43, desc: 'Hypersonic shadow — the fastest airframe ever declassified.' },
+  { id: 'mx6', name: 'NGAD Spectre X', cost: '$9.99', premium: true, usd: 9.99, mystery: true, rarity: 'Mythic', mesh: 'x02', color: 0x1c1440, accent: 0x22d3ee, hp: 360, spd: 1.54, turn: 1.46, dmg: 48, desc: 'Sixth-generation phantom. Officially, it does not exist.' }
 ];
 // ---- Rarity presentation (shared by mystery jets + skins) ----
 const RARITY_COLORS = { Common: '#94a3b8', Rare: '#38bdf8', Epic: '#a855f7', Legendary: '#f59e0b', Mythic: '#f43f5e' };
@@ -3719,10 +3739,11 @@ function switchHangarTab(tab, btnEl) {
   if (btnEl) { document.querySelectorAll('#hangarModal .tab-btn').forEach(function(b) { b.classList.remove('active'); }); btnEl.classList.add('active'); }
   const body = document.getElementById('hangarBody');
   if (tab === 'jets') {
-    body.innerHTML = '<div class="card-grid">' + JETS.map(function(j) {
+    body.innerHTML = takePremiumNoticeHtml() + '<div class="card-grid">' + JETS.map(function(j) {
       const owned = state.ownedJets.includes(j.id); const eq = state.selectedJet === j.id; let btnHtml = '';
       if (eq) btnHtml = '<button class="btn btn-sec btn-sm" disabled>Equipped</button>';
       else if (owned) btnHtml = `<button class="btn btn-play btn-sm" onclick="equipJet('${j.id}')">Equip</button>`;
+      else if (j.usd) btnHtml = premiumButtonsHtml(j); // v26: real-money jets — payment link + redeem code, never coins
       else if (j.premium) btnHtml = `<button class="btn btn-gold btn-sm" onclick="openModalsShop()">Store Only (${j.cost})</button>`;
       else btnHtml = `<button class="btn btn-gold btn-sm" onclick="buyJet('${j.id}')">Buy (${j.cost} Coins)</button>`;
       const pct = Math.round(j.spd * 100);
@@ -3733,7 +3754,9 @@ function switchHangarTab(tab, btnEl) {
       const dStats = masked ? 'Hull: ?? | DMG: ?? | SPD: ??' : `Hull: ${j.hp} | DMG: ${j.dmg} | SPD: ${pct}%`;
       const dBar = masked ? 50 : Math.min(100, j.hp / 3.6);
       const badge = j.mystery ? ' ' + rarityBadge(j.rarity) : '';
-      return `<div class="item-card"><h3>${dName}${badge}</h3><p>${dDesc}</p><p>${dStats}</p><div class="stat-bar"><div class="stat-fill" style="width:${dBar}%"></div></div>${btnHtml}</div>`;
+      const premTag = j.usd ? ' <span class="premium-tag">PREMIUM</span>' : '';
+      const priceLine = (j.usd && !owned) ? `<p class="premium-price">$${j.usd.toFixed(2)}</p>` : '';
+      return `<div class="item-card"><h3>${dName}${badge}${premTag}</h3><p>${dDesc}</p><p>${dStats}</p><div class="stat-bar"><div class="stat-fill" style="width:${dBar}%"></div></div>${priceLine}${btnHtml}</div>`;
     }).join('') + '</div>';
   } else {
     const upgs = [
@@ -3753,18 +3776,21 @@ function switchHangarTab(tab, btnEl) {
 }
 function openModalsShop() { closeModals(); renderShop(); document.getElementById('shopModal').classList.remove('hidden'); }
 function equipJet(id) { state.selectedJet = id; saveState(); refreshMenuJet(); switchHangarTab('jets'); }
-function buyJet(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j || typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); refreshMenuJet(); switchHangarTab('jets'); }
+function buyJet(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j) return; if (j.usd) { buyPremiumJet(id); return; } // v26: real-money jets can never be bought with coins — route to the premium flow
+  if (typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); refreshMenuJet(); switchHangarTab('jets'); }
 function buyUpgrade(key, cost) { if (state.coins < cost) { alert('Not enough coins!'); return; } if (state.upgrades[key] >= 6) return; state.coins -= cost; state.upgrades[key]++; saveState(); refreshMenuJet(); switchHangarTab('upgrades'); }
-function buyJetShop(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j || typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); refreshMenuJet(); renderShop(); showBanner(`REVEALED: ${j.name} (${j.rarity})! Now equipped.`, 3600); }
+function buyJetShop(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j) return; if (j.usd) { buyPremiumJet(id); return; } // v26: real-money jets can never be bought with coins — route to the premium flow
+  if (typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); refreshMenuJet(); renderShop(); showBanner(`REVEALED: ${j.name} (${j.rarity})! Now equipped.`, 3600); }
 function renderShop() {
   const packs = [ { name: 'Pilot Coin Pouch', coins: 600, price: '$0.99' }, { name: 'Squadron War Chest', coins: 1800, price: '$2.99' }, { name: 'Commander Vault', coins: 5000, price: '$6.99' } ];
-  const premJets = JETS.filter(function(j) { return j.premium; });
+  const premJets = JETS.filter(function(j) { return j.premium && !j.mystery; }); // v26: mystery jets are premium too, but keep their own Classified section (no duplicates)
   const mystJets = JETS.filter(function(j) { return j.mystery; });
   document.getElementById('shopBody').innerHTML =
+    takePremiumNoticeHtml() +
     '<div class="section-label">Coin Bundles</div><div class="card-grid">' + packs.map(function(pk) { return `<div class="item-card"><h3>${pk.name}</h3><p>Instant +${pk.coins} Coins for upgrades & jets.</p><button class="btn btn-gold btn-sm" onclick="simulateIAP('${pk.name}', ${pk.coins}, '')">Buy ${pk.price}</button></div>`; }).join('') + '</div>' +
-    '<div class="section-label" style="margin-top:8px;">Classified Aircraft — Identity Hidden Until Purchased</div><div class="card-grid">' + mystJets.map(function(j) { const owned = state.ownedJets.includes(j.id); const masked = !owned; const btn = owned ? '<button class="btn btn-sec btn-sm" disabled>Owned</button>' : `<button class="btn btn-gold btn-sm" onclick="buyJetShop('${j.id}')">Buy (${j.cost} Coins)</button>`; return `<div class="item-card"><h3>${masked ? '???' : j.name} ${rarityBadge(j.rarity)}</h3><p>${masked ? 'Unknown aircraft — buy to reveal' : j.desc}</p><p>${masked ? 'Hull: ?? | DMG: ?? | SPD: ??' : `Hull: ${j.hp} | DMG: ${j.dmg} | SPD: ${Math.round(j.spd * 100)}%`}</p>${btn}</div>`; }).join('') + '</div>' +
-    '<div class="section-label" style="margin-top:8px;">Exclusive Prototype Aircraft (Real-Money Only)</div><div class="card-grid">' + premJets.map(function(j) { const owned = state.ownedJets.includes(j.id); const btn = owned ? '<button class="btn btn-sec btn-sm" disabled>Owned</button>' : `<button class="btn btn-gold btn-sm" onclick="simulateIAP('${j.name}', 0, '${j.id}')">Unlock ${j.cost}</button>`; return `<div class="item-card"><h3>${j.name}</h3><p>${j.desc}</p>${btn}</div>`; }).join('') + '</div>' +
-    '<p style="color:#94a3b8;font-size:0.8rem;">Note: This is a simulated/test purchase flow. Connect Stripe Payment Links or App Store billing when deployed live.</p>';
+    '<div class="section-label" style="margin-top:8px;">Classified Aircraft — Identity Hidden Until Purchased</div><div class="card-grid">' + mystJets.map(function(j) { const owned = state.ownedJets.includes(j.id); const masked = !owned; const btn = owned ? '<button class="btn btn-sec btn-sm" disabled>Owned</button>' : premiumButtonsHtml(j); const priceLine = (j.usd && !owned) ? `<p class="premium-price">$${j.usd.toFixed(2)}</p>` : ''; return `<div class="item-card"><h3>${masked ? '???' : j.name} ${rarityBadge(j.rarity)} <span class="premium-tag">PREMIUM</span></h3><p>${masked ? 'Unknown aircraft — buy to reveal' : j.desc}</p><p>${masked ? 'Hull: ?? | DMG: ?? | SPD: ??' : `Hull: ${j.hp} | DMG: ${j.dmg} | SPD: ${Math.round(j.spd * 100)}%`}</p>${priceLine}${btn}</div>`; }).join('') + '</div>' +
+    '<div class="section-label" style="margin-top:8px;">Exclusive Prototype Aircraft (Real-Money Only)</div><div class="card-grid">' + premJets.map(function(j) { const owned = state.ownedJets.includes(j.id); const btn = owned ? '<button class="btn btn-sec btn-sm" disabled>Owned</button>' : premiumButtonsHtml(j); const priceLine = (j.usd && !owned) ? `<p class="premium-price">$${j.usd.toFixed(2)}</p>` : ''; return `<div class="item-card"><h3>${j.name} <span class="premium-tag">PREMIUM</span></h3><p>${j.desc}</p>${priceLine}${btn}</div>`; }).join('') + '</div>' +
+    '<p style="color:#94a3b8;font-size:0.8rem;">Premium jets are real-money purchases: tap 💳 Buy to check out, then unlock the jet with the one-time code from your email via 🎟 Redeem Code. Coin bundles above still use the simulated/test flow.</p>';
 }
 // ---- Customization UI (v10): supply crates + skin collection ----
 let lastCrateResult = '';
@@ -3836,7 +3862,96 @@ function renderCollection() {
   body.innerHTML = html;
 }
 function equipSkinFromCollection(id) { state.equippedSkin = id; saveState(); refreshMenuJet(); renderCollection(); }
-function simulateIAP(title, coins, jetId) { if (!confirm(`Confirm test purchase of ${title}?`)) return; if (coins) state.coins += coins; if (jetId && !state.ownedJets.includes(jetId)) { state.ownedJets.push(jetId); state.selectedJet = jetId; } saveState(); refreshMenuJet(); renderShop(); }
+function simulateIAP(title, coins, jetId) {
+  // v26: jets are NEVER granted by the simulated flow anymore — a jet id routes to
+  // the real premium purchase flow (payment link + redeem code). Coin bundles
+  // (jetId === '') keep the legacy simulated behavior below.
+  if (jetId) { const j = JETS.find(function(x) { return x.id === jetId; }); if (j && j.usd) { buyPremiumJet(jetId); return; } }
+  if (!confirm(`Confirm test purchase of ${title}?`)) return; if (coins) state.coins += coins; if (jetId && !state.ownedJets.includes(jetId)) { state.ownedJets.push(jetId); state.selectedJet = jetId; } saveState(); refreshMenuJet(); renderShop();
+}
+// ---- Premium jets (v26): real-money purchases via payment links + redeem codes ----
+// A premium jet (j.usd set) is unlocked ONLY by claiming a one-time code from the
+// Firestore 'redeem_codes' collection (doc id = the code, fields { jetId, claimedBy }).
+// 💳 Buy opens the jet's PAYMENT_LINKS entry (Stripe Payment Link) in a new tab; the
+// buyer receives their code by email and unlocks the jet with 🎟 Redeem Code.
+let premiumNotice = ''; // one-shot inline notice shown at the top of the shop / hangar jets tab
+function takePremiumNoticeHtml() { if (!premiumNotice) return ''; const h = `<div class="premium-notice">${premiumNotice}</div>`; premiumNotice = ''; return h; }
+function premiumButtonsHtml(j) {
+  return `<span style="display:inline-flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-gold btn-sm" onclick="buyPremiumJet('${j.id}')">💳 Buy — $${j.usd.toFixed(2)}</button><button class="btn btn-sec btn-sm" onclick="openRedeem('${j.id}')">🎟 Redeem Code</button></span>`;
+}
+function refreshPremiumSurfaces() {
+  const shop = document.getElementById('shopModal');
+  if (shop && !shop.classList.contains('hidden')) renderShop();
+  const hang = document.getElementById('hangarModal');
+  if (hang && !hang.classList.contains('hidden')) switchHangarTab('jets');
+}
+function buyPremiumJet(id) {
+  const j = JETS.find(function(x) { return x.id === id; });
+  if (!j || !j.usd) return;
+  if (state.ownedJets.includes(id)) return;
+  const link = PAYMENT_LINKS[id] ? String(PAYMENT_LINKS[id]).trim() : '';
+  if (link) {
+    window.open(link, '_blank');
+    premiumNotice = 'Complete your purchase, then tap 🎟 Redeem Code and enter the code from your email.';
+  } else {
+    premiumNotice = 'This jet goes on sale soon — check back!';
+  }
+  refreshPremiumSurfaces();
+}
+// ---- Redeem codes: one shared modal, target jet kept in redeemTargetId ----
+let redeemTargetId = null;
+function redeemMsg(msg, isErr) { const e = document.getElementById('redeemMsg'); if (!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); e.classList.toggle('err', !!isErr); }
+function openRedeem(id) {
+  const j = JETS.find(function(x) { return x.id === id; });
+  if (!j || !j.usd) return;
+  redeemTargetId = id;
+  const nm = document.getElementById('redeemJetName');
+  if (nm) nm.textContent = (j.mystery && !state.ownedJets.includes(id)) ? '??? — Classified Aircraft' : j.name; // never spoil a mystery reveal in the modal
+  const inp = document.getElementById('redeemCodeInput');
+  if (inp) inp.value = '';
+  redeemMsg('', false);
+  document.getElementById('redeemModal').classList.remove('hidden');
+  setTimeout(function() { if (inp) inp.focus(); }, 60);
+}
+async function redeemEnsureUid() {
+  const c = await cloudInit(); // throws when the SDK/network is unavailable — caller reports it
+  const user = cloudUser || c.auth.currentUser || null;
+  if (user) return user.uid;
+  const cred = await c.authMod.signInAnonymously(c.auth); // same anonymous sign-in the matchmaking uses (guests)
+  return cred.user.uid;
+}
+async function tryRedeem() {
+  const j = JETS.find(function(x) { return x.id === redeemTargetId; });
+  if (!j) return;
+  if (state.ownedJets.includes(j.id)) { redeemMsg('You already own this jet!', true); return; }
+  const code = document.getElementById('redeemCodeInput').value.trim().toUpperCase(); // code format: the Firestore doc id is the code exactly as issued, matched case-insensitively by normalizing input to uppercase
+  if (!code) { redeemMsg('Enter your code first.', true); return; }
+  redeemMsg('Checking your code…', false);
+  let uid;
+  try { uid = await redeemEnsureUid(); } catch (e) { redeemMsg('Redemption needs an internet connection.', true); return; }
+  const c = CLOUD;
+  if (!c || !c.db) { redeemMsg('Redemption needs an internet connection.', true); return; }
+  const ref = c.fsMod.doc(c.db, 'redeem_codes', code);
+  let snap;
+  try { snap = await c.fsMod.getDoc(ref); } catch (e) { redeemMsg('Redemption needs an internet connection.', true); return; }
+  if (!snap.exists()) { redeemMsg('Code not found — check the spelling.', true); return; }
+  const data = snap.data() || {};
+  if (data.jetId !== j.id) { redeemMsg('That code is for a different jet.', true); return; }
+  if (data.claimedBy) { redeemMsg('That code has already been used.', true); return; }
+  try { await c.fsMod.updateDoc(ref, { claimedBy: uid }); } catch (e) { redeemMsg('Could not claim that code — try again.', true); return; }
+  // Claimed — grant the jet. saveState() also pushes the save to the cloud for cloud pilots.
+  if (!state.ownedJets.includes(j.id)) state.ownedJets.push(j.id);
+  state.selectedJet = j.id;
+  saveState(); refreshMenuJet();
+  document.getElementById('redeemModal').classList.add('hidden');
+  refreshPremiumSurfaces();
+  const col = document.getElementById('collectionModal');
+  if (col && !col.classList.contains('hidden')) renderCollection();
+  showBanner(`🛩 ${j.name} UNLOCKED!`, 4200); // the mystery reveal moment (renderers now show the jet, owned)
+}
+document.getElementById('btnRedeemUnlock').addEventListener('click', tryRedeem);
+document.getElementById('redeemCodeInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryRedeem(); });
+document.getElementById('btnCloseRedeem').addEventListener('click', function() { document.getElementById('redeemModal').classList.add('hidden'); });
 const BIND_LABELS = [ ['pitchUp', 'Pitch Nose Up'], ['pitchDown', 'Pitch Nose Down'], ['turnLeft', 'Bank / Turn Left'], ['turnRight', 'Bank / Turn Right'], ['fire', 'Fire Primary Guns'], ['rocket', 'Launch Homing Rocket'], ['autoaim', 'Activate Auto-Aim Lock'], ['boost', 'Engage Afterburner'], ['pause', 'Pause / Settings Menu'] ];
 let listeningAction = null;
 // ---- v15 settings: quality + camera appliers ----
@@ -4349,6 +4464,16 @@ if (!storageOK) {
 // boot probe for session restore) — boot and offline/local play never wait on it,
 // and every failure path degrades to "cloud unavailable" with local pilots intact.
 const firebaseConfig = { apiKey: "AIzaSyCDcwefunM1cRiO2aoNIW8gCn2_NlQl6o4", authDomain: "nebula-dogfight.firebaseapp.com", projectId: "nebula-dogfight", storageBucket: "nebula-dogfight.firebasestorage.app", messagingSenderId: "402021366914", appId: "1:402021366914:web:a924d3151554185007889b" };
+// ---- Premium jet payments (v26) — JAYCE: paste your Stripe Payment Links here ----
+// Create one Stripe Payment Link per jet (dashboard.stripe.com → Payment Links),
+// set its price to match the jet's $ price, and paste the https://buy.stripe.com/…
+// URL between the quotes. The 💳 Buy button on that jet's card opens the link in a
+// new tab; after paying, the buyer unlocks the jet with the one-time code from
+// their email via 🎟 Redeem Code (codes live in the Firestore 'redeem_codes'
+// collection — doc id = the code, fields: jetId, claimedBy).
+// Leave a link as '' (empty) and that jet is NOT on sale yet: its Buy button just
+// shows a "goes on sale soon" notice and nothing is charged or granted.
+const PAYMENT_LINKS = { mx1: '', mx2: '', mx3: '', mx4: '', mx5: '', mx6: '', x02: '', adf11: '' };
 let cloudInitPromise = null;
 function cloudMsg(msg, isErr) { const e = document.getElementById('cloudMsg'); if (!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); e.classList.toggle('err', !!isErr); }
 function cloudInit() {
@@ -4531,6 +4656,8 @@ window.buyJet = buyJet;
 window.buyUpgrade = buyUpgrade;
 window.simulateIAP = simulateIAP;
 window.buyJetShop = buyJetShop;
+window.buyPremiumJet = buyPremiumJet;
+window.openRedeem = openRedeem;
 window.openCrate = openCrate;
 window.equipSkin = equipSkin;
 window.equipSkinFromCollection = equipSkinFromCollection;
