@@ -17,14 +17,17 @@
   .nav-links a{color:var(--muted);text-decoration:none;font-size:.92rem;font-weight:600}
   .nav-links a:hover{color:#fff}
   .nav-cta{background:linear-gradient(135deg,#0284c7,#38bdf8);color:#fff!important;padding:8px 18px;border-radius:8px;font-weight:700}
-  .hero{padding:52px 6% 26px;text-align:center;background:radial-gradient(circle at top,rgba(56,189,248,.16),transparent 60%)}
-  .hero-badge{display:inline-block;padding:5px 14px;border-radius:999px;background:rgba(56,189,248,.14);border:1px solid var(--border);color:var(--accent);font-size:.8rem;font-weight:700;letter-spacing:1px;margin-bottom:14px}
-  .hero h1{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:900;line-height:1.1;margin-bottom:14px}
-  .hero h1 span{color:var(--accent)}
-  .hero p{max-width:700px;margin:0 auto 24px;color:var(--muted);font-size:1.05rem;line-height:1.55}
-  .btn{display:inline-block;padding:13px 28px;border-radius:10px;border:none;background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;font-weight:800;font-size:1rem;text-decoration:none;cursor:pointer;box-shadow:0 6px 20px rgba(37,99,235,.4)}
-  .btn-gold{background:linear-gradient(135deg,#d97706,#f59e0b);color:#090d16;box-shadow:none;margin-left:10px}
-  .game-section{padding:0 4% 10px;max-width:1320px;margin:0 auto}
+  .hero{position:relative;overflow:hidden;padding:86px 6% 74px;text-align:center;background:linear-gradient(180deg,#0b2440 0%,#17507e 34%,#3d7ca8 55%,#c97e3d 78%,#3a2b33 100%)}
+  .hero .sun{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(255,214,140,.95) 0%,rgba(255,166,66,.55) 38%,rgba(255,140,50,0) 70%);pointer-events:none}
+  .hero .cloud{position:absolute;background:rgba(255,255,255,.85);border-radius:999px;filter:blur(6px);opacity:.5;pointer-events:none}
+  .hero .jet{position:relative;z-index:2;width:min(680px,88vw);margin:0 auto 8px;filter:drop-shadow(0 24px 28px rgba(0,0,0,.45))}
+  .hero-badge{position:relative;z-index:2;display:inline-block;padding:5px 14px;border-radius:999px;background:rgba(7,20,36,.45);border:1px solid rgba(255,255,255,.35);color:#ffe1a8;font-size:.8rem;font-weight:700;letter-spacing:1px;margin-bottom:14px}
+  .hero h1{position:relative;z-index:2;font-size:clamp(2.2rem,5vw,3.8rem);font-weight:900;line-height:1.05;margin-bottom:14px;text-shadow:0 4px 24px rgba(0,0,0,.5)}
+  .hero h1 span{color:#7dd3fc}
+  .hero p{position:relative;z-index:2;max-width:700px;margin:0 auto 26px;color:#e8eef4;font-size:1.05rem;line-height:1.55;text-shadow:0 2px 10px rgba(0,0,0,.55)}
+  .btn{position:relative;z-index:2;display:inline-block;padding:13px 28px;border-radius:10px;border:none;background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;font-weight:800;font-size:1rem;text-decoration:none;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .btn-gold{background:linear-gradient(135deg,#d97706,#f59e0b);color:#090d16;margin-left:10px}
+  .game-section{padding:34px 4% 10px;max-width:1320px;margin:0 auto}
   .game-frame-wrap{position:relative;width:100%;height:78vh;min-height:540px;background:#04070e;border-radius:16px;overflow:hidden;border:2px solid var(--border);box-shadow:0 24px 60px rgba(0,0,0,.75)}
   .game-frame-wrap iframe{width:100%;height:100%;border:0;display:block}
   .frame-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;color:var(--muted);font-size:.88rem;flex-wrap:wrap;gap:8px}
@@ -54,26 +57,36 @@
     <a href="#modes">Game Modes</a>
     <a href="#jets">Jets</a>
     <a href="#controls">Controls</a>
-    <a class="nav-cta" href="play-v6.html">Play Fullscreen</a>
+    <a class="nav-cta" href="play-v7.html">Play Fullscreen</a>
   </div>
 </nav>
 
 <header class="hero">
+  <div class="sun"></div>
+  <div class="cloud" style="left:6%;top:16%;width:220px;height:34px"></div>
+  <div class="cloud" style="right:8%;top:26%;width:300px;height:42px"></div>
+  <div class="cloud" style="left:16%;top:64%;width:170px;height:26px;opacity:.35"></div>
+  <div class="cloud" style="right:18%;top:70%;width:210px;height:30px;opacity:.3"></div>
+  <svg class="jet" viewBox="0 0 640 210" xmlns="http://www.w3.org/2000/svg" aria-label="Fighter jet silhouette">
+    <path fill="#0d1b2a" d="M320 6 L338 62 L452 118 L548 150 L552 164 L462 158 L356 128 L362 168 L398 190 L400 200 L342 188 L322 190 L302 188 L244 200 L246 190 L282 168 L288 128 L182 158 L92 164 L96 150 L192 118 L306 62 Z"/>
+    <ellipse cx="322" cy="58" rx="11" ry="26" fill="#274b66"/>
+    <path fill="#f59e0b" opacity=".85" d="M306 190 L320 226 L334 190 L326 184 L314 184 Z"/>
+  </svg>
   <div class="hero-badge">FREE BROWSER GAME &bull; NO DOWNLOAD</div>
   <h1>SKY ACE <span>3D</span><br />Fighter Jet Dogfight</h1>
   <p>Pilot realistic fighter jets across 10 campaign chapters, climb a 15-tier Gun Game, survive a 50-pilot Ranked Battle Royale storm zone, and challenge real players in Online 1v1. Earn coins, upgrade your jet, and become the ace.</p>
   <a class="btn" href="#play">Play Now</a>
-  <a class="btn btn-gold" href="play-v6.html">Open Fullscreen</a>
+  <a class="btn btn-gold" href="play-v7.html">Open Fullscreen</a>
 </header>
 
 <main>
   <div class="game-section" id="play">
     <div class="game-frame-wrap">
-      <iframe src="play-v6.html" title="SKY ACE 3D Game" allow="fullscreen" allowfullscreen></iframe>
+      <iframe src="play-v7.html" title="SKY ACE 3D Game" allow="fullscreen" allowfullscreen></iframe>
     </div>
     <div class="frame-bar">
       <span>Tip: click inside the game first so your keyboard controls it. Progress saves automatically in your browser.</span>
-      <a href="play-v6.html">Play fullscreen &rarr;</a>
+      <a href="play-v7.html">Play fullscreen &rarr;</a>
     </div>
   </div>
 
@@ -82,7 +95,7 @@
     <p class="sub">Four ways to play, all in the game window above.</p>
     <div class="grid">
       <div class="card"><h3>Campaign</h3><p>10 chapters from Sunlit Harbor City to the Cyber Core Citadel. Clear enemy squadrons, earn coin and XP rewards, and unlock the next chapter.</p><span class="tag">10 Chapters</span></div>
-      <div class="card"><h3>Gun Game</h3><p>10-bot free-for-all. Every kill promotes you to the next of 15 jet tiers, from the T-1 Trainer to the T-15 Darkstar railgun. First to 15 kills wins.</p><span class="tag">15 Tiers</span></div>
+      <div class="card"><h3>Gun Game</h3><p>10-bot free-for-all. Every kill promotes you to the next of 15 jet tiers, from the T-1 Trainer to the T-15 Darkstar railgun. First to 15 kills wins — and now you respawn when you die, so the race never ends early.</p><span class="tag">15 Tiers</span></div>
       <div class="card"><h3>Ranked Royale</h3><p>50 pilots, one shrinking storm zone. Grab power rings for speed, rapid fire, repairs and target lock, place high, and climb from Silver to Ranked Global.</p><span class="tag">50 Pilots</span></div>
       <div class="card"><h3>Online 1v1</h3><p>Real players only, zero bots. Host a room, share your 4-letter room code with a friend, and dogfight head-to-head in real time.</p><span class="tag">Live PvP</span></div>
     </div>
