@@ -207,7 +207,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v24 — CLOUD & GUEST ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v25 — ONLINE ROYALE ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -239,6 +239,12 @@
         <select id="diffSelect"><option value="rookie">Rookie</option><option value="veteran" selected>Veteran</option><option value="ace">Ace</option></select>
       </label>
       <div id="onlineRoomWrap" class="hidden">
+        <div id="mmWrap" class="hidden">
+          <button class="btn btn-sec btn-sm" id="btnFindMatch">🌐 FIND ONLINE MATCH</button>
+          <button class="btn btn-danger btn-sm hidden" id="btnCancelMatch">Cancel Search</button>
+          <div id="mmStatus" style="margin-top:6px;font-size:0.8rem;color:#7dd3fc;line-height:1.45;"></div>
+          <div style="margin-top:8px;font-size:0.78rem;color:#94a3b8;">Private match (room code):</div>
+        </div>
         <button class="btn btn-sec btn-sm" id="btnHostRoom">Host Room</button>
         <input type="text" id="joinCodeInput" placeholder="Room code" style="width:110px" />
         <button class="btn btn-sec btn-sm" id="btnJoinRoom">Join</button>
@@ -515,6 +521,17 @@ const CHAPTERS = [
   { num: 10, name: 'Ch.10: Heart of the Nebula', theme: 'nebula', sky: 0x0d0217, fog: 0x311042, ground: 0x0d0217, enemies: 12, reward: 450 }
 ];
 function getRankName(rp) { if (rp >= 1200) return 'Ranked Global'; if (rp >= 700) return 'Diamond'; if (rp >= 300) return 'Gold'; return 'Silver'; }
+// v25 ranked bots: the rank ladder, lowest -> highest. Royale fill bots are built
+// from the LOCAL player's rank so a match always fields opposition at your level:
+// skill / hull / gun damage interpolate smoothly from the bottom of the ladder
+// (0.70 / x0.85 / x0.85) to the top (1.35 / x1.20 / x1.25). Unknown rank -> middle.
+const RANK_LADDER = ['Silver', 'Gold', 'Diamond', 'Ranked Global'];
+function rankBotProfile(rankName) {
+  const n = RANK_LADDER.length;
+  const idx = RANK_LADDER.indexOf(rankName);
+  const t = idx < 0 ? 0.5 : (n > 1 ? idx / (n - 1) : 0);
+  return { skill: 0.7 + (1.35 - 0.7) * t, hpMul: 0.85 + (1.2 - 0.85) * t, fireMul: 0.85 + (1.25 - 0.85) * t };
+}
 let currentMode = 'campaign';
 const chSel = document.getElementById('chapterSelect');
 CHAPTERS.forEach(function(c) { const o = document.createElement('option'); o.value = c.num; o.textContent = c.name; chSel.appendChild(o); });
@@ -539,7 +556,9 @@ document.querySelectorAll('.mode-btn').forEach(function(btn) {
     document.getElementById('diffSelectWrap').classList.toggle('hidden', currentMode === 'royale' || currentMode === 'online1v1');
     document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1' && currentMode !== 'royale'); // v18: room controls also serve Online Royale
     document.getElementById('royaleOnlineNote').classList.toggle('hidden', currentMode !== 'royale'); // v18
+    document.getElementById('mmWrap').classList.toggle('hidden', currentMode !== 'royale'); // v25: public matchmaking lives with the Royale controls
     if (currentMode !== 'royale') royalePeerReady = false; // v18: leaving Royale drops the online-royale pairing (the peer link itself is untouched)
+    if (currentMode !== 'royale' && typeof mm !== 'undefined' && mm.searching) mmCancelSearch(); // v25: leaving Royale abandons a pending search
   };
 });
 updateStartLabel();
@@ -2827,6 +2846,7 @@ window.addEventListener('keydown', function(e) { keys[e.code] = true; if (active
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
 function startMission() {
   closeModals(); clearSmoke();
+  if (typeof mm !== 'undefined' && mm.searching && !(typeof mmPendingMatch !== 'undefined' && mmPendingMatch)) mmCancelSearch(); // v25: dropping in manually abandons a pending matchmaking search (an mm drop itself carries mmPendingMatch)
   _missionClock = 0; _autoQDropped = false; _frameEma = 16; // v20: fresh auto-quality window per mission
   if (currentMode === 'online1v1') { startOnlineMatchmaking(); return; }
   if (!renderer) { alert('3D engine failed to load. Check connection and reload.'); return; }
@@ -2843,28 +2863,31 @@ function startMission() {
   buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.22 : 1); // v15: Gun Game thins the asteroid field // v18: 0.38 -> 0.22 (~15 rocks — galaxy props fill the space instead)
   // v18 Online Royale: a peer that connected while Royale was selected turns this
   // drop into a 2-human match (48 bots + rival puppet). Solo Royale is untouched.
-  const onlineRoyale = (currentMode === 'royale' && royalePeerReady && conn && conn.open);
+  const mmCfg = (currentMode === 'royale' && typeof mmPendingMatch !== 'undefined' && mmPendingMatch) ? mmPendingMatch : null; // v25: a formed matchmaking match waiting to drop
+  const onlineRoyale = mmCfg ? true : (currentMode === 'royale' && royalePeerReady && conn && conn.open);
+  if (mmCfg) royalePeerReady = false; // v25: the matchmade path supersedes any stale room pairing for this drop
   royaleRemoteRef = null;
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
-  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (onlineRoyale ? 48 : 49)); // v18: online royale swaps one bot for the human rival (still 50 pilots)
+  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49))); // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
   for (let i = 0; i < botCount; i++) {
     const ang = (i / botCount) * Math.PI * 2; const dist = currentMode === 'royale' ? (350 + Math.random() * 1650) : (320 + Math.random() * 550);
     const randJet = JETS[i % JETS.length];
     const botUpg = currentMode === 'royale' ? { hull: 1 + (i % 4), damage: 1 + (i % 3), agility: 1 + (i % 3), speed: 1 } : { hull: 1, damage: 1, agility: 1, speed: 1 };
     const m = buildJetMesh(randJet.color, randJet.accent, botUpg, randJet.id); m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
     let skill = diff === 'rookie' ? 0.55 : (diff === 'ace' ? 1.15 : 0.85);
-    if (currentMode === 'royale') { const rName = getRankName(state.rp); skill = rName === 'Silver' ? 0.65 : (rName === 'Gold' ? 0.9 : (rName === 'Diamond' ? 1.15 : 1.35)); }
+    let botFireMul = 1, botHpMul = null;
+    if (currentMode === 'royale') { const prof = rankBotProfile(getRankName(state.rp)); skill = prof.skill * (0.92 + Math.random() * 0.16); botHpMul = prof.hpMul * (0.92 + Math.random() * 0.16); botFireMul = prof.fireMul * (0.92 + Math.random() * 0.16); } // v25: ranked bots — every fill bot scales to YOUR rank (skill / hull / gun damage) with the existing ±8% per-bot variance on top
     const botBaseHp = currentMode === 'campaign' ? (170 + 30 * ch.num) : (currentMode === 'gungame' ? 230 : 380);
-    const botHp = Math.round(botBaseHp * (0.9 + 0.2 * skill));
-    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    const botHp = botHpMul ? Math.round(380 * botHpMul) : Math.round(botBaseHp * (0.9 + 0.2 * skill));
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   }
   if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
-  if (onlineRoyale) {
+  if (onlineRoyale && !mmCfg) {
     // v18: the rival pilot joins EXACTLY like remoteEnt in Online 1v1 — a puppet in
     // activeGame.entities driven by peer {pos,quat} messages. Generic bullet/rocket
     // hit detection and pickFrontTarget lock-on already include it; the bot AI loop
@@ -2877,6 +2900,23 @@ function startMission() {
     activeGame.entities.push(royaleRemoteRef);
     try { conn.send({ type: 'rstart' }); } catch (e) {} // tell the rival we dropped — their client auto-starts its own Royale (zone timers start together)
     showBanner('ONLINE ROYALE (BETA) — you + your rival + 48 bots. Last pilot standing wins!', 4200);
+  }
+  if (mmCfg) {
+    // v25 matchmade Royale: one puppet per OTHER human in the match (star topology:
+    // the host's client relays everyone's state; guests only talk to the host).
+    // Puppets live in activeGame.entities exactly like the v18 rival, so alive
+    // counts, placement and victory need no changes; the AI skips them via
+    // isRemoteId and the minimap draws them cyan.
+    const others = mmCfg.matchPlayers.filter(function(pl) { return pl.peerId !== mmCfg.myPeerId; });
+    others.forEach(function(pl, idx) {
+      const ang = (idx / Math.max(1, others.length)) * Math.PI * 2;
+      const pm = buildJetMesh(0xef4444, 0xfbbf24, null, 'f22'); pm.position.set(Math.cos(ang) * 450, 220, Math.sin(ang) * 450); scene.add(pm);
+      const puppet = makeRoyalePuppet(pl.peerId, pl.callsign, pm);
+      activeGame.puppets.set(pl.peerId, puppet);
+      activeGame.entities.push(puppet);
+    });
+    mmMatchStarted(mmCfg);
+    showBanner(`ONLINE ROYALE — ${mmCfg.matchPlayers.length} real pilots + ${botCount} ranked bots. Last pilot standing wins!`, 4200);
   }
   SFX.engineStart(); // v20: engine hum fades in with the mission
   paused = false;
@@ -3031,6 +3071,7 @@ function endMatch(victory, title, summary) {
     if (victory && modeAtEnd === 'campaign') pst.missionsWon += 1;
     accumulatePlayTime();
   }
+  mmCleanupMatch(); // v25: tear down matchmaking timers/connections (no-op when no mm match ran)
   royaleRemoteRef = null; // v18: the online-royale puppet never outlives its match (the peer link + royalePeerReady stay up for a rematch)
   activeGame = null; paused = false; clearSmoke(); SFX.engineStop();
   document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
@@ -3042,7 +3083,7 @@ function endMatch(victory, title, summary) {
   document.getElementById('statusModal').classList.remove('hidden');
 }
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
+function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -3060,9 +3101,10 @@ function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
 // ---- Bot AI helpers (v4): damage tracking, targeting, target info ----
 const _botTmpFwd = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+function isRemoteId(id) { return typeof id === 'string' && id.indexOf('remote') === 0; } // v25: 'remote' (v18 room rival) and 'remote_<peerId>' (v25 matchmade puppets) are both network-driven, never AI
 function noteBotHit(ent, ownerId) {
   ent.lastHitAt = gameTime; ent.lastAttacker = ownerId;
-  if (ownerId !== 'player' && ownerId !== 'remote' && activeGame) {
+  if (ownerId !== 'player' && !isRemoteId(ownerId) && activeGame) {
     for (let q = 0; q < activeGame.entities.length; q++) { if (activeGame.entities[q].id === ownerId) { activeGame.entities[q].lastDealtHitAt = gameTime; break; } }
   }
 }
@@ -3083,7 +3125,7 @@ function pickBotTarget(bot) {
   let best = null, bestD = Infinity;
   const includePlayer = !(activeGame.player.respawnT > 0);
   if (includePlayer) { best = 'player'; bestD = bot.mesh.position.distanceTo(p.mesh.position); }
-  for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || e.id === 'remote') continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } }
+  for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || isRemoteId(e.id)) continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } }
   return best || ((activeGame.player.respawnT > 0) ? null : 'player');
 }
 // ---- Campaign engagement slots (v21) ----
@@ -3354,7 +3396,7 @@ function animate(now) {
   // goes through the stable heading/pitch/roll model + orientFlight.
   for (let i = activeGame.entities.length - 1; i >= 0; i--) {
     const bot = activeGame.entities[i]; bot.fireCd -= dt; bot.rocketCd -= dt;
-    if (bot.id === 'remote') continue; // online rival is driven by the network, not the AI
+    if (isRemoteId(bot.id)) continue; // online puppets are driven by the network, not the AI
     if (bot.lastHitAt === undefined) { bot.lastHitAt = -99; bot.lastAttacker = null; bot.aiState = 'engage'; bot.stateT = 0; bot.retargetT = Math.random() * 2; bot.weaveSeed = Math.random() * 100; bot.tgt = null; bot.closeT = 0; bot.engageT = 0; bot.lastDealtHitAt = -99; bot.waypoint = null; bot.evadeDur = 3; bot._seenHitAt = -99; bot.lastEvadeEnd = -99; }
     bot.stateT += dt; bot.retargetT -= dt; bot.wanderAng += dt * 1.4;
     const bp = bot.mesh.position;
@@ -3464,7 +3506,7 @@ function animate(now) {
     if (bot.aiState === 'engage' && ti) {
       const toT = ti.pos.clone().sub(bp).normalize();
       const aimAng = Math.acos(clampNum(bFwd.dot(toT), -1, 1));
-      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill * (activeGame.mode === 'gungame' ? (GUN_GAME_TIERS[bot.ggTier].dmg / GUN_GAME_TIERS[0].dmg) : 1), 0xf87171); bot.fireCd = 0.45 / bot.skill; }
+      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill * (bot.fireMul || 1) * (activeGame.mode === 'gungame' ? (GUN_GAME_TIERS[bot.ggTier].dmg / GUN_GAME_TIERS[0].dmg) : 1), 0xf87171); bot.fireCd = 0.45 / bot.skill; }
       if (dist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35 * (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[bot.ggTier].rocketDmg : 1)); bot.rocketCd = 11 / bot.skill; }
     }
   }
@@ -3507,7 +3549,7 @@ function animate(now) {
       gungamePlayerDown('shot');
       if (!activeGame) return; // the credited kill was a bot's 15th — match over
     }
-    else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; } // v18: place = alive bots + living rival (both sit in entities) + you — and the rival is told you fell
+    else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame.mmMatch) mmNotifyMyDeath(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; } // v18: place = alive bots + living rival (both sit in entities) + you — and the rival is told you fell
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); return; }
   }
   // Afterburner flicker + cloud drift (visual life, no allocations)
@@ -3625,6 +3667,7 @@ function handleEntityEliminated(eIdx, killerId) {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
     if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; applyBotTier(killerBot); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
   }
+  if (victim.mmPeerId && activeGame.mmMatch) { activeGame.puppets.delete(victim.mmPeerId); if (!victim._silentElim) showBanner(`${victim.name} ELIMINATED!`, 3000); mmNotifyPuppetDead(victim.mmPeerId); } // v25: a matchmade human's puppet died on this client — report it to the match (first reporter wins via the dead set)
   if (victim.id === 'remote' && activeGame.mode === 'royale') { royaleRemoteRef = null; showBanner('RIVAL ELIMINATED!', 3000); } // v18: the Online Royale puppet died (any killer) — out of this client's storm; the rival's own client stays authoritative for their real death ('rdead')
   if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); victim.heading = Math.atan2(-victim.mesh.position.x, -victim.mesh.position.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
   else {
@@ -3644,7 +3687,7 @@ function updateHUD(curSpd) {
   document.getElementById('btnAutoAim').textContent = p.autoAimCd > 0 ? `LOCK (${Math.ceil(p.autoAimCd)}s)` : 'AUTO-AIM (RDY)';
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
-  else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = activeGame.onlineRoyale ? 'Ranked Royale — ONLINE (BETA)' : 'Ranked Royale'; document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; } // v18: alive = bots + rival puppet (both in entities) + you
+  else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = activeGame.mmMatch ? 'Ranked Royale — ONLINE' : (activeGame.onlineRoyale ? 'Ranked Royale — ONLINE (BETA)' : 'Ranked Royale'); document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; } // v18: alive = bots + rival puppet (both in entities) + you
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
   activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444'); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
@@ -3654,7 +3697,7 @@ function drawMinimap() {
   ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(55, 55, Math.max(4, activeGame.zoneRadius * scale), 0, Math.PI * 2); ctx.stroke();
   const px = 55 + activeGame.player.mesh.position.x * scale, pz = 55 + activeGame.player.mesh.position.z * scale;
   ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(px, pz, 3.5, 0, Math.PI * 2); ctx.fill();
-  activeGame.entities.forEach(function(e) { const ex = 55 + e.mesh.position.x * scale, ez = 55 + e.mesh.position.z * scale; if ((ex - 55) * (ex - 55) + (ez - 55) * (ez - 55) < 2500) { ctx.fillStyle = e.id === 'remote' ? '#22d3ee' : '#ef4444'; ctx.beginPath(); ctx.arc(ex, ez, e.id === 'remote' ? 3 : 2, 0, Math.PI * 2); ctx.fill(); } }); // v18: the online rival is a bigger cyan dot, bots stay red
+  activeGame.entities.forEach(function(e) { const ex = 55 + e.mesh.position.x * scale, ez = 55 + e.mesh.position.z * scale; if ((ex - 55) * (ex - 55) + (ez - 55) * (ez - 55) < 2500) { ctx.fillStyle = isRemoteId(e.id) ? '#22d3ee' : '#ef4444'; ctx.beginPath(); ctx.arc(ex, ez, isRemoteId(e.id) ? 3 : 2, 0, Math.PI * 2); ctx.fill(); } }); // v18/v25: online humans are bigger cyan dots, bots stay red
 }
 
 // HANGAR, SHOP & SETTINGS UI
@@ -3957,6 +4000,298 @@ function handleRoyalePeerGone() { // disconnect: the match continues offline, se
   if (royaleRemoteRef && activeGame) { killRoyaleRemote(null); if (activeGame) showBanner('Rival disconnected — match continues', 3000); } // if the removal ended the match (rival was last), the victory screen already says so
   else if (wasReady) showBanner('Rival disconnected', 3000);
 }
+// ---- v25 Online Royale: public matchmaking + up-to-8-human star netcode ----
+// Ranked Royale is now a real online mode. FIND ONLINE MATCH drops the pilot into
+// a Firestore queue (mm_queue); the longest-waiting pilot is host-elect and forms
+// the match (mm_matches) once a lobby is viable, everyone else follows as guests.
+// Topology is a STAR: guests hold ONE PeerJS connection (to the host); the host
+// holds one per guest, applies each guest's state to that guest's puppet, and
+// relays a combined {type:'rstate'} packet to all guests at 20 Hz. The remaining
+// seats of the 50 are filled with ranked bots (rankBotProfile, Part 1) simulated
+// locally per client — the same local-sim philosophy as v18, so damage is never
+// networked and each client stays authoritative for its own death ('rdead').
+// The v18 room-code path above is untouched: it keeps its own `conn`,
+// royaleRemoteRef and message set, and mm uses separate connection objects.
+const mm = { searching: false, forming: false, pollTimer: null, hostWaitTimer: null, syncTimer: null, relayTimer: null, uid: null, peerId: null, callsign: 'GUEST', rank: 'Silver', role: null, matchId: null, matchPlayers: [], hostPeerId: null, hostConn: null, guestConns: new Map(), guestState: {}, deadSet: new Set(), hostCreatedAt: 0, started: false };
+let mmPendingMatch = null; // set just before startMission() drops an mm match
+function mmSetStatus(txt) { const e = document.getElementById('mmStatus'); if (e) e.textContent = txt || ''; }
+function makeRoyalePuppet(peerId, callsign, mesh) {
+  return { id: 'remote_' + peerId, mmPeerId: peerId, name: callsign || 'Pilot', mesh: mesh, hp: 380, maxHp: 380, spd: 0, skill: 0, fireCd: 99, rocketCd: 99, wanderAng: 0, kills: 0, ggTier: 0, heading: Math.PI, pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: 2, weaveSeed: 0, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 };
+}
+async function mmGetIdentity() {
+  const c = await cloudInit(); // throws if the SDK/network is unavailable — caller reports it
+  const user = cloudUser || c.auth.currentUser || null;
+  if (currentProfile && currentProfile.cloud && user && !user.isAnonymous && currentProfile.uid === user.uid) return { uid: user.uid, callsign: currentProfile.callsign };
+  if (user && user.isAnonymous) return { uid: user.uid, callsign: (currentProfile && currentProfile.callsign) || 'GUEST' };
+  const cred = await c.authMod.signInAnonymously(c.auth); // guests still need a stable queue identity
+  return { uid: cred.user.uid, callsign: (currentProfile && currentProfile.callsign) || 'GUEST' };
+}
+function mmEnsurePeer() {
+  return new Promise(function(resolve, reject) {
+    if (typeof Peer === 'undefined') { reject(new Error('peerjs unavailable')); return; }
+    // Matchmaking always flies on its OWN freshly-created peer so the connection
+    // router below can never be confused with a stale room-code pairing.
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    conn = null; royalePeerReady = false; remoteNet = null;
+    if (peerSyncTimer) { clearInterval(peerSyncTimer); peerSyncTimer = null; }
+    let settled = false;
+    try {
+      peer = new Peer();
+      peer.on('open', function(id) { if (!settled) { settled = true; resolve(id); } });
+      peer.on('connection', function(c) {
+        if (mm.role === 'host' && mm.matchId) mmAcceptGuestConn(c); // mm guest knocking
+        else { conn = c; setupPeerConn(c); } // anything else keeps the legacy routing
+      });
+      peer.on('error', function(err) { if (!settled) { settled = true; reject(err); } });
+    } catch (e) { reject(e); }
+  });
+}
+async function mmFindMatch() {
+  if (mm.searching || currentMode !== 'royale') return;
+  mmSetStatus('Connecting to matchmaking…');
+  let id;
+  try { id = await mmGetIdentity(); }
+  catch (e) { mmSetStatus('Online matchmaking unavailable — enable Anonymous sign-in in Firebase, or use a private room code.'); return; }
+  let myPeerId;
+  try { myPeerId = await mmEnsurePeer(); }
+  catch (e) { mmSetStatus('Online matchmaking unavailable — the peer network could not be reached. You can still use a private room code.'); return; }
+  mm.uid = id.uid; mm.callsign = id.callsign; mm.peerId = myPeerId; mm.rank = getRankName(state.rp);
+  try { await CLOUD.fsMod.setDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_queue', mm.uid), { peerId: mm.peerId, callsign: mm.callsign, rank: mm.rank, ts: Date.now(), status: 'waiting' }); }
+  catch (e) { mmSetStatus('Online matchmaking unavailable — could not reach the queue. You can still use a private room code.'); return; }
+  mm.searching = true;
+  document.getElementById('btnFindMatch').classList.add('hidden');
+  document.getElementById('btnCancelMatch').classList.remove('hidden');
+  mmSetStatus('Searching… 1 pilot in queue');
+  if (mm.pollTimer) clearInterval(mm.pollTimer);
+  mm.pollTimer = setInterval(mmPoll, 2000);
+  mmPoll();
+}
+async function mmPoll() {
+  if (!mm.searching || mm.role || !CLOUD) return;
+  const fs = CLOUD.fsMod, db = CLOUD.db;
+  try {
+    const snap = await fs.getDocs(fs.collection(db, 'mm_queue')); // tiny collection: fetch-all + client-side sort (no composite index needed)
+    const now = Date.now();
+    const docs = [];
+    snap.forEach(function(d) { docs.push(Object.assign({ id: d.id }, d.data())); });
+    docs.forEach(function(d) { if (d.status === 'waiting' && now - (d.ts || 0) > 45000 && d.id !== mm.uid) { try { fs.deleteDoc(fs.doc(db, 'mm_queue', d.id)).catch(function() {}); } catch (e) {} } }); // stale entries are ignored + swept
+    const mine = docs.find(function(d) { return d.id === mm.uid; });
+    if (mine && mine.status === 'matched' && mine.matchId) { mmJoinAsGuest(mine.matchId); return; }
+    const waiting = docs.filter(function(d) { return d.status === 'waiting' && now - (d.ts || 0) <= 45000; }).sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+    mmSetStatus(`Searching… ${Math.max(1, waiting.length)} pilot${waiting.length === 1 ? '' : 's'} in queue`);
+    if (waiting.length && waiting[0].id === mm.uid && mine && mine.status === 'waiting') { // I am the oldest: host-elect
+      const included = waiting.slice(0, 8);
+      const youngest = included[included.length - 1];
+      if (included.length >= 2 && (included.length >= 8 || (now - (youngest.ts || now)) >= 4000 || (now - (mine.ts || now)) >= 20000)) mmFormMatch(included);
+    }
+  } catch (e) { /* transient Firestore error — the next poll retries */ }
+}
+async function mmFormMatch(included) {
+  if (mm.role || mm.forming) return;
+  mm.forming = true;
+  mm.matchId = mm.uid;
+  const players = included.map(function(d) { return { uid: d.id, peerId: d.peerId, callsign: d.callsign, rank: d.rank }; });
+  const fs = CLOUD.fsMod, db = CLOUD.db;
+  try {
+    await fs.setDoc(fs.doc(db, 'mm_matches', mm.matchId), { hostUid: mm.uid, hostPeerId: mm.peerId, players: players, status: 'forming', createdAt: Date.now() });
+    for (let i = 0; i < included.length; i++) { try { await fs.updateDoc(fs.doc(db, 'mm_queue', included[i].id), { status: 'matched', matchId: mm.matchId }); } catch (e) {} }
+  } catch (e) { mm.forming = false; mm.matchId = null; return; } // stay queued; a later poll retries
+  mm.forming = false;
+  mm.role = 'host'; mm.matchPlayers = players; mm.hostCreatedAt = Date.now();
+  if (mm.pollTimer) { clearInterval(mm.pollTimer); mm.pollTimer = null; }
+  mmSetStatus(`Match found! Waiting for pilots to connect (1/${players.length})…`);
+  if (mm.hostWaitTimer) clearInterval(mm.hostWaitTimer);
+  mm.hostWaitTimer = setInterval(mmHostCheckStart, 500);
+  mmHostCheckStart();
+}
+function mmHostCheckStart() {
+  if (mm.started || mm.role !== 'host') return;
+  if (currentMode !== 'royale') { mmCleanupMatch(); return; } // host wandered off to another mode
+  const connected = mm.guestConns.size + 1;
+  mmSetStatus(`Match found! Waiting for pilots to connect (${connected}/${mm.matchPlayers.length})…`);
+  if (connected >= mm.matchPlayers.length || Date.now() - mm.hostCreatedAt >= 15000) mmHostStartMatch();
+}
+function mmHostStartMatch() {
+  if (mm.started || mm.role !== 'host') return;
+  mm.started = true;
+  if (mm.hostWaitTimer) { clearInterval(mm.hostWaitTimer); mm.hostWaitTimer = null; }
+  mmPendingMatch = { role: 'host', matchPlayers: mm.matchPlayers, hostPeerId: mm.peerId, myPeerId: mm.peerId };
+  mm.guestConns.forEach(function(c) { try { c.send({ type: 'rstart' }); } catch (e) {} }); // everyone drops together
+  mmDeleteMatchDocs(); // host deletes the match doc + every included queue doc as rstart goes out
+  mmSetStatus('');
+  startMission();
+}
+function mmDeleteMatchDocs() {
+  if (!CLOUD || !mm.matchId) return;
+  const fs = CLOUD.fsMod, db = CLOUD.db, mid = mm.matchId;
+  try { fs.deleteDoc(fs.doc(db, 'mm_matches', mid)).catch(function() {}); } catch (e) {}
+  mm.matchPlayers.forEach(function(pl) { if (pl.uid) { try { fs.deleteDoc(fs.doc(db, 'mm_queue', pl.uid)).catch(function() {}); } catch (e) {} } });
+}
+function mmDeleteMyQueueDoc() {
+  if (!CLOUD || !mm.uid) return;
+  try { CLOUD.fsMod.deleteDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_queue', mm.uid)).catch(function() {}); } catch (e) {}
+}
+async function mmJoinAsGuest(matchId) {
+  if (mm.role) return;
+  mm.role = 'guest'; mm.matchId = matchId;
+  if (mm.pollTimer) { clearInterval(mm.pollTimer); mm.pollTimer = null; }
+  let mdoc = null;
+  try { const snap = await CLOUD.fsMod.getDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_matches', matchId)); if (snap.exists()) mdoc = snap.data(); } catch (e) {}
+  if (!mdoc || !mdoc.hostPeerId || !mdoc.players) { mmResetSearch(); mmSetStatus('That match fell apart before it started — search again.'); return; }
+  mm.matchPlayers = mdoc.players; mm.hostPeerId = mdoc.hostPeerId;
+  mmSetStatus('Match found! Connecting to the host…');
+  try {
+    const c = peer.connect(mdoc.hostPeerId, { metadata: { mm: true, peerId: mm.peerId, callsign: mm.callsign, rank: mm.rank, uid: mm.uid } });
+    mm.hostConn = c;
+    c.on('open', function() { try { c.send({ type: 'mmhello', peerId: mm.peerId, callsign: mm.callsign, rank: mm.rank, uid: mm.uid }); } catch (e) {} mmSetStatus('Connected — waiting for the drop…'); });
+    c.on('data', function(d) { mmGuestOnData(d); });
+    c.on('close', function() { mmGuestHostGone(); });
+    c.on('error', function() {});
+  } catch (e) { mmResetSearch(); mmSetStatus('Could not connect to the match host — search again.'); }
+}
+function mmAcceptGuestConn(c) {
+  c.on('data', function(d) { mmHostOnData(c, d); });
+  c.on('close', function() { mmHostOnGuestGone(c); });
+  c.on('error', function() {});
+}
+function mmHostOnData(c, d) {
+  if (!d) return;
+  if (d.type === 'mmhello') { // a match guest identifying itself — register it in the host's guest map
+    c.__mmPeerId = d.peerId; c.__mmCallsign = d.callsign;
+    mm.guestConns.set(d.peerId, c);
+    if (mm.started) { try { c.send({ type: 'rstart' }); } catch (e) {} } // late hello after the drop: send them straight in
+    mmHostCheckStart();
+    return;
+  }
+  const fromPid = c.__mmPeerId; if (!fromPid) return;
+  if (d.type === 'mstate') { // guest's own transform: drive their puppet here, stash for the relay
+    mm.guestState[fromPid] = { pos: d.pos, quat: d.quat, hp: d.hp, alive: d.alive !== false, callsign: c.__mmCallsign };
+    if (activeGame && activeGame.puppets) { const pp = activeGame.puppets.get(fromPid); if (pp && pp.mesh && d.pos) { pp.mesh.position.fromArray(d.pos); if (d.quat) pp.mesh.quaternion.fromArray(d.quat); } }
+    if (d.alive === false) mmOnRemoteDead(fromPid);
+    return;
+  }
+  if (d.type === 'pdead') { mmOnRemoteDead(d.peerId, fromPid); return; }
+  if (d.type === 'rdead') { mmOnRemoteDead(fromPid); return; }
+}
+function mmGuestOnData(d) {
+  if (!d) return;
+  if (d.type === 'rstart') { // host dropped — follow them in
+    if (mm.started) return;
+    if (currentMode !== 'royale') { mmCleanupMatch(); return; }
+    mm.started = true;
+    mmPendingMatch = { role: 'guest', matchPlayers: mm.matchPlayers, hostPeerId: mm.hostPeerId, myPeerId: mm.peerId };
+    mmDeleteMyQueueDoc(); // host sweeps all queue docs too; deleting mine twice is harmless
+    mmSetStatus('');
+    startMission();
+    return;
+  }
+  if (d.type === 'rstate') { // host relay: everyone's latest transform (skip my own entry)
+    if (!activeGame || !activeGame.puppets || !d.players) return;
+    Object.keys(d.players).forEach(function(pid) {
+      if (pid === mm.peerId) return;
+      const s = d.players[pid]; if (!s) return;
+      if (s.alive === false) { mmOnRemoteDead(pid); return; }
+      const pp = activeGame.puppets.get(pid);
+      if (pp && pp.mesh && s.pos) { pp.mesh.position.fromArray(s.pos); if (s.quat) pp.mesh.quaternion.fromArray(s.quat); }
+    });
+    return;
+  }
+  if (d.type === 'pdead') { mmOnRemoteDead(d.peerId); return; }
+  if (d.type === 'rdead') { mmOnRemoteDead(mm.hostPeerId); return; } // the host fell on their own client
+}
+function mmMatchStarted(cfg) { // called from startMission once the puppets exist
+  mm.searching = false; mm.deadSet = new Set();
+  document.getElementById('btnFindMatch').classList.remove('hidden');
+  document.getElementById('btnCancelMatch').classList.add('hidden');
+  if (mm.syncTimer) clearInterval(mm.syncTimer);
+  if (mm.relayTimer) clearInterval(mm.relayTimer);
+  mm.syncTimer = null; mm.relayTimer = null;
+  if (cfg.role === 'guest') { // my state uplink to the host, 20 Hz (same cadence/shape as 1v1 + hp/alive)
+    mm.syncTimer = setInterval(function() {
+      if (!activeGame || !activeGame.mmMatch || !mm.hostConn || !mm.hostConn.open) return;
+      try { mm.hostConn.send({ type: 'mstate', pos: activeGame.player.mesh.position.toArray(), quat: activeGame.player.mesh.quaternion.toArray(), hp: Math.max(0, Math.round(activeGame.player.hp)), alive: true }); } catch (e) {}
+    }, 50);
+  } else if (cfg.role === 'host') { // relay: my state + every guest's last state -> all guests, 20 Hz
+    mm.relayTimer = setInterval(function() {
+      if (!activeGame || !activeGame.mmMatch) return;
+      const players = {};
+      players[mm.peerId] = { pos: activeGame.player.mesh.position.toArray(), quat: activeGame.player.mesh.quaternion.toArray(), hp: Math.max(0, Math.round(activeGame.player.hp)), alive: true, callsign: mm.callsign };
+      Object.keys(mm.guestState).forEach(function(pid) { const s = mm.guestState[pid]; if (s && s.pos) players[pid] = { pos: s.pos, quat: s.quat, hp: s.hp, alive: s.alive, callsign: s.callsign }; });
+      mm.guestConns.forEach(function(c) { if (c.open) { try { c.send({ type: 'rstate', players: players }); } catch (e) {} } });
+    }, 50);
+  }
+}
+function mmBroadcast(msg, excludePid) {
+  if (mm.role === 'host') { mm.guestConns.forEach(function(c, pid) { if (pid !== excludePid && c.open) { try { c.send(msg); } catch (e) {} } }); }
+  else if (mm.role === 'guest' && mm.hostConn && mm.hostConn.open) { try { mm.hostConn.send(msg); } catch (e) {} }
+}
+function mmNotifyPuppetDead(peerId) { // a puppet died ON MY CLIENT: tell the match (dead set = first reporter wins)
+  if (!mm.role || mm.deadSet.has(peerId)) return;
+  mm.deadSet.add(peerId);
+  mmBroadcast({ type: 'pdead', peerId: peerId });
+}
+function mmOnRemoteDead(peerId, relayExcludePid) { // a pdead/rdead for peerId arrived: mark, relay (host), eliminate my local puppet
+  if (!peerId || mm.deadSet.has(peerId)) return;
+  mm.deadSet.add(peerId);
+  if (mm.role === 'host') mmBroadcast({ type: 'pdead', peerId: peerId }, relayExcludePid || peerId);
+  if (!activeGame || !activeGame.puppets) return;
+  const puppet = activeGame.puppets.get(peerId);
+  if (puppet) { const idx = activeGame.entities.indexOf(puppet); if (idx !== -1) { puppet.hp = 0; handleEntityEliminated(idx, 'net'); } }
+}
+function mmNotifyMyDeath() { // I fell (or quit): the match hears it from me directly
+  if (!mm.role) return;
+  mmBroadcast({ type: 'rdead' });
+}
+function mmHostOnGuestGone(c) {
+  const pid = c.__mmPeerId; if (!pid) return;
+  mm.guestConns.delete(pid);
+  if (mm.guestState[pid]) { mm.guestState[pid].alive = false; const st = mm.guestState; setTimeout(function() { if (st[pid] && st[pid].alive === false) delete st[pid]; }, 250); } // relayed once as alive:false, then dropped
+  if (activeGame && activeGame.mmMatch && activeGame.puppets) {
+    const puppet = activeGame.puppets.get(pid);
+    if (puppet) { puppet._silentElim = true; showBanner(`${puppet.name} disconnected`, 3000); mmOnRemoteDead(pid); }
+  }
+}
+function mmGuestHostGone() {
+  if (activeGame && activeGame.mmMatch && mm.role === 'guest') { // host left mid-match: my storm ends here
+    const place = activeGame.entities.length + 1;
+    const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState();
+    endMatch(false, 'HOST LEFT', `The match host disconnected. You placed #${place} / 50 | Kills: ${activeGame.player.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`);
+  } else if (mm.role === 'guest' && !mm.started) { mmResetSearch(); mmSetStatus('The match host vanished before the drop — search again.'); }
+}
+function mmResetSearch() { // back to idle menu state (peer + identity are kept for the next search)
+  if (mm.pollTimer) { clearInterval(mm.pollTimer); mm.pollTimer = null; }
+  if (mm.hostWaitTimer) { clearInterval(mm.hostWaitTimer); mm.hostWaitTimer = null; }
+  if (mm.hostConn) { try { mm.hostConn.close(); } catch (e) {} mm.hostConn = null; }
+  mm.searching = false; mm.forming = false; mm.role = null; mm.matchId = null; mm.matchPlayers = []; mm.hostPeerId = null; mm.started = false;
+  document.getElementById('btnFindMatch').classList.remove('hidden');
+  document.getElementById('btnCancelMatch').classList.add('hidden');
+}
+function mmCancelSearch() {
+  mmDeleteMyQueueDoc();
+  if (mm.role === 'host' && mm.matchId) { mmDeleteMatchDocs(); mm.guestConns.forEach(function(c) { try { c.close(); } catch (e) {} }); mm.guestConns.clear(); } // a forming host abandoning the lobby releases its guests
+  mmResetSearch();
+  mmSetStatus('Search cancelled.');
+}
+function mmCleanupMatch() { // endMatch / returnHome: tear down timers + connections, reset for the next search
+  if (mm.syncTimer) { clearInterval(mm.syncTimer); mm.syncTimer = null; }
+  if (mm.relayTimer) { clearInterval(mm.relayTimer); mm.relayTimer = null; }
+  if (mm.pollTimer) { clearInterval(mm.pollTimer); mm.pollTimer = null; }
+  if (mm.hostWaitTimer) { clearInterval(mm.hostWaitTimer); mm.hostWaitTimer = null; }
+  const toClose = [];
+  mm.guestConns.forEach(function(c) { toClose.push(c); });
+  mm.guestConns.clear();
+  if (mm.hostConn) { toClose.push(mm.hostConn); mm.hostConn = null; }
+  if (toClose.length) setTimeout(function() { toClose.forEach(function(c) { try { c.close(); } catch (e) {} }); }, 400); // let a just-sent rdead flush before the sockets close
+  mm.guestState = {}; mm.deadSet = new Set();
+  mmPendingMatch = null;
+  mm.role = null; mm.matchId = null; mm.matchPlayers = []; mm.hostPeerId = null; mm.started = false; mm.forming = false;
+  if (mm.searching) { mmDeleteMyQueueDoc(); mm.searching = false; }
+  document.getElementById('btnFindMatch').classList.remove('hidden');
+  document.getElementById('btnCancelMatch').classList.add('hidden');
+}
+document.getElementById('btnFindMatch').addEventListener('click', function() { mmFindMatch(); });
+document.getElementById('btnCancelMatch').addEventListener('click', function() { mmCancelSearch(); });
+window.addEventListener('beforeunload', function() { if (mm.searching) mmDeleteMyQueueDoc(); });
 function cancelOnline() { royalePeerReady = false; if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); showMenuScene(); }
 document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
 document.getElementById('btnJoinRoom').onclick = function() { const c = document.getElementById('joinCodeInput').value.trim(); if (c) startOnlineMatchmaking(c, false); else startOnlineMatchmaking(); };
