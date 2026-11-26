@@ -8,6 +8,9 @@
 <meta http-equiv="Expires" content="0" />
 <title>NEBULA DOGFIGHT — 3D Fighter Jet Game</title>
 <meta name="description" content="Play NEBULA DOGFIGHT in your browser. Campaign, Gun Game, Ranked Royale and Online 1v1." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&display=swap" rel="stylesheet" />
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
@@ -17,39 +20,57 @@
   #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse at center, transparent 58%, rgba(2,0,12,0.42) 100%); }
   .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; background: radial-gradient(circle at center, rgba(10,18,34,0.25) 0%, rgba(5,9,18,0.72) 100%); overflow-y: auto; }
   .hidden { display: none !important; }
-  .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; padding: 10px 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
-  .brand h1 { font-size: clamp(1.1rem, 2.5vw, 1.6rem); letter-spacing: 2px; color: #38bdf8; text-transform: uppercase; }
-  .brand span { font-size: 0.78rem; color: #94a3b8; }
-  .stats-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .topnav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(56,189,248,0.22); }
-  .topnav .btn { border: 1px solid rgba(56,189,248,0.55); }
+  .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 14px; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.22); border-radius: 18px; padding: 12px 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
+  .brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .logo-mark { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, #06b6d4, #8b5cf6); display: flex; align-items: center; justify-content: center; color: #ffffff; box-shadow: 0 4px 16px rgba(56,189,248,0.40); flex: 0 0 auto; }
+  .logo-mark svg { width: 23px; height: 23px; display: block; }
+  .brand h1 { font-family: 'Orbitron', 'Segoe UI', Roboto, sans-serif; font-size: clamp(1.05rem, 2.4vw, 1.5rem); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; background: linear-gradient(92deg, #7dd3fc 0%, #38bdf8 48%, #a78bfa 100%); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.1; }
+  .brand-sub { font-size: 0.62rem; font-weight: 700; letter-spacing: 2.6px; color: #7d8aa5; text-transform: uppercase; margin-top: 3px; }
+  .ver-chip { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.7px; color: #fcd34d; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.45); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .stats-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .topnav { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; width: 100%; margin-top: 10px; padding: 6px; background: rgba(8,11,24,0.45); border: 1px solid rgba(148,163,255,0.18); border-radius: 12px; }
+  .topnav .btn { flex: 1 1 118px; border-radius: 8px; }
+  .topnav .btn-sec { background: rgba(30,41,59,0.55); border: 1px solid transparent; }
+  .topnav .btn:hover { border-color: rgba(56,189,248,0.65); box-shadow: inset 0 -2px 0 #38bdf8, 0 0 12px rgba(56,189,248,0.22); }
   .rarity-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.6px; color: #0b0f16; vertical-align: middle; }
   .swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); vertical-align: middle; }
   .pill { background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
   .pill.coins { color: #fbbf24; border-color: rgba(251,191,36,0.4); }
   .pill.rank { color: #a78bfa; border-color: rgba(167,139,250,0.4); }
+  #uiPilotLvl::before { content: '★ '; color: #7dd3fc; }
+  #uiRank::before { content: '◆ '; color: #a78bfa; }
+  #uiCoins::before { content: '● '; color: #fbbf24; }
   .menu-center { max-width: 470px; width: 100%; margin: auto auto auto 0; align-self: flex-start; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
   @media (max-width: 760px) { .menu-center { max-width: 100%; margin: auto; align-self: stretch; } }
   .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }
-  .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .mode-btn { background: linear-gradient(160deg, rgba(56,89,199,0.28), rgba(10,12,28,0.85)); border: 2px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; transition: 0.15s; }
-  .mode-btn:hover { border-color: rgba(56,189,248,0.7); box-shadow: 0 0 14px rgba(56,189,248,0.35); }
-  .mode-btn.active { border-color: #38bdf8; background: linear-gradient(160deg, rgba(56,189,248,0.35), rgba(139,92,246,0.22)); box-shadow: 0 0 16px rgba(56,189,248,0.3); }
-  .mode-btn strong { display: block; font-size: 0.95rem; margin-bottom: 3px; color: #fff; }
-  .mode-btn small { font-size: 0.75rem; color: #94a3b8; line-height: 1.2; display: block; }
-  .sub-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: #0f172a; padding: 12px; border-radius: 10px; border: 1px solid #1e293b; }
-  select, input[type="text"] { background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; }
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mode-btn { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; background: linear-gradient(160deg, rgba(56,89,199,0.28), rgba(10,12,28,0.85)); border: 1px solid rgba(148,163,255,0.22); color: #e2e8f0; border-radius: 14px; padding: 13px 13px 11px; text-align: left; cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+  .mode-btn:hover { transform: translateY(-1px); border-color: rgba(56,189,248,0.75); box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 14px rgba(56,189,248,0.3); }
+  .mode-btn.active { border-color: #38bdf8; background: linear-gradient(160deg, rgba(56,189,248,0.35), rgba(139,92,246,0.22)); box-shadow: 0 0 0 1px rgba(56,189,248,0.55), 0 0 18px rgba(56,189,248,0.3); }
+  .mode-btn.active::after { content: 'SELECTED'; position: absolute; top: 9px; right: 9px; font-size: 0.52rem; font-weight: 800; letter-spacing: 1px; color: #06202e; background: linear-gradient(135deg, #22d3ee, #38bdf8); padding: 2px 6px; border-radius: 999px; }
+  .mode-btn strong { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-size: 0.88rem; font-weight: 800; letter-spacing: 0.4px; color: #fff; }
+  .mode-btn small { font-size: 0.72rem; color: #94a3b8; line-height: 1.25; display: block; }
+  .mode-ico { color: #7dd3fc; display: flex; }
+  .mode-ico svg { width: 21px; height: 21px; display: block; }
+  .mode-btn.active .mode-ico { color: #bae6fd; }
+  .mode-meta { margin-top: 2px; font-size: 0.56rem; font-weight: 800; letter-spacing: 1.2px; color: #a5c8e8; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.3); padding: 2px 7px; border-radius: 999px; }
+  .sub-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: rgba(9,13,26,0.6); padding: 12px; border-radius: 12px; border: 1px solid rgba(148,163,255,0.18); }
+  .sub-controls label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 1.1px; color: #8fa3c0; font-weight: 700; }
+  select, input[type="text"] { background: rgba(15,23,42,0.9); color: #fff; border: 1px solid rgba(148,163,255,0.28); border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; }
   .nav-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .btn { border: none; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.15s; }
-  .btn-play { background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #fff; font-size: 1.05rem; box-shadow: 0 6px 22px rgba(34,211,238,0.35); }
+  .btn-play { background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #fff; font-size: 1.05rem; font-family: 'Orbitron', 'Segoe UI', sans-serif; letter-spacing: 1.2px; box-shadow: 0 6px 22px rgba(34,211,238,0.35); }
+  .nav-buttons .btn-play { height: 54px; width: 100%; font-size: 1.1rem; position: relative; overflow: hidden; }
+  .nav-buttons .btn-play::after { content: ''; position: absolute; top: 0; left: -80%; width: 45%; height: 100%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent); transform: skewX(-20deg); transition: left 0.55s ease; pointer-events: none; }
+  .nav-buttons .btn-play:hover::after { left: 130%; }
   .btn-sec { background: #1e293b; color: #f8fafc; border: 1px solid #475569; }
   .btn-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; }
   .btn-danger { background: #dc2626; color: #fff; }
   .btn-sm { padding: 7px 12px; font-size: 0.8rem; }
   .modal { position: fixed; inset: 0; z-index: 25; background: rgba(5,9,18,0.92); display: flex; align-items: center; justify-content: center; padding: 16px; }
-  .modal-card { width: 100%; max-width: 820px; max-height: 88vh; background: #0f172a; border: 1px solid #334155; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
-  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: #1e293b; border-bottom: 1px solid #334155; }
-  .modal-header h2 { font-size: 1.15rem; color: #38bdf8; }
+  .modal-card { width: 100%; max-width: 820px; max-height: 88vh; background: linear-gradient(180deg, rgba(24,32,56,0.98), rgba(10,14,27,0.98)); border: 1px solid rgba(148,163,255,0.22); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(148,163,255,0.16); }
+  .modal-header h2 { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-size: 1.05rem; font-weight: 800; letter-spacing: 1px; color: #38bdf8; }
   .tabs { display: flex; gap: 6px; padding: 10px 18px; background: #0b1120; border-bottom: 1px solid #1e293b; overflow-x: auto; }
   .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; padding: 7px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .tab-btn.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
@@ -73,8 +94,22 @@
   .action-btns { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
   .hud-btn { background: rgba(15,23,42,0.85); border: 1px solid #38bdf8; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
   .hud-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  #reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 2px solid rgba(56,189,248,0.8); border-radius: 50%; }
+  #reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 2px solid rgba(56,189,248,0.8); border-radius: 50%; transition: transform 0.13s ease-out; }
   #reticle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); }
+  #hitmarker { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: 900; line-height: 1; color: #ffffff; text-shadow: 0 0 7px rgba(0,0,0,0.85); opacity: 0; pointer-events: none; z-index: 9; transition: opacity 0.08s; }
+  #hitmarker.show { opacity: 1; }
+  #hitmarker.kill { color: #ef4444; font-size: 34px; }
+  #dmgVignette { position: fixed; inset: 0; pointer-events: none; z-index: 6; background: radial-gradient(ellipse at center, transparent 52%, rgba(220,38,38,0.6) 100%); opacity: 0; }
+  #bootOverlay { position: fixed; inset: 0; z-index: 200; background: radial-gradient(circle at 50% 38%, #0d1530 0%, #05070f 72%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; transition: opacity 0.6s ease; }
+  #bootOverlay.done { opacity: 0; pointer-events: none; }
+  .boot-logo { width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #06b6d4, #8b5cf6); display: flex; align-items: center; justify-content: center; color: #ffffff; box-shadow: 0 10px 34px rgba(56,189,248,0.45); }
+  .boot-logo svg { width: 34px; height: 34px; display: block; }
+  .boot-title { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-weight: 800; letter-spacing: 4px; font-size: 1.15rem; color: #e0f2fe; }
+  .boot-bar { width: 220px; height: 4px; background: rgba(148,163,255,0.18); border-radius: 999px; overflow: hidden; }
+  .boot-bar i { display: block; height: 100%; width: 40%; border-radius: 999px; background: linear-gradient(90deg, #22d3ee, #8b5cf6); animation: bootSlide 1.1s ease-in-out infinite; }
+  @keyframes bootSlide { 0% { transform: translateX(-110%); } 100% { transform: translateX(330%); } }
+  .boot-text { font-size: 0.62rem; font-weight: 700; letter-spacing: 4px; color: #7d8aa5; animation: bootPulse 1.2s ease-in-out infinite; }
+  @keyframes bootPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
   #bannerAlert { position: absolute; top: 75px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.9); border: 1px solid #fbbf24; color: #fbbf24; padding: 8px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; text-align: center; max-width: 90vw; z-index: 12; }
   #countdownOverlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 900; color: #38bdf8; text-shadow: 0 0 25px rgba(56,189,248,0.8); background: rgba(5,9,18,0.45); }
   #minimap { width: 110px; height: 110px; border-radius: 50%; border: 2px solid #38bdf8; background: rgba(7,11,20,0.85); }
@@ -89,10 +124,25 @@
 <canvas id="gameCanvas"></canvas>
 <div id="vignette" class="hidden"></div>
 <div id="targetBoxes"></div>
+<div id="dmgVignette"></div>
+<div id="hitmarker">✕</div>
+<div id="bootOverlay">
+  <div class="boot-logo"><svg viewBox="0 0 24 24"><polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" /></svg></div>
+  <div class="boot-title">NEBULA DOGFIGHT</div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-text">LOADING</div>
+</div>
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v19 — TERRAIN & PLANETS ★</div></div>
+    <div class="brand">
+      <div class="logo-mark"><svg viewBox="0 0 24 24"><polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" /><polyline points="22 2 11 13" fill="none" stroke="rgba(5,10,20,0.55)" stroke-width="1.6" /></svg></div>
+      <div class="brand-text">
+        <h1>NEBULA DOGFIGHT</h1>
+        <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
+      </div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v20 — PRO EDITION ★</div>
+    </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -108,12 +158,12 @@
   </div>
   <div class="menu-center">
     <div>
-      <div class="section-label">1. Select Game Mode</div>
+      <div class="section-label">Select Mode</div>
       <div class="mode-grid">
-        <button class="mode-btn active" data-mode="campaign"><strong>Campaign</strong><small>10 chapters across cities &amp; peaks</small></button>
-        <button class="mode-btn" data-mode="gungame"><strong>Gun Game</strong><small>10-bot FFA, 15 jets, first to 15 kills</small></button>
-        <button class="mode-btn" data-mode="royale"><strong>Ranked Royale</strong><small>50-pilot storm zone, Silver to Global</small></button>
-        <button class="mode-btn" data-mode="online1v1"><strong>Online 1v1</strong><small>Real players only — zero bots</small></button>
+        <button class="mode-btn active" data-mode="campaign"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M12 2.2l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.2l-6 3.3 1.3-6.7-5-4.6 6.8-.8z" fill="currentColor" /></svg></span><strong>Campaign</strong><small>10 chapters across cities &amp; peaks</small><span class="mode-meta">10 CHAPTERS</span></button>
+        <button class="mode-btn" data-mode="gungame"><span class="mode-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 2.2v4M12 17.8v4M2.2 12h4M17.8 12h4" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="1.6" fill="currentColor" /></svg></span><strong>Gun Game</strong><small>10-bot FFA, 15 jets, first to 15 kills</small><span class="mode-meta">FIRST TO 15</span></button>
+        <button class="mode-btn" data-mode="royale"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M3.2 18.6h17.6M4.4 17.4L3.2 8.2l5.6 4L12 5l3.2 7.2 5.6-4-1.2 9.2z" fill="currentColor" /></svg></span><strong>Ranked Royale</strong><small>50-pilot storm zone, Silver to Global</small><span class="mode-meta">50 PILOTS</span></button>
+        <button class="mode-btn" data-mode="online1v1"><span class="mode-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><ellipse cx="12" cy="12" rx="4.2" ry="9" fill="none" stroke="currentColor" stroke-width="2" /><path d="M3.4 9h17.2M3.4 15h17.2" stroke="currentColor" stroke-width="2" /></svg></span><strong>Online 1v1</strong><small>Real players only — zero bots</small><span class="mode-meta">REAL PLAYERS</span></button>
       </div>
     </div>
     <div class="sub-controls">
@@ -201,6 +251,9 @@
       <label>Camera Shake: <span id="shakeVal">0.6</span> <input type="range" id="shakeSlider" min="0" max="1" step="0.1" value="0.6" /></label>
       <div class="section-label">Graphics</div>
       <label>Quality: <select id="qualitySelect"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+      <div class="section-label">Audio</div>
+      <label>Master Volume: <span id="volVal">70%</span> <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.7" /></label>
+      <label><input type="checkbox" id="muteToggle" /> Mute All Sound</label>
       <div class="section-label">Touch</div>
       <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
       <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
@@ -236,6 +289,7 @@ const defaultState = {
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1 },
   sensitivity: 1.0, mobileTouch: false,
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
+  volume: 0.7, muted: false,
   binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
 };
 let state;
@@ -252,6 +306,8 @@ if (typeof state.shake !== 'number') state.shake = 0.6;
 if (typeof state.invertY !== 'boolean') state.invertY = false;
 if (typeof state.assist !== 'boolean') state.assist = true;
 if (['high', 'medium', 'low'].indexOf(state.quality) === -1) state.quality = 'high';
+if (typeof state.volume !== 'number' || isNaN(state.volume) || state.volume < 0 || state.volume > 1) state.volume = 0.7;
+if (typeof state.muted !== 'boolean') state.muted = false;
 function saveState() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} updateTopUI(); }
 
 const JETS = [
@@ -378,6 +434,135 @@ function awardXP(amount) {
   saveState();
 }
 
+// ---- Sound engine (v20): a tiny WebAudio synth — the game shipped silent, and a
+// store-quality build needs audio. Everything is synthesized (no audio assets):
+// filtered noise bursts + oscillators through one master gain driven by
+// state.volume / state.muted. Every entry point is guarded: if WebAudio is
+// unavailable or blocked, the game simply stays silent — audio can never break it.
+const SFX = {
+  ctx: null, master: null, _noiseBuf: null,
+  _gunLast: 0, _beepT: -9, _eng: null,
+  init: function() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') { try { this.ctx.resume(); } catch (e) {} } return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = state.muted ? 0 : (typeof state.volume === 'number' ? state.volume : 0.7);
+      this.master.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate;
+      this._noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const d = this._noiseBuf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { this.ctx = null; this.master = null; }
+  },
+  setVolume: function() { if (this.ctx && this.master) { try { this.master.gain.setTargetAtTime(state.muted ? 0 : state.volume, this.ctx.currentTime, 0.03); } catch (e) {} } },
+  _burst: function(dur, filterType, f0, f1, vol) {
+    if (!this.ctx || !this._noiseBuf) return;
+    try {
+      const t = this.ctx.currentTime;
+      const src = this.ctx.createBufferSource(); src.buffer = this._noiseBuf; src.loop = true;
+      const flt = this.ctx.createBiquadFilter(); flt.type = filterType; flt.frequency.setValueAtTime(f0, t);
+      if (f1) flt.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(flt); flt.connect(g); g.connect(this.master);
+      src.start(t); src.stop(t + dur + 0.05);
+    } catch (e) {}
+  },
+  _tone: function(freq, dur, vol, type, slideTo, delay) {
+    if (!this.ctx) return;
+    try {
+      const t = this.ctx.currentTime + (delay || 0);
+      const o = this.ctx.createOscillator(); o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+      const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+    } catch (e) {}
+  },
+  gun: function() { const n = performance.now(); if (n - this._gunLast < 120) return; this._gunLast = n; this._burst(0.07, 'bandpass', 1700, 500, 0.20); this._tone(140, 0.05, 0.10, 'square', 60); },
+  rocket: function() { this._burst(0.5, 'lowpass', 3200, 300, 0.16); this._tone(280, 0.45, 0.08, 'sawtooth', 65); },
+  explosion: function() { this._tone(110, 0.38, 0.42, 'sine', 30); this._burst(0.32, 'lowpass', 900, 120, 0.30); },
+  hit: function() { this._tone(180, 0.08, 0.16, 'square', 110); },
+  kill: function() { this._tone(660, 0.07, 0.14); this._tone(990, 0.09, 0.14, 'sine', null, 0.07); },
+  promotion: function() { const self = this; [523, 659, 784, 1047].forEach(function(f, i) { self._tone(f, 0.12, 0.12, 'triangle', null, i * 0.085); }); },
+  click: function() { this._tone(1250, 0.03, 0.045, 'square'); },
+  crate: function() { this._tone(300, 0.35, 0.12, 'sine', 1250); const self = this; [1560, 1980, 2340].forEach(function(f, i) { self._tone(f, 0.09, 0.07, 'sine', null, 0.3 + i * 0.07); }); },
+  lockBeep: function() { this._tone(1250, 0.06, 0.10, 'sine'); },
+  engineStart: function() {
+    if (!this.ctx || this._eng) return;
+    try {
+      const t = this.ctx.currentTime;
+      const gain = this.ctx.createGain(); gain.gain.value = 0;
+      const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 320; filter.Q.value = 0.6;
+      const osc = this.ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 52;
+      const osc2 = this.ctx.createOscillator(); osc2.type = 'square'; osc2.frequency.value = 26;
+      const og = this.ctx.createGain(); og.gain.value = 0.5;
+      const og2 = this.ctx.createGain(); og2.gain.value = 0.35;
+      const noise = this.ctx.createBufferSource(); noise.buffer = this._noiseBuf; noise.loop = true;
+      const ng = this.ctx.createGain(); ng.gain.value = 0.16;
+      osc.connect(og); og.connect(filter); osc2.connect(og2); og2.connect(filter); noise.connect(ng); ng.connect(filter);
+      filter.connect(gain); gain.connect(this.master);
+      osc.start(t); osc2.start(t); noise.start(t);
+      gain.gain.setTargetAtTime(0.014, t, 0.4);
+      this._eng = { osc: osc, osc2: osc2, noise: noise, gain: gain, filter: filter };
+    } catch (e) { this._eng = null; }
+  },
+  engineUpdate: function(f, boosting) {
+    if (!this.ctx || !this._eng) return;
+    try {
+      const t = this.ctx.currentTime;
+      this._eng.gain.gain.setTargetAtTime(0.014 + f * 0.030 + (boosting ? 0.012 : 0), t, 0.09);
+      this._eng.osc.frequency.setTargetAtTime(50 + f * 35, t, 0.09);
+      this._eng.osc2.frequency.setTargetAtTime(25 + f * 17, t, 0.09);
+    } catch (e) {}
+  },
+  engineStop: function() {
+    if (!this._eng) return;
+    const eng = this._eng; this._eng = null;
+    try {
+      const t = this.ctx.currentTime;
+      eng.gain.gain.setTargetAtTime(0.0, t, 0.08);
+      setTimeout(function() { try { eng.osc.stop(); eng.osc2.stop(); eng.noise.stop(); eng.gain.disconnect(); } catch (e) {} }, 350);
+    } catch (e) {}
+  }
+};
+window.addEventListener('pointerdown', function() { SFX.init(); }, { passive: true });
+window.addEventListener('keydown', function() { SFX.init(); });
+document.addEventListener('click', function(e) { const t = e.target; if (t && t.closest && t.closest('.btn')) { SFX.init(); SFX.click(); } });
+// ---- v20 game feel: hitmarker + damage vignette helpers (hoisted; used by animate) ----
+let _hmTimer = null;
+function showHitmarker(kill) {
+  const el = document.getElementById('hitmarker'); if (!el) return;
+  el.classList.toggle('kill', !!kill);
+  el.classList.add('show');
+  clearTimeout(_hmTimer);
+  _hmTimer = setTimeout(function() { el.classList.remove('show'); }, kill ? 140 : 90);
+}
+let _dmgFlashAt = 0;
+function flashDamage() {
+  const now = performance.now(); if (now - _dmgFlashAt < 120) return; _dmgFlashAt = now;
+  const el = document.getElementById('dmgVignette'); if (!el) return;
+  el.style.transition = 'none'; el.style.opacity = '0.9';
+  requestAnimationFrame(function() { requestAnimationFrame(function() { el.style.transition = 'opacity 0.3s ease-out'; el.style.opacity = '0'; }); });
+}
+let _reticleTimer = null;
+function spreadReticle() {
+  const el = document.getElementById('reticle'); if (!el) return;
+  el.style.transform = 'translate(-50%, -50%) scale(1.35)';
+  clearTimeout(_reticleTimer);
+  _reticleTimer = setTimeout(function() { el.style.transform = 'translate(-50%, -50%) scale(1)'; }, 150);
+}
+// ---- v20 boot loader: fades on window load / first frame, with a hard 4s fallback ----
+let _bootHidden = false;
+function hideBootOverlay() {
+  if (_bootHidden) return; _bootHidden = true;
+  const b = document.getElementById('bootOverlay'); if (!b) return;
+  b.classList.add('done');
+  setTimeout(function() { b.style.display = 'none'; }, 700);
+}
+window.addEventListener('load', hideBootOverlay);
+setTimeout(hideBootOverlay, 4000);
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
 let renderer = null, scene = null, camera = null, sunLight = null, hemiLight = null, fillLight = null;
 let composer = null, bloomPass = null; // v16: post-processing pipeline (UnrealBloom) — null-safe, plain rendering is the fallback
@@ -678,12 +863,22 @@ function getBillboardTexture() {
   if (THREE.SRGBColorSpace) _bbTex.colorSpace = THREE.SRGBColorSpace;
   return _bbTex;
 }
-function getSkyTexture(top, bottom) {
-  const t = makeCanvas(4, 512, function(ctx, w, h) {
+function getSkyTexture(top, bottom, cirrus) {
+  const t = makeCanvas(256, 512, function(ctx, w, h) {
     const g = ctx.createLinearGradient(0, 0, 0, h);
     if (Array.isArray(top)) { top.forEach(function(st) { g.addColorStop(st[0], st[1]); }); }
     else { g.addColorStop(0, top); g.addColorStop(0.55, bottom); g.addColorStop(1, bottom); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    if (cirrus) { // v20: faint high cirrus streaks on earth skies — soft stretched radial blobs, alpha 0.05-0.1
+      for (let s = 0; s < 30; s++) {
+        const sx = Math.random() * w, sy = h * (0.08 + Math.random() * 0.5), sl = 50 + Math.random() * 130, sh = 1.4 + Math.random() * 3.4;
+        const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, sl);
+        rg.addColorStop(0, 'rgba(255,255,255,' + (0.05 + Math.random() * 0.05).toFixed(3) + ')');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.save(); ctx.translate(sx, sy); ctx.scale(1, sh / sl); ctx.fillStyle = rg;
+        ctx.beginPath(); ctx.arc(0, 0, sl, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+    }
   });
   if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -962,9 +1157,9 @@ function getJetGeos(spec, key) {
   const canard = planformGeo({ rl: 0.50, rt: -0.55, tl: 0.18, tt: -0.48 }, 1.85, 0.10);
   const lerx = planformGeo({ rl: 1.20, rt: -1.20, tl: 0.60, tt: -0.80 }, 2.15, 0.10);
   const geos = {
-    fuse: new THREE.LatheGeometry(fusePts, 48),
-    radome: new THREE.LatheGeometry(radPts, 48),
-    canopy: new THREE.LatheGeometry(canPts, 48),
+    fuse: new THREE.LatheGeometry(fusePts, 64),
+    radome: new THREE.LatheGeometry(radPts, 64),
+    canopy: new THREE.LatheGeometry(canPts, 64),
     wingR: wing.r, wingL: wing.l,
     stabR: stab.r, stabL: stab.l,
     canardR: canard.r, canardL: canard.l,
@@ -1090,6 +1285,17 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const pitot = new THREE.Mesh(geos.pitot, darkMat); pitot.rotation.x = Math.PI / 2; pitot.position.set(0, 0.05, spec.len * 0.5 + 1.05); g.add(pitot);
   // Blade antennas on the spine
   [-0.5, -2.3].forEach(function(az) { const ant = new THREE.Mesh(geos.box, darkMat); ant.scale.set(0.07, 0.52, 0.66); ant.position.set(0, spec.rad * spec.flat + 0.16, az); ant.rotation.x = -0.12; g.add(ant); });
+  // AOA (angle-of-attack) probe vane on the side of the nose (v20)
+  const aoa = new THREE.Mesh(geos.box, darkMat); aoa.scale.set(0.05, 0.24, 0.44); aoa.position.set(spec.rad * spec.width * 0.82, 0.10, spec.len * 0.33); aoa.rotation.z = -0.25; g.add(aoa);
+  // Wingtip missile rails + Sidewinders on the non-stealth jets (v20) — the stealth
+  // airframes (f35/f22/su57/x02/adf11) carry their stores in internal bays instead.
+  if (jetId === 'f16' || jetId === 'fa18' || jetId === 'mx2' || jetId === 'mx3') {
+    const tipZ = (spec.wing.tl + spec.wing.tt) / 2;
+    [-1, 1].forEach(function(side) {
+      const rail = new THREE.Mesh(geos.box, darkMat); rail.scale.set(0.16, 0.13, 2.7); rail.position.set(side * halfSpan, -0.20, tipZ + 0.1); g.add(rail);
+      const wm = buildSidewinder(geos); wm.scale.setScalar(0.85); wm.position.set(side * halfSpan, -0.42, tipZ + 0.25); g.add(wm);
+    });
+  }
   // HUD sensor glass bump under the nose — the F-35 carries its EOTS bump in this spot instead
   if (jetId !== 'f35') { const hudGlass = new THREE.Mesh(geos.canopy, glassMat); hudGlass.scale.set(0.42, 0.55, 0.30); hudGlass.position.set(0, -spec.rad * spec.flat * 0.80, spec.len * 0.30); g.add(hudGlass); }
   // Main wings: accurate planform extrusions; wing-root fairings blend them into the fuselage (no toy seams)
@@ -1684,7 +1890,20 @@ function buildCityGrid(theme, radius) {
   const roofMat = new THREE.MeshStandardMaterial({ color: theme === 'neon' ? 0x11141c : 0x3c4654, roughness: 0.9 });
   const core = Math.min(radius * 0.95, 1450);
   const n = Math.floor(core / CITY_PITCH);
-  const roofXforms = [], towerXforms = [], treePts = [], lightPts = [];
+  const roofXforms = [], towerXforms = [], treePts = [], lightPts = [], helipadXforms = [];
+  // v20: tall towers (>90) get a setback crown — a second box at 60% footprint and 18%
+  // of the tower's height — and ~10% of them (deterministic hash) get a rooftop
+  // helipad, instanced after the grid loop from helipadXforms. Returns the roof top Y.
+  function addRoofDetail(bx, bz, w, d, hh, seedA, seedB) {
+    let topY = hh;
+    if (hh > 90) {
+      const cw = w * 0.6, cd = d * 0.6, chh = hh * 0.18;
+      const crown = new THREE.Mesh(_boxGeo, roofMat); crown.scale.set(cw, chh, cd); crown.position.set(bx, hh + chh / 2, bz); crown.castShadow = true; crown.receiveShadow = true; worldGroup.add(crown);
+      topY = hh + chh;
+      if (hash2(seedA, seedB) < 0.10) helipadXforms.push([bx, topY, bz, Math.min(w, d) * 0.34]);
+    }
+    return topY;
+  }
   for (let gi = -n; gi < n; gi++) {
     for (let gj = -n; gj < n; gj++) {
       const cx = (gi + 0.5) * CITY_PITCH, cz = (gj + 0.5) * CITY_PITCH;
@@ -1705,6 +1924,7 @@ function buildCityGrid(theme, radius) {
           const mesh = new THREE.Mesh(_boxGeo, mat); mesh.scale.set(w, hh, d); mesh.position.set(bx, hh / 2, bz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
           obstacles.push({ x: bx, z: bz, r: Math.max(w, d) * 0.62, h: hh });
           if (hash2(bx, bz) < 0.5) roofXforms.push([bx, hh, bz, w * 0.4, 4 + hash2(bz, bx) * 3, d * 0.4]);
+          addRoofDetail(bx, bz, w, d, hh, bx * 1.31 + oi * 7, bz * 0.77 - oi * 3);
         });
       } else { // one main building, occasionally a landmark tower
         const w = 48 + h1 * 34, d = 48 + h2v * 34;
@@ -1713,6 +1933,7 @@ function buildCityGrid(theme, radius) {
         const mesh = new THREE.Mesh(_boxGeo, mat); mesh.scale.set(w, hh, d); mesh.position.set(cx, hh / 2, cz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
         obstacles.push({ x: cx, z: cz, r: Math.max(w, d) * 0.60, h: hh });
         if (landmark) { const spire = new THREE.Mesh(_boxGeo, roofMat); spire.scale.set(6, 26, 6); spire.position.set(cx, hh + 13, cz); worldGroup.add(spire); }
+        if (!landmark) addRoofDetail(cx, cz, w, d, hh, cx * 0.91 - 51, cz * 1.13 + 33);
         if (hash2(cx, cz) < 0.55) roofXforms.push([cx + (h1 - 0.5) * w * 0.4, hh, cz + (h2v - 0.5) * d * 0.4, 8 + h1 * 8, 4 + h3 * 4, 8 + h2v * 8]);
         if (hash2(cz, cx) < 0.22) towerXforms.push([cx - (h1 - 0.5) * w * 0.4, hh, cz - (h3 - 0.5) * d * 0.4]);
       }
@@ -1749,6 +1970,19 @@ function buildCityGrid(theme, radius) {
     const im2 = new THREE.InstancedMesh(wtGeo, wtMat, towerXforms.length);
     towerXforms.forEach(function(tf, i) { _pos.set(tf[0], tf[1] + 8.5, tf[2]); _scl.set(1, 1, 1); _m4.compose(_pos, _q, _scl); im2.setMatrixAt(i, _m4); });
     im2.castShadow = true; worldGroup.add(im2);
+  }
+  if (helipadXforms.length) { // v20: rooftop helipads — dark disc + emissive ring, one instanced mesh each
+    const padGeo = new THREE.CylinderGeometry(1, 1, 0.7, 20);
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x151a22, roughness: 0.85 });
+    const pads = new THREE.InstancedMesh(padGeo, padMat, helipadXforms.length);
+    const ringGeo = new THREE.TorusGeometry(0.82, 0.045, 6, 28);
+    const rings = new THREE.InstancedMesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfacc15 }), helipadXforms.length);
+    const _qFlat = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    helipadXforms.forEach(function(hp, i) {
+      _pos.set(hp[0], hp[1] + 0.35, hp[2]); _scl.set(hp[3], 1, hp[3]); _m4.compose(_pos, _q, _scl); pads.setMatrixAt(i, _m4);
+      _pos.y = hp[1] + 0.78; _scl.set(hp[3], hp[3], hp[3]); _m4.compose(_pos, _qFlat, _scl); rings.setMatrixAt(i, _m4);
+    });
+    worldGroup.add(pads); worldGroup.add(rings);
   }
   if (treePts.length) { // trees: instanced trunks + foliage
     const trunkGeo = new THREE.CylinderGeometry(0.55, 0.8, 4.5, 6);
@@ -2221,7 +2455,7 @@ function buildEnvironment(theme, radius, densityScale) {
   if (isSpace) { scene.background = new THREE.Color(0x0a0418); scene.fog = new THREE.FogExp2(0x1a0b2e, _tl.fogDensity); } // v13 deep-space override: dark purple, low density so asteroids stay visible out to ~radius*1.2
   // Gradient sky dome (BackSide sphere with canvas gradient)
   const skyR = Math.min(radius * 2.9, 4200);
-  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot), side: THREE.BackSide, fog: false, depthWrite: false }));
+  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot, !isSpace), side: THREE.BackSide, fog: false, depthWrite: false }));
   worldGroup.add(skyDome);
   // Sun disc sprite aligned with the directional light
   if (!isSpace) { // space themes have no sun disc — the starfield + nebulae carry the sky
@@ -2272,7 +2506,7 @@ function buildEnvironment(theme, radius, densityScale) {
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
   if (theme === 'city') {
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.18, metalness: 0.85, envMapIntensity: 1.2, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.14, metalness: 0.85, envMapIntensity: 1.35, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water; v20: sharper sun glint (roughness down, env up)
     water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water); worldGroup.userData.water = water;
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
@@ -2381,6 +2615,7 @@ window.addEventListener('keydown', function(e) { keys[e.code] = true; if (active
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
 function startMission() {
   closeModals(); clearSmoke();
+  _missionClock = 0; _autoQDropped = false; _frameEma = 16; // v20: fresh auto-quality window per mission
   if (currentMode === 'online1v1') { startOnlineMatchmaking(); return; }
   if (!renderer) { alert('3D engine failed to load. Check connection and reload.'); return; }
   if (menuGroup) menuGroup.visible = false;
@@ -2431,6 +2666,7 @@ function startMission() {
     try { conn.send({ type: 'rstart' }); } catch (e) {} // tell the rival we dropped — their client auto-starts its own Royale (zone timers start together)
     showBanner('ONLINE ROYALE (BETA) — you + your rival + 48 bots. Last pilot standing wins!', 4200);
   }
+  SFX.engineStart(); // v20: engine hum fades in with the mission
   paused = false;
 }
 function runCountdown() {
@@ -2539,7 +2775,7 @@ function firePlayerRocket() {
   if (p.respawnT > 0) return;
   const best = pickFrontTarget(1000); // true lock-on: most-in-front opponent within 1000; no lock = dumbfire straight
   const ggTierDef = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier] : null;
-  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, (55 + state.upgrades.rocket * 12) * (ggTierDef ? ggTierDef.rocketDmg : 1));
+  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, (55 + state.upgrades.rocket * 12) * (ggTierDef ? ggTierDef.rocketDmg : 1)); SFX.rocket();
   if (best) showBanner('MISSILE AWAY — LOCKED ON', 1500);
   p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7) * (ggTierDef ? ggTierDef.rocketCd : 1);
 }
@@ -2573,7 +2809,7 @@ function togglePause(forceOpen) {
 function endMatch(victory, title, summary) {
   const modeAtEnd = currentMode; const chapterAtEnd = activeGame ? activeGame.chapter : Number(chSel.value);
   royaleRemoteRef = null; // v18: the online-royale puppet never outlives its match (the peer link + royalePeerReady stay up for a rematch)
-  activeGame = null; paused = false; clearSmoke();
+  activeGame = null; paused = false; clearSmoke(); SFX.engineStop();
   document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
   applyFov(); // v17: snap FOV back to the player's setting (a boost kick may have left it wide)
   document.getElementById('statusTitle').textContent = title;
@@ -2583,7 +2819,7 @@ function endMatch(victory, title, summary) {
   document.getElementById('statusModal').classList.remove('hidden');
 }
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
+function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -2592,6 +2828,10 @@ const _camEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ
 const _camQuat = (typeof THREE !== 'undefined') ? new THREE.Quaternion() : null;
 const _camOff = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 let shakeT = 0; // v15 camera shake: trauma value set by hits/explosions, decays in the cam update, scaled by state.shake
+// v20 auto-quality safeguard: EMA of frame time during missions; if the device is
+// struggling on 'high', step down to 'medium' once per mission — but never override
+// a quality the user picked themselves this session (_qualityTouched).
+let _frameEma = 16, _missionClock = 0, _autoQDropped = false, _qualityTouched = false;
 function angleWrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
@@ -2738,9 +2978,14 @@ function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
   if (!renderer) return;
+  if (!_bootHidden) hideBootOverlay(); // v20: boot loader lifts on the first rendered frame
+  if (activeGame && !paused) { // v20 auto-quality: watch the frame-time EMA once the mission settles
+    _frameEma = _frameEma * 0.95 + (dt * 1000) * 0.05; _missionClock += dt;
+    if (!_autoQDropped && !_qualityTouched && _missionClock > 6 && _frameEma > 26 && state.quality === 'high') { _autoQDropped = true; state.quality = 'medium'; applyQuality(); saveState(); showBanner('Quality auto-adjusted for smoothness', 2600); }
+  }
   if (fillLight) fillLight.visible = !!activeGame; // v17: camera fill light is mission-only
   if (!activeGame) { animateMenuScene(dt); renderFrame(); return; }
-  if (paused) { renderFrame(); return; }
+  if (paused) { SFX.engineUpdate(0, false); renderFrame(); return; }
   // v17 WS1 — SHADOWS THAT FOLLOW THE PLAYER: the sun's +-450 shadow frustum used to sit
   // fixed on the map origin, so shadows vanished a few hundred units into a mission. Now
   // the frustum anchor tracks the player, snapped to a 50-unit grid (snapping is what
@@ -2834,14 +3079,14 @@ function animate(now) {
       shotDir.x += (Math.random() - 0.5) * 0.012; shotDir.y += (Math.random() - 0.5) * 0.012; shotDir.z += (Math.random() - 0.5) * 0.012;
       shotDir.normalize();
     }
-    spawnBullet(muzzle, shotDir, 'player', gunDmg); p.fireCd = fireRate;
+    spawnBullet(muzzle, shotDir, 'player', gunDmg); p.fireCd = fireRate; SFX.gun(); spreadReticle();
   }
   for (let i = activeGame.rings.length - 1; i >= 0; i--) { const rg = activeGame.rings[i]; rg.mesh.rotation.y += dt * 1.5; if (p.respawnT <= 0 && rg.mesh.position.distanceTo(p.mesh.position) < 22) { if (rg.info.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + 50); else if (rg.info.type === 'lock') { p.autoAimLeft = 7; p.lockTarget = pickFrontTarget(1200); } else { p.buff = rg.info.type; p.buffTimer = 8; } showBanner(`${rg.info.name}: ${rg.info.desc}`, 3800); scene.remove(rg.mesh); activeGame.rings.splice(i, 1); spawnPowerRing(); } }
   if (activeGame.mode === 'royale') {
     activeGame.zoneTimer -= dt;
     if (activeGame.zoneTimer <= 0 && activeGame.zoneRadius > 220) { activeGame.zoneRadius = Math.max(220, activeGame.zoneRadius - 320); activeGame.zoneTimer = 35; showBanner('STORM ZONE CLOSING IN!', 2500); }
     const distCenter = Math.hypot(p.mesh.position.x, p.mesh.position.z);
-    if (distCenter > activeGame.zoneRadius) { p.hp -= 12 * dt; document.getElementById('hudWarning').textContent = 'OUTSIDE SAFE ZONE — TAKING STORM DAMAGE!'; }
+    if (distCenter > activeGame.zoneRadius) { p.hp -= 12 * dt; flashDamage(); document.getElementById('hudWarning').textContent = 'OUTSIDE SAFE ZONE — TAKING STORM DAMAGE!'; }
     else { document.getElementById('hudWarning').textContent = `ZONE RADIUS: ${Math.round(activeGame.zoneRadius)}M`; }
     drawMinimap();
   }
@@ -2969,8 +3214,8 @@ function animate(now) {
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
-    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -2988,13 +3233,14 @@ function animate(now) {
     // Visible white smoke trail so pilots can see missiles coming
     rk._smokeAcc = (rk._smokeAcc || 0) + 20 * dt;
     while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.1, grow: 2.4, life: 0.5, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
-    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     let rHit = false;
-    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
+    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); if (rk.ownerId === 'player') showHitmarker(ent.hp <= 0); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
     if (!activeGame) return;
   }
   if (activeGame.mode !== 'royale') { document.getElementById('hudWarning').textContent = incomingMissile ? 'MISSILE LOCK! TURN & SHOOT ROCKET TO DETONATE!' : (p.spawnProtT > 0 ? 'SPAWN PROTECTION' : (p.autoAimLeft > 0 ? `AUTO-AIM ACTIVE (${p.autoAimLeft.toFixed(1)}s)` : 'RADAR CLEAR')); }
+  if (incomingMissile && p.respawnT <= 0 && gameTime - SFX._beepT > 0.4) { SFX._beepT = gameTime; SFX.lockBeep(); } // v20: lock-on warning beep
   if (p.hp <= 0 && p.respawnT <= 0) {
     if (activeGame.mode === 'gungame') {
       // Gun Game (v6/v14): first to 15 — dying costs a death and 2 seconds, never the match.
@@ -3014,6 +3260,7 @@ function animate(now) {
   if (_botFlashT > 0) { _botFlashT -= dt; if (_botFlashT <= 0 && _botFlash) _botFlash.material.opacity = 0; }
   if (worldGroup && worldGroup.userData.water && worldGroup.userData.water.material.map) worldGroup.userData.water.material.map.offset.x += dt * 0.01; // animated harbor water
   flickerFlames(p.mesh, boosting, dt);
+  SFX.engineUpdate(clampNum(curSpd / Math.max(1, p.spd * 1.45), 0, 1), boosting); // v20: engine hum tracks speed/boost
   if (p.mesh.userData.burnerLight) p.mesh.userData.burnerLight.intensity = (boosting ? 30 : 8) * (0.85 + Math.random() * 0.3);
   if (p.respawnT <= 0) emitContrails(p, curSpd, Math.abs(p.yawIn || 0), dt);
   for (let fi = 0; fi < activeGame.entities.length; fi++) flickerFlames(activeGame.entities[fi].mesh, false, dt);
@@ -3092,6 +3339,7 @@ function gungamePlayerDown(cause) {
   }
   for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
   for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8, hdr: 1.6 }); // v17: fireball core blooms
+  SFX.explosion(); // v20: your own death is loud
   shakeT = Math.max(shakeT, 0.6); // v15: your own explosion kicks the camera
   p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
   showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
@@ -3107,9 +3355,11 @@ function royaleVictory() {
 }
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
+  if (victim.mesh && p && p.mesh && victim.mesh.position.distanceTo(p.mesh.position) < 900) SFX.explosion(); // v20: deaths are audible when they happen near you
   if (killerId === 'player') {
+    SFX.kill(); // v20: kill-confirm blip
     p.kills++; const coinGain = Math.round((activeGame.mode === 'campaign' ? 20 : 6) * 0.6); const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain); // v15: kill coins x0.6 (12 campaign / 4 other)
-    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); }
+    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); SFX.promotion(); }
   } else {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
     if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; applyBotTier(killerBot); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
@@ -3149,6 +3399,7 @@ function drawMinimap() {
 // HANGAR, SHOP & SETTINGS UI
 function closeModals() { document.querySelectorAll('.modal').forEach(function(m) { m.classList.add('hidden'); }); }
 document.getElementById('btnStartPlay').onclick = startMission;
+document.getElementById('btnStartPlay').addEventListener('click', function() { SFX.init(); }); // v20: unlock audio on the Start tap
 document.getElementById('btnTopHangar').onclick = function() { switchHangarTab('jets'); document.getElementById('hangarModal').classList.remove('hidden'); };
 document.getElementById('btnTopShop').onclick = function() { renderShop(); document.getElementById('shopModal').classList.remove('hidden'); };
 document.getElementById('btnTopCustom').onclick = function() { renderCustomization(); document.getElementById('customModal').classList.remove('hidden'); };
@@ -3234,7 +3485,7 @@ function renderCustomization() {
 function openCrate(crateId) {
   const cr = CRATES.find(function(c) { return c.id === crateId; }); if (!cr) return;
   if (state.coins < cr.cost) { alert('Not enough coins!'); return; }
-  state.coins -= cr.cost;
+  state.coins -= cr.cost; SFX.crate();
   // Roll a rarity by the crate odds, then a random skin of that rarity
   let roll = Math.random() * 100, rarity = 'Common', acc = 0;
   const order = ['Common', 'Rare', 'Epic', 'Legendary', 'Mythic'];
@@ -3325,6 +3576,8 @@ function renderKeybinds() {
   const iyT = document.getElementById('invertYToggle'); if (iyT) iyT.checked = !!state.invertY;
   const asT = document.getElementById('assistToggle'); if (asT) asT.checked = !!state.assist;
   const qS = document.getElementById('qualitySelect'); if (qS) qS.value = state.quality;
+  const vS = document.getElementById('volSlider'); if (vS) { vS.value = state.volume; const vv = document.getElementById('volVal'); if (vv) vv.textContent = Math.round(state.volume * 100) + '%'; }
+  const mT = document.getElementById('muteToggle'); if (mT) mT.checked = !!state.muted;
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
@@ -3336,7 +3589,9 @@ document.getElementById('camDistSlider').oninput = function(e) { state.camDist =
 document.getElementById('shakeSlider').oninput = function(e) { state.shake = parseFloat(e.target.value); document.getElementById('shakeVal').textContent = state.shake.toFixed(1); saveState(); };
 document.getElementById('invertYToggle').onchange = function(e) { state.invertY = e.target.checked; saveState(); };
 document.getElementById('assistToggle').onchange = function(e) { state.assist = e.target.checked; saveState(); };
-document.getElementById('qualitySelect').onchange = function(e) { state.quality = e.target.value; applyQuality(); saveState(); };
+document.getElementById('qualitySelect').onchange = function(e) { state.quality = e.target.value; _qualityTouched = true; applyQuality(); saveState(); };
+document.getElementById('volSlider').oninput = function(e) { state.volume = parseFloat(e.target.value); const vv = document.getElementById('volVal'); if (vv) vv.textContent = Math.round(state.volume * 100) + '%'; SFX.init(); SFX.setVolume(); saveState(); };
+document.getElementById('muteToggle').onchange = function(e) { state.muted = e.target.checked; SFX.init(); SFX.setVolume(); saveState(); };
 applyFov(); applyQuality(); // v15: boot with the saved camera + quality settings
 document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
 // Touch joystick & HUD buttons
