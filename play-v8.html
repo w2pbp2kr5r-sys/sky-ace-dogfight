@@ -92,7 +92,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v17 — MISSION GRAPHICS ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v18 — GALAXY FRONTIER ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -125,6 +125,7 @@
         <button class="btn btn-sec btn-sm" id="btnHostRoom">Host Room</button>
         <input type="text" id="joinCodeInput" placeholder="Room code" style="width:110px" />
         <button class="btn btn-sec btn-sm" id="btnJoinRoom">Join</button>
+        <div id="royaleOnlineNote" class="hidden" style="margin-top:8px;font-size:0.8rem;color:#7dd3fc;line-height:1.45;">Online Royale <strong style="color:#fbbf24;">BETA</strong>: host or join a room, then Enter the Royale — your friend drops into the same storm with you (plus 48 bots). Both pilots must pick Ranked Royale before connecting.</div>
       </div>
       <div id="activeJetLabel">Equipped: F-16 Falcon</div>
     </div>
@@ -359,7 +360,9 @@ document.querySelectorAll('.mode-btn').forEach(function(btn) {
     updateStartLabel();
     document.getElementById('chapterSelectWrap').classList.toggle('hidden', currentMode !== 'campaign');
     document.getElementById('diffSelectWrap').classList.toggle('hidden', currentMode === 'royale' || currentMode === 'online1v1');
-    document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1');
+    document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1' && currentMode !== 'royale'); // v18: room controls also serve Online Royale
+    document.getElementById('royaleOnlineNote').classList.toggle('hidden', currentMode !== 'royale'); // v18
+    if (currentMode !== 'royale') royalePeerReady = false; // v18: leaving Royale drops the online-royale pairing (the peer link itself is untouched)
   };
 });
 updateStartLabel();
@@ -378,7 +381,7 @@ function awardXP(amount) {
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
 let renderer = null, scene = null, camera = null, sunLight = null, hemiLight = null, fillLight = null;
 let composer = null, bloomPass = null; // v16: post-processing pipeline (UnrealBloom) — null-safe, plain rendering is the fallback
-let baseBloomStrength = 0.55, bloomQualityFactor = 1, currentThemeName = 'city'; // v17: theme-driven bloom (updateBloom = base x quality factor) + active theme for shadow tracking
+let baseBloomStrength = 0.47, bloomQualityFactor = 1, currentThemeName = 'city'; // v17: theme-driven bloom (updateBloom = base x quality factor) + active theme for shadow tracking // v18: menu default 0.55 -> 0.47 (x0.85)
 const canvas = document.getElementById('gameCanvas');
 if (typeof THREE !== 'undefined') {
   renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
@@ -424,7 +427,7 @@ if (typeof THREE !== 'undefined') {
   try {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.55, 0.6); // v17: threshold 0.82 -> 0.6 so bloom actually engages in daylight missions, not just the dark menu
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.47, 0.55, 0.6); // v17: threshold 0.82 -> 0.6 so bloom actually engages in daylight missions, not just the dark menu // v18: initial strength matches the 0.47 menu default
     composer.addPass(bloomPass);
     composer.addPass(new OutputPass());
   } catch (compErr) { composer = null; bloomPass = null; }
@@ -435,12 +438,13 @@ if (typeof THREE !== 'undefined') {
   sunLight.shadow.mapSize.set(2048, 2048);
   sunLight.shadow.camera.left = -450; sunLight.shadow.camera.right = 450; sunLight.shadow.camera.top = 450; sunLight.shadow.camera.bottom = -450; // v17: tightened from +-600 — the frustum now FOLLOWS the player (see animate), so a smaller box = crisper shadows
   sunLight.shadow.camera.near = 50; sunLight.shadow.camera.far = 1800; sunLight.shadow.bias = -0.0006;
+  sunLight.shadow.radius = 3; // v18: softer, more natural shadow edges (no-op under PCFSoft, active if the shadow type ever changes)
   scene.add(sunLight); scene.add(sunLight.target);
   // v17 camera fill light: parented to the camera (camera joins the scene graph so its
   // children get world matrices) — the player's jet is never flat-lit from behind in a
   // mission. No shadows, mission-only (visibility toggled per frame in animate()).
   scene.add(camera);
-  fillLight = new THREE.DirectionalLight(0xaac4ff, 0.35); fillLight.castShadow = false;
+  fillLight = new THREE.DirectionalLight(0xaac4ff, 0.27); fillLight.castShadow = false; // v18: fill 0.35 -> 0.27 (a touch less bright)
   fillLight.position.set(0, 0, 0); fillLight.target.position.set(0, 0, -10);
   camera.add(fillLight); camera.add(fillLight.target); fillLight.visible = false;
 } else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
@@ -847,8 +851,10 @@ function getHullMaps(baseColor, jetId, skin) {
       nImg.data[i + 1] = (dy * inv * 0.5 + 0.5) * 255;
       nImg.data[i + 2] = inv * 255;
       nImg.data[i + 3] = 255;
-      // Roughness: mid-grey base (~0.42), camo patches vary it, darker panel lines run smoother
-      const rv = Math.max(60, Math.min(175, 107 + (lum(x, y) - 0.5) * 70));
+      // Roughness: mid-grey base (~0.48 — v18: +0.06 matter military paint; the hull
+      // materials use roughness: 1.0 as a pure multiplier, so the map carries the value),
+      // camo patches vary it, darker panel lines run smoother
+      const rv = Math.max(75, Math.min(190, 122 + (lum(x, y) - 0.5) * 70));
       rImg.data[i] = rv; rImg.data[i + 1] = rv; rImg.data[i + 2] = rv; rImg.data[i + 3] = 255;
     }
   }
@@ -1014,7 +1020,7 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   // good) — modest 0.25 clearcoat on bots, the hero jets (withBurnerLight: player +
   // home-screen showcase) keep the richer 0.3 coat and full env intensity.
   const hullMat = (THREE.MeshPhysicalMaterial)
-    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: withBurnerLight ? 0.3 : 0.25, clearcoatRoughness: 0.25, envMapIntensity: 1.25 })) // v17: all jets get the full 1.25 env intensity, hero and bot alike
+    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: withBurnerLight ? 0.3 : 0.25, clearcoatRoughness: 0.31, envMapIntensity: 1.25 })) // v17: all jets get the full 1.25 env intensity, hero and bot alike // v18: clearcoatRoughness 0.25 -> 0.31 (matte coat to match the +0.06 hull roughness)
     : new THREE.MeshStandardMaterial(hullProps);
   const armorMat = new THREE.MeshStandardMaterial({ color: 0x1c222c, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.6 });
   // Control surfaces (v8): same paint, darkened ~15% so the hinge gaps read as separate panels
@@ -1545,7 +1551,7 @@ function buildMenuScene() {
   // from behind, plus a purple ambient wash near the platform — all inside
   // menuGroup, so they vanish with it during missions.
   menuGroup.add(new THREE.AmbientLight(0x33245e, 0.55));
-  const keyLight = new THREE.DirectionalLight(0xd8ccff, 1.1);
+  const keyLight = new THREE.DirectionalLight(0xd8ccff, 0.99); // v18: x0.9
   keyLight.position.set(-120, 260, -180);
   keyLight.target.position.set(46, 160, 0);
   menuGroup.add(keyLight); menuGroup.add(keyLight.target);
@@ -1560,7 +1566,7 @@ function buildMenuScene() {
   // is +Z, away from the camera) so the hero jet gets a magenta edge against the dark.
   // decay 0 keeps the spec'd 0.9 intensity meaningful — r160's physical decay (2)
   // would make a 0.9 spot invisible at ~200 units.
-  const pinkSpot = new THREE.SpotLight(0xf472b6, 0.9, 400, 0.5, 1, 0);
+  const pinkSpot = new THREE.SpotLight(0xf472b6, 0.81, 400, 0.5, 1, 0); // v18: x0.9
   pinkSpot.position.set(176, 250, 190);
   pinkSpot.target.position.set(46, 160, 0);
   menuGroup.add(pinkSpot); menuGroup.add(pinkSpot.target);
@@ -1585,7 +1591,7 @@ function showMenuScene() {
   if (menuGroup) menuGroup.visible = true;
   if (worldGroup) worldGroup.visible = false;
   scene.fog = null; scene.background = null;
-  baseBloomStrength = 0.55; updateBloom(); // v17: menu gets the default bloom strength back (missions set it per theme)
+  baseBloomStrength = 0.47; updateBloom(); // v17: menu gets the default bloom strength back (missions set it per theme) // v18: 0.55 -> 0.47
 }
 function animateMenuScene(dt) {
   if (!menuGroup || !menuGroup.visible) return;
@@ -1640,17 +1646,17 @@ const ENV_THEMES = {
 // by applyThemeLighting() at the end of every buildEnvironment(). fogDensity is the v13
 // 0.00038 x1.15 for earth themes (a touch more depth), space stays at its tuned 0.00013.
 const THEME_LIGHTING = {
-  city:     { sun: 0xffe3b3, sunInt: 1.7,  sunDir: [0.55, 0.62, 0.35],  hemiSky: 0xbfd9ff, hemiGround: 0x4a4238, hemiInt: 0.5,  exposure: 1.12, fogDensity: 0.00044 },
-  canyon:   { sun: 0xffc38a, sunInt: 1.8,  sunDir: [0.7, 0.38, 0.2],    hemiSky: 0xffd9b0, hemiGround: 0x6b3a22, hemiInt: 0.45, exposure: 1.14, fogDensity: 0.00044 },
-  mountain: { sun: 0xeaf2ff, sunInt: 1.65, sunDir: [0.35, 0.8, 0.3],    hemiSky: 0xd6e6ff, hemiGround: 0x5a6672, hemiInt: 0.55, exposure: 1.1,  fogDensity: 0.00044 },
-  neon:     { sun: 0x8fb4ff, sunInt: 0.9,  sunDir: [-0.4, 0.7, -0.3],   hemiSky: 0x2a3560, hemiGround: 0x0a0a14, hemiInt: 0.5,  exposure: 1.18, fogDensity: 0.00044 },
-  nebula:   { sun: 0xd8ccff, sunInt: 1.5,  sunDir: [0.5, 0.65, 0.45],   hemiSky: 0x6a5acd, hemiGround: 0x14042a, hemiInt: 0.6,  exposure: 1.12, fogDensity: 0.00013 },
-  orbit:    { sun: 0xf3e8ff, sunInt: 1.6,  sunDir: [-0.45, 0.6, 0.5],   hemiSky: 0x7a6fe0, hemiGround: 0x180538, hemiInt: 0.6,  exposure: 1.14, fogDensity: 0.00013 }
-};
+  city:     { sun: 0xffe3b3, sunInt: 1.56, sunDir: [0.55, 0.62, 0.35],  hemiSky: 0xbfd9ff, hemiGround: 0x4a4238, hemiInt: 0.45, exposure: 1.06, fogDensity: 0.00044 },
+  canyon:   { sun: 0xffc38a, sunInt: 1.66, sunDir: [0.7, 0.38, 0.2],    hemiSky: 0xffd9b0, hemiGround: 0x6b3a22, hemiInt: 0.41, exposure: 1.08, fogDensity: 0.00044 },
+  mountain: { sun: 0xeaf2ff, sunInt: 1.52, sunDir: [0.35, 0.8, 0.3],    hemiSky: 0xd6e6ff, hemiGround: 0x5a6672, hemiInt: 0.5,  exposure: 1.04, fogDensity: 0.00044 },
+  neon:     { sun: 0x8fb4ff, sunInt: 0.83, sunDir: [-0.4, 0.7, -0.3],   hemiSky: 0x2a3560, hemiGround: 0x0a0a14, hemiInt: 0.45, exposure: 1.12, fogDensity: 0.00044 },
+  nebula:   { sun: 0xd8ccff, sunInt: 1.38, sunDir: [0.5, 0.65, 0.45],   hemiSky: 0x6a5acd, hemiGround: 0x14042a, hemiInt: 0.54, exposure: 1.06, fogDensity: 0.00013 },
+  orbit:    { sun: 0xf3e8ff, sunInt: 1.47, sunDir: [-0.45, 0.6, 0.5],   hemiSky: 0x7a6fe0, hemiGround: 0x180538, hemiInt: 0.54, exposure: 1.08, fogDensity: 0.00013 }
+}; // v18: Jayce asked a touch less bright — exposure -0.06 everywhere, sun x0.92, hemi x0.9
 const _sunDirVec = (typeof THREE !== 'undefined') ? new THREE.Vector3(0.55, 0.62, 0.35).normalize() : null;
 function themeSunDir(theme) { const L = THEME_LIGHTING[theme] || THEME_LIGHTING.city; if (_sunDirVec) _sunDirVec.set(L.sunDir[0], L.sunDir[1], L.sunDir[2]).normalize(); return _sunDirVec; }
 function updateBloom() { if (bloomPass) bloomPass.strength = baseBloomStrength * bloomQualityFactor; }
-function setBloomForTheme(theme) { baseBloomStrength = (theme === 'nebula' || theme === 'orbit') ? 0.85 : (theme === 'neon' ? 0.8 : 0.5); updateBloom(); }
+function setBloomForTheme(theme) { baseBloomStrength = (theme === 'nebula' || theme === 'orbit') ? 0.72 : (theme === 'neon' ? 0.68 : 0.43); updateBloom(); } // v18: bloom bases x0.85
 function applyThemeLighting(theme) {
   const L = THEME_LIGHTING[theme] || THEME_LIGHTING.city;
   currentThemeName = theme;
@@ -1930,7 +1936,9 @@ function getAsteroidGeos() {
 }
 function buildAsteroids(count, radius, yMin, yMax, avoid) {
   const geos = getAsteroidGeos();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6b6472, roughness: 0.95, metalness: 0.15, flatShading: true, envMapIntensity: 0.7 }); // v15: slight metalness + env so rocks catch rim light
+  // v18: three shared materials (grey / grey-purple / brown-grey) picked per rock —
+  // subtle color variation across the field without a per-mesh material explosion.
+  const mats = [0x6b6472, 0x5d5566, 0x6e6258].map(function(c) { return new THREE.MeshStandardMaterial({ color: c, roughness: 0.95, metalness: 0.15, flatShading: true, envMapIntensity: 0.7 }); }); // v15: slight metalness + env so rocks catch rim light
   const spin = worldGroup.userData.spin || (worldGroup.userData.spin = []);
   let placed = 0, guard = 0;
   while (placed < count && guard++ < count * 40) {
@@ -1941,7 +1949,7 @@ function buildAsteroids(count, radius, yMin, yMax, avoid) {
     if (avoid) for (let ai = 0; ai < avoid.length; ai++) { if (Math.hypot(x - avoid[ai].x, z - avoid[ai].z) < avoid[ai].d) { bad = true; break; } }
     if (bad) continue;
     const s = 6 + Math.random() * 24, y = yMin + Math.random() * (yMax - yMin);
-    const m = new THREE.Mesh(geos[placed % geos.length], mat);
+    const m = new THREE.Mesh(geos[placed % geos.length], mats[Math.floor(Math.random() * mats.length)]);
     m.scale.setScalar(s); m.position.set(x, y, z);
     m.rotation.set(Math.random() * 3.1, Math.random() * 3.1, Math.random() * 3.1);
     m.castShadow = true; m.receiveShadow = true;
@@ -2008,6 +2016,76 @@ function buildSpaceStation() {
   worldGroup.add(grp);
   obstacles.push({ x: SX, z: SZ, r: 55, h: SY + 42 }); // one obstacle routes bots around the whole station
 }
+// ---- Galaxy props (v18): space maps are more than asteroids now — derelict
+// satellites, cargo pods and tumbling debris dress both space themes, orbit gains
+// crystal clusters, and nebula gets a backdrop planet + moon on the horizon.
+// Everything lives in worldGroup (cleanup is automatic) and tumbles via the same
+// worldGroup.userData.spin hook the asteroids use. Satellites/pods register
+// obstacles in the shared {x,z,r,h} format so bot weaving treats them as terrain.
+function buildGalaxyProps(group, radius, opts) {
+  opts = opts || {};
+  const spin = group.userData.spin || (group.userData.spin = []);
+  const avoid = opts.avoid || [];
+  function spot(minD) { // random x/z honouring the spawn keep-out and the avoid list
+    for (let t = 0; t < 30; t++) {
+      const a = Math.random() * Math.PI * 2, d = minD + Math.random() * Math.max(80, radius * 0.92 - minD);
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      let bad = false;
+      for (let ai = 0; ai < avoid.length; ai++) { if (Math.hypot(x - avoid[ai].x, z - avoid[ai].z) < avoid[ai].d) { bad = true; break; } }
+      if (!bad) return { x: x, z: z };
+    }
+    return { x: radius * 0.5, z: 0 };
+  }
+  // Derelict satellites x5: bus body, two solar wings, a comms dish
+  const satMetal = new THREE.MeshStandardMaterial({ color: 0x8a94a6, metalness: 0.8, roughness: 0.4, envMapIntensity: 0.8 });
+  const satPanel = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.6, roughness: 0.35, envMapIntensity: 0.9 });
+  const dishMat = new THREE.MeshStandardMaterial({ color: 0xc8ccd4, metalness: 0.4, roughness: 0.5, side: THREE.DoubleSide });
+  for (let si = 0; si < 5; si++) {
+    const s = spot(180), y = 80 + Math.random() * 240;
+    const grp = new THREE.Group(); grp.position.set(s.x, y, s.z);
+    grp.rotation.set(Math.random() * 0.9 - 0.45, Math.random() * Math.PI * 2, Math.random() * 0.9 - 0.45);
+    const body = new THREE.Mesh(_boxGeo, satMetal); body.scale.set(3, 3, 6); body.castShadow = true; grp.add(body);
+    [-1, 1].forEach(function(sd) { const wing = new THREE.Mesh(_boxGeo, satPanel); wing.scale.set(10, 0.3, 4); wing.position.set(sd * 6.8, 0, 0); wing.castShadow = true; grp.add(wing); });
+    const dish = new THREE.Mesh(new THREE.SphereGeometry(2.4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 3), dishMat); dish.position.set(0, 2.0, 1); dish.rotation.x = -0.6; grp.add(dish);
+    grp.userData.svx = (Math.random() - 0.5) * 0.05; grp.userData.svy = (Math.random() - 0.5) * 0.08; // slow derelict tumble
+    group.add(grp); spin.push(grp);
+    obstacles.push({ x: s.x, z: s.z, r: 11, h: y + 8 });
+  }
+  // Cargo pods x8: container hulls with glowing band strips
+  const podCols = [0xb45a28, 0x2a7f7a, 0x707a88, 0x8a6d3b];
+  for (let pi = 0; pi < 8; pi++) {
+    const s = spot(170), y = 60 + Math.random() * 280;
+    const grp = new THREE.Group(); grp.position.set(s.x, y, s.z);
+    grp.rotation.set((Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.8);
+    const pod = new THREE.Mesh(_boxGeo, new THREE.MeshStandardMaterial({ color: podCols[pi % podCols.length], metalness: 0.55, roughness: 0.5, envMapIntensity: 0.7 }));
+    pod.scale.set(5, 5, 9); pod.castShadow = true; grp.add(pod);
+    const stripMat = new THREE.MeshStandardMaterial({ color: 0x0b2027, emissive: pi % 2 ? 0xfb923c : 0x22d3ee, emissiveIntensity: 1.4, roughness: 0.4 });
+    [-2.6, 2.6].forEach(function(zo) { const band = new THREE.Mesh(_boxGeo, stripMat); band.scale.set(5.35, 5.35, 0.55); band.position.z = zo; grp.add(band); });
+    grp.userData.svx = (Math.random() - 0.5) * 0.06; grp.userData.svy = (Math.random() - 0.5) * 0.1;
+    group.add(grp); spin.push(grp);
+    obstacles.push({ x: s.x, z: s.z, r: 8, h: y + 7 });
+  }
+  // Loose metal debris x16: visual only (too small to register as obstacles)
+  const debrisMat = new THREE.MeshStandardMaterial({ color: 0x3a4150, metalness: 0.7, roughness: 0.6 });
+  for (let di = 0; di < 16; di++) {
+    const s = spot(120), y = 50 + Math.random() * 320;
+    const m = new THREE.Mesh(_boxGeo, debrisMat);
+    m.scale.set(2 + Math.random() * 4, 0.3 + Math.random() * 0.8, 1 + Math.random() * 2.5);
+    m.position.set(s.x, y, s.z); m.rotation.set(Math.random() * 3.1, Math.random() * 3.1, Math.random() * 3.1);
+    m.userData.svx = (Math.random() - 0.5) * 0.4; m.userData.svy = (Math.random() - 0.5) * 0.4;
+    group.add(m); spin.push(m);
+  }
+  if (opts.crystals) buildCrystalSpires(radius, opts.crystals); // orbit borrows nebula's crystal builder
+  if (opts.backdrop) { // nebula backdrop: a banded planet + small moon on the horizon (visual only)
+    const px = -radius * 0.95, py = 420, pz = -radius * 0.8;
+    const bp = new THREE.Mesh(new THREE.SphereGeometry(130, 40, 28), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
+    bp.position.set(px, py, pz); group.add(bp);
+    const atm = makeAtmosphere(130 * 1.05, 0x2dd4bf); atm.position.set(px, py, pz); group.add(atm);
+    const moonMat = (typeof getMoonTexture === 'function' && getMoonTexture()) ? new THREE.MeshStandardMaterial({ map: getMoonTexture(), roughness: 1, metalness: 0 }) : new THREE.MeshStandardMaterial({ color: 0xb089a0, roughness: 1, metalness: 0 });
+    const moon = new THREE.Mesh(new THREE.SphereGeometry(40, 24, 18), moonMat);
+    moon.position.set(px + 300, py + 130, pz + 220); group.add(moon);
+  }
+}
 function buildSpaceEnvironment(theme, radius, density) {
   if (typeof density !== 'number') density = 1;
   worldGroup.userData.spin = [];
@@ -2052,15 +2130,17 @@ function buildSpaceEnvironment(theme, radius, density) {
     // No ground in deep space: a faint additive nebula glow far below stands in for a floor
     const disc = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.4, 40), new THREE.MeshBasicMaterial({ map: getCloudTexture(), color: 0x7c3aed, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     disc.rotation.x = -Math.PI / 2; disc.position.y = -140; worldGroup.add(disc);
-    buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), radius, 40, 380, null); // density 0.38 at r=1300: 70 -> ~27 rocks
+    buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), radius, 40, 380, null); // density 0.22 at r=1300: 70 -> ~15 rocks (v18: Gun Game thinned again — props carry the scene now)
     buildCrystalSpires(radius, density < 1 ? 6 : 12);
+    buildGalaxyProps(worldGroup, radius, { backdrop: true }); // v18: satellites, cargo pods, debris + a backdrop planet for nebula skies
   } else { // orbit: a gas giant fills the sky below + a station to fight around
     const planet = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 32), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
     planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
     const atmo = makeAtmosphere(4000 * 1.03, 0x8b7cf6); // v16: fresnel shader shell replaces the flat glow sphere
     atmo.position.copy(planet.position); worldGroup.add(atmo);
     buildSpaceStation();
-    buildAsteroids(35, radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // keep the station's airspace clear
+    buildAsteroids(Math.floor(35 * 0.7), radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // v18: 35 x 0.7 -> 24 rocks; keep the station's airspace clear
+    buildGalaxyProps(worldGroup, radius, { crystals: 6, avoid: [{ x: 260, z: -260, d: 130 }] }); // v18: satellites, cargo pods, debris + crystal clusters join orbit
   }
 }
 function buildEnvironment(theme, radius, densityScale) {
@@ -2187,14 +2267,18 @@ function startMission() {
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
   const mapRadius = currentMode === 'royale' ? 2400 : 1300;
   const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : ch.theme);
-  buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.38 : 1); // v15: Gun Game gets ~38% asteroid density
+  buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.22 : 1); // v15: Gun Game thins the asteroid field // v18: 0.38 -> 0.22 (~15 rocks — galaxy props fill the space instead)
+  // v18 Online Royale: a peer that connected while Royale was selected turns this
+  // drop into a 2-human match (48 bots + rival puppet). Solo Royale is untouched.
+  const onlineRoyale = (currentMode === 'royale' && royalePeerReady && conn && conn.open);
+  royaleRemoteRef = null;
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
-  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : 49);
+  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (onlineRoyale ? 48 : 49)); // v18: online royale swaps one bot for the human rival (still 50 pilots)
   for (let i = 0; i < botCount; i++) {
     const ang = (i / botCount) * Math.PI * 2; const dist = currentMode === 'royale' ? (350 + Math.random() * 1650) : (320 + Math.random() * 550);
     const randJet = JETS[i % JETS.length];
@@ -2207,6 +2291,20 @@ function startMission() {
     activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   }
   if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
+  if (onlineRoyale) {
+    // v18: the rival pilot joins EXACTLY like remoteEnt in Online 1v1 — a puppet in
+    // activeGame.entities driven by peer {pos,quat} messages. Generic bullet/rocket
+    // hit detection and pickFrontTarget lock-on already include it; the bot AI loop
+    // and pickBotTarget already skip id 'remote', so bots never hunt it. Alive and
+    // placement counts (entities.length + 1) therefore include it with no changes:
+    // 48 bots + rival + you = 50 pilots.
+    const oppMesh = buildJetMesh(0xef4444, 0xfbbf24, null, 'f22'); oppMesh.position.set(0, 220, 450); scene.add(oppMesh);
+    royaleRemoteRef = { id: 'remote', name: 'Rival Pilot', mesh: oppMesh, hp: 380, maxHp: 380, spd: 0, skill: 0, fireCd: 99, rocketCd: 99, wanderAng: 0, kills: 0, ggTier: 0, heading: Math.PI, pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: 2, weaveSeed: 0, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 };
+    if (remoteNet && remoteNet.pos) { oppMesh.position.fromArray(remoteNet.pos); if (remoteNet.quat) oppMesh.quaternion.fromArray(remoteNet.quat); }
+    activeGame.entities.push(royaleRemoteRef);
+    try { conn.send({ type: 'rstart' }); } catch (e) {} // tell the rival we dropped — their client auto-starts its own Royale (zone timers start together)
+    showBanner('ONLINE ROYALE (BETA) — you + your rival + 48 bots. Last pilot standing wins!', 4200);
+  }
   paused = false;
 }
 function runCountdown() {
@@ -2348,6 +2446,7 @@ function togglePause(forceOpen) {
 }
 function endMatch(victory, title, summary) {
   const modeAtEnd = currentMode; const chapterAtEnd = activeGame ? activeGame.chapter : Number(chSel.value);
+  royaleRemoteRef = null; // v18: the online-royale puppet never outlives its match (the peer link + royalePeerReady stay up for a rematch)
   activeGame = null; paused = false; clearSmoke();
   document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
   applyFov(); // v17: snap FOV back to the player's setting (a boost kick may have left it wide)
@@ -2358,7 +2457,7 @@ function endMatch(victory, title, summary) {
   document.getElementById('statusModal').classList.remove('hidden');
 }
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { activeGame = null; paused = false; clearSmoke(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); }
+function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -2776,7 +2875,7 @@ function animate(now) {
       gungamePlayerDown('shot');
       if (!activeGame) return; // the credited kill was a bot's 15th — match over
     }
-    else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; }
+    else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; } // v18: place = alive bots + living rival (both sit in entities) + you — and the rival is told you fell
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); return; }
   }
   // Afterburner flicker + cloud drift (visual life, no allocations)
@@ -2861,6 +2960,15 @@ function gungamePlayerDown(cause) {
   p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
   showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
 }
+// v18: the Royale win payout, shared by the last-elimination path in
+// handleEntityEliminated and by Online Royale's rival-removal path
+// (killRoyaleRemote) so the rewards can never drift apart. Online Royale also
+// notifies the peer that they lost (their client ends its match as a defeat).
+function royaleVictory() {
+  if (!activeGame) return; const p = activeGame.player;
+  if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rivalwin' }); } catch (e) {} }
+  state.rp += 35; state.coins += 54; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); // v15: royale coins 90 -> 54 (x0.6), RP unchanged
+}
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (killerId === 'player') {
@@ -2870,12 +2978,13 @@ function handleEntityEliminated(eIdx, killerId) {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
     if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; applyBotTier(killerBot); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
   }
+  if (victim.id === 'remote' && activeGame.mode === 'royale') { royaleRemoteRef = null; showBanner('RIVAL ELIMINATED!', 3000); } // v18: the Online Royale puppet died (any killer) — out of this client's storm; the rival's own client stays authoritative for their real death ('rdead')
   if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); victim.heading = Math.atan2(-victim.mesh.position.x, -victim.mesh.position.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
   else {
     scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
     if (activeGame.entities.length === 0) {
       if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; const chReward = Math.round(ch.reward * 0.6); state.coins += chReward; state.unlockedChapter = Math.min(10, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${chReward} Coins & +45 XP!`); }
-      else if (activeGame.mode === 'royale') { state.rp += 35; state.coins += 54; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); } // v15: royale coins 90 -> 54 (x0.6), RP unchanged
+      else if (activeGame.mode === 'royale') { royaleVictory(); }
       else if (activeGame.mode === 'online1v1' || currentMode === 'online1v1') { endMatch(true, '1V1 VICTORY!', 'You shot down your online rival!'); }
     }
   }
@@ -2888,7 +2997,7 @@ function updateHUD(curSpd) {
   document.getElementById('btnAutoAim').textContent = p.autoAimCd > 0 ? `LOCK (${Math.ceil(p.autoAimCd)}s)` : 'AUTO-AIM (RDY)';
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
-  else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = 'Ranked Royale'; document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; }
+  else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = activeGame.onlineRoyale ? 'Ranked Royale — ONLINE (BETA)' : 'Ranked Royale'; document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; } // v18: alive = bots + rival puppet (both in entities) + you
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
   activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444'); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
@@ -2898,7 +3007,7 @@ function drawMinimap() {
   ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(55, 55, Math.max(4, activeGame.zoneRadius * scale), 0, Math.PI * 2); ctx.stroke();
   const px = 55 + activeGame.player.mesh.position.x * scale, pz = 55 + activeGame.player.mesh.position.z * scale;
   ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(px, pz, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ef4444'; activeGame.entities.forEach(function(e) { const ex = 55 + e.mesh.position.x * scale, ez = 55 + e.mesh.position.z * scale; if ((ex - 55) * (ex - 55) + (ez - 55) * (ez - 55) < 2500) { ctx.beginPath(); ctx.arc(ex, ez, 2, 0, Math.PI * 2); ctx.fill(); } });
+  activeGame.entities.forEach(function(e) { const ex = 55 + e.mesh.position.x * scale, ez = 55 + e.mesh.position.z * scale; if ((ex - 55) * (ex - 55) + (ez - 55) * (ez - 55) < 2500) { ctx.fillStyle = e.id === 'remote' ? '#22d3ee' : '#ef4444'; ctx.beginPath(); ctx.arc(ex, ez, e.id === 'remote' ? 3 : 2, 0, Math.PI * 2); ctx.fill(); } }); // v18: the online rival is a bigger cyan dot, bots stay red
 }
 
 // HANGAR, SHOP & SETTINGS UI
@@ -3102,13 +3211,19 @@ function bindHold(id, prop) { const el = document.getElementById(id); const on =
 bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost');
 // ONLINE 1v1 (PeerJS — optional, no bots)
 let peer = null, conn = null, peerSyncTimer = null;
+// v18 Online Royale state: royalePeerReady = a peer connected while Ranked Royale
+// was the selected mode (the pairing survives match end for rematches; leaving the
+// Royale mode or cancelling matchmaking clears it). remoteNet caches the rival's
+// last broadcast transform so a puppet can be placed before the next update lands.
+// royaleRemoteRef points at the live puppet entity inside an online-royale match.
+let royalePeerReady = false, remoteNet = null, royaleRemoteRef = null;
 function startOnlineMatchmaking(roomCodeToJoin, isHost) {
-  document.getElementById('statusTitle').textContent = 'Online 1v1 (No Bots)';
+  document.getElementById('statusTitle').textContent = currentMode === 'royale' ? 'Online Royale (BETA)' : 'Online 1v1 (No Bots)'; // v18
   if (typeof Peer === 'undefined') { document.getElementById('statusBody').innerHTML = '<p style="color:#cbd5e1;line-height:1.5;">PeerJS failed to load, so online play is unavailable right now. All offline modes still work.</p><div style="margin-top:12px;"><button class="btn btn-sec" onclick="returnHome()">Home Menu</button></div>'; document.getElementById('statusModal').classList.remove('hidden'); return; }
   const code = Math.random().toString(36).substring(2, 6).toUpperCase();
   const peerId = isHost ? `SKYACE-${code}` : undefined;
   const hostMsg = `<p style="font-size:0.9rem;">Share Room Code with your friend: <strong style="color:#fbbf24;font-size:1.2rem;">${code}</strong></p>`;
-  const joinMsg = '<p style="font-size:0.85rem;color:#94a3b8;">Searching live 1v1 queue (Zero AI Bots)...</p>';
+  const joinMsg = currentMode === 'royale' ? '<p style="font-size:0.85rem;color:#94a3b8;">Searching for a Royale rival (BETA)...</p>' : '<p style="font-size:0.85rem;color:#94a3b8;">Searching live 1v1 queue (Zero AI Bots)...</p>'; // v18
   document.getElementById('statusBody').innerHTML = `<p style="color:#cbd5e1;">Waiting for online players...</p>${isHost ? hostMsg : joinMsg}<div style="margin-top:12px;"><button class="btn btn-danger btn-sm" onclick="cancelOnline()">Cancel Search</button></div>`;
   document.getElementById('statusModal').classList.remove('hidden');
   try {
@@ -3122,6 +3237,7 @@ function startOnlineMatchmaking(roomCodeToJoin, isHost) {
 function setupPeerConn(c) {
   if (!c) return;
   c.on('open', function() {
+    if (currentMode === 'royale') { setupRoyalePeer(c); return; } // v18: paired for Online Royale — no forced match start (1v1 path below is untouched)
     closeModals(); showBanner('OPPONENT CONNECTED! 1v1 DOGFIGHT STARTING!', 3000);
     const savedMode = currentMode; currentMode = 'campaign'; startMission(); currentMode = 'online1v1'; if (activeGame) activeGame.mode = 'campaign';
     if (!activeGame) return;
@@ -3134,7 +3250,62 @@ function setupPeerConn(c) {
     c.on('data', function(d) { if (d && d.pos && remoteEnt.mesh) { remoteEnt.mesh.position.fromArray(d.pos); if (d.quat) remoteEnt.mesh.quaternion.fromArray(d.quat); } });
   });
 }
-function cancelOnline() { if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); showMenuScene(); }
+// ---- Online Royale (v18, BETA): the 1v1 sync model mapped onto Ranked Royale ----
+// Same transport and same philosophy as 1v1: each client broadcasts only its own
+// {pos, quat} at 20 Hz and simulates everything else locally. The shared truth is
+// the two human pilots; each client's 48 bots are its own. Three tiny control
+// messages ride the same connection: 'rstart' (I dropped — start your Royale so
+// the zone timers begin together), 'rdead' (I was eliminated / I quit), and
+// 'rivalwin' (I won my storm — you take the defeat). Damage is never networked:
+// the rival puppet in activeGame.entities takes local bullet/rocket hits through
+// the generic hit detection, exactly like remoteEnt in 1v1.
+function setupRoyalePeer(c) {
+  royalePeerReady = true; remoteNet = null;
+  closeModals(); showBanner('RIVAL CONNECTED! ONLINE ROYALE (BETA) — hit ENTER THE ROYALE to drop in together!', 4500);
+  if (peerSyncTimer) clearInterval(peerSyncTimer);
+  peerSyncTimer = setInterval(function() { if (activeGame && conn && conn.open) { try { conn.send({ pos: activeGame.player.mesh.position.toArray(), quat: activeGame.player.mesh.quaternion.toArray() }); } catch (e) {} } }, 50); // same 20 Hz transform broadcast as 1v1
+  c.on('data', function(d) { handleRoyalePeerData(d); });
+  c.on('close', function() { handleRoyalePeerGone(); });
+}
+function handleRoyalePeerData(d) {
+  if (!d) return;
+  if (d.pos) { // transform update: cache it and drive the puppet if one is live
+    remoteNet = { pos: d.pos, quat: d.quat || null };
+    if (royaleRemoteRef && royaleRemoteRef.mesh) { royaleRemoteRef.mesh.position.fromArray(d.pos); if (d.quat) royaleRemoteRef.mesh.quaternion.fromArray(d.quat); }
+    return;
+  }
+  if (d.type === 'rstart') { // rival dropped in — follow them if we're still in the menu
+    if (royalePeerReady && !activeGame && currentMode === 'royale') startMission();
+    return;
+  }
+  if (d.type === 'rdead') { killRoyaleRemote('RIVAL ELIMINATED!'); return; } // rival fell (or quit) on their client
+  if (d.type === 'rivalwin') { // rival won their storm — this match ends as a defeat
+    if (activeGame && activeGame.mode === 'royale' && activeGame.onlineRoyale) {
+      const place = activeGame.entities.length + (royaleRemoteRef ? 1 : 2); // rival is #1; you take the next spot behind the surviving bots
+      const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState();
+      endMatch(false, 'RIVAL TAKES THE CROWN', `Your online rival won their Royale! You placed #${place} / 50 | Kills: ${activeGame.player.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`);
+    }
+    return;
+  }
+}
+function killRoyaleRemote(msg) { // remove the rival puppet from this client's storm
+  if (!royaleRemoteRef) return;
+  if (activeGame) {
+    const idx = activeGame.entities.indexOf(royaleRemoteRef);
+    if (idx !== -1) { scene.remove(royaleRemoteRef.mesh); activeGame.entities.splice(idx, 1); }
+  }
+  royaleRemoteRef = null;
+  if (msg) showBanner(msg, 3000);
+  // The puppet was the last thing standing between the player and the crown
+  if (activeGame && activeGame.mode === 'royale' && activeGame.entities.length === 0) royaleVictory();
+}
+function handleRoyalePeerGone() { // disconnect: the match continues offline, seamlessly
+  const wasReady = royalePeerReady;
+  royalePeerReady = false;
+  if (royaleRemoteRef && activeGame) { killRoyaleRemote(null); if (activeGame) showBanner('Rival disconnected — match continues', 3000); } // if the removal ended the match (rival was last), the victory screen already says so
+  else if (wasReady) showBanner('Rival disconnected', 3000);
+}
+function cancelOnline() { royalePeerReady = false; if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); showMenuScene(); }
 document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
 document.getElementById('btnJoinRoom').onclick = function() { const c = document.getElementById('joinCodeInput').value.trim(); if (c) startOnlineMatchmaking(c, false); else startOnlineMatchmaking(); };
 // v16: this script is now an ES module, so its top-level functions are NOT globals.
