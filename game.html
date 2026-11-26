@@ -141,7 +141,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v20 — PRO EDITION ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v21 — REAL SKIES ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -1026,13 +1026,15 @@ function getHullTexture(baseColor, jetId, skin) {
   return t;
 }
 // ---- Hull surface maps (v8): Sobel height->normal + roughness variation, derived from the
-// scheme canvas at 512px and cached per scheme — panel lines/rivets become real lit relief ----
+// scheme canvas and cached per scheme — panel lines/rivets become real lit relief.
+// v21: derived at 1024px to match the (already 1024px) hull colour canvas, so panel
+// lines and rivets stay crisp in the normal/roughness relief instead of blurring. ----
 const _hullMapCache = {};
 function getHullMaps(baseColor, jetId, skin) {
   const key = (jetId || 'plain') + '_' + baseColor + ((skin && skin.id !== 'stock') ? '_skin_' + skin.id : '');
   if (_hullMapCache[key]) return _hullMapCache[key];
   const src = getHullTexture(baseColor, jetId, skin);
-  const S = 512;
+  const S = 1024;
   const hc = document.createElement('canvas'); hc.width = S; hc.height = S;
   const hx = hc.getContext('2d'); hx.drawImage(src.image, 0, 0, S, S);
   const hd = hx.getImageData(0, 0, S, S).data;
@@ -1070,6 +1072,7 @@ function getHullMaps(baseColor, jetId, skin) {
 // ---- Jet decals: star roundel + ACE-01 tail code, plus NO STEP / RESCUE stencils (v7) ----
 let _decalTex = null, _decalMat = null;
 const _decalPlaneGeo = (typeof THREE !== 'undefined') ? new THREE.PlaneGeometry(1.5, 0.75) : null;
+const _hudGlassGeo = (typeof THREE !== 'undefined') ? new THREE.PlaneGeometry(0.35, 0.3) : null; // v21: cockpit HUD reflector plane, shared by every jet
 function _drawStar(ctx, cx, cy, r, color) {
   ctx.fillStyle = color; ctx.beginPath();
   for (let k = 0; k < 10; k++) {
@@ -1207,6 +1210,35 @@ function _trailZ(w, halfSpan, fx) {
   const x = 0.30 + (halfSpan - 0.30) * fx;
   return w.rt + (w.tt - w.rt) * ((x - 0.30) / Math.max(0.01, halfSpan - 0.30));
 }
+// ---- LERX (v21): leading-edge root extensions — a flattened, swept triangular blend
+// from the fuselage out to the wing root (Shape + ExtrudeGeometry, 0.09 thick, hull
+// material), sized per jet from its spec dimensions: the leading edge starts beside
+// the cockpit (len * 0.30) and sweeps back-out to the wing root's leading edge, the
+// short outer chord and the root trailing edge close the blend. Gives the F-16 and
+// F-35 the strake blend they lacked; the F/A-18 keeps its signature LERX through the
+// same helper. F-22/Su-57 chines and the exotic x02/adf11 planforms already read as
+// LERX, so they are skipped. Mystery donors on these airframes (mx3=fa18, mx4=f35)
+// inherit automatically via the jetId gate in buildJetMesh. ----
+function addLERX(g, spec, hullMat) {
+  const rootX = spec.rad * spec.width;            // fuselage half-width at the root
+  const outerX = rootX + 1.35;                    // blend tip, just past the wing root
+  const zFront = spec.len * 0.30;                 // leading edge starts beside the cockpit
+  const zLead = spec.wing.rl - 0.15;              // meets the wing root leading edge
+  const zTrail = spec.wing.rt + 0.30;             // root trailing edge
+  [-1, 1].forEach(function(side) {
+    const sh = new THREE.Shape();
+    sh.moveTo(side * rootX * 0.55, zFront);
+    sh.lineTo(side * outerX, zLead);
+    sh.lineTo(side * outerX, zLead - 1.0);
+    sh.lineTo(side * rootX * 0.72, zTrail);
+    sh.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.09, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.04, bevelSegments: 1, steps: 1 });
+    const m = new THREE.Mesh(geo, hullMat);
+    m.rotation.x = Math.PI / 2; // shape XY -> world XZ, same convention as the planform wings
+    m.position.y = 0.02;
+    g.add(m);
+  });
+}
 function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin) {
   upg = upg || { hull: 1, damage: 1, agility: 1, speed: 1 };
   const spec = JET_SPECS[jetId] || JET_SPECS.f16;
@@ -1270,8 +1302,10 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const helmet = new THREE.Mesh(geos.helmet, new THREE.MeshStandardMaterial({ color: 0xd8dde2, metalness: 0.15, roughness: 0.5 }));
   helmet.position.set(0, canopyY + 0.44, spec.canopyZ - 0.62); g.add(helmet); noShadow.push(helmet);
   const visor = new THREE.Mesh(geos.helmet, glassMat); visor.scale.set(0.82, 0.72, 0.82); visor.position.set(0, canopyY + 0.45, spec.canopyZ - 0.50); g.add(visor); noShadow.push(visor);
-  const hudGlass = new THREE.Mesh(geos.box, new THREE.MeshBasicMaterial({ color: 0x39ff88, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  hudGlass.scale.set(0.36, 0.28, 0.02); hudGlass.position.set(0, canopyY + 0.30, spec.canopyZ + 0.52); hudGlass.rotation.x = -0.35; g.add(hudGlass); noShadow.push(hudGlass);
+  // v21: the HUD reflector is now a true 0.35 x 0.3 plane in HUD green (0x39ff9a) at a
+  // subtler 0.18 additive opacity — a faint green shimmer ahead of the pilot, not a slab
+  const hudGlass = new THREE.Mesh(_hudGlassGeo, new THREE.MeshBasicMaterial({ color: 0x39ff9a, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  hudGlass.position.set(0, canopyY + 0.30, spec.canopyZ + 0.52); hudGlass.rotation.x = -0.35; g.add(hudGlass); noShadow.push(hudGlass);
   // Spine fairing (v9): a tapered dorsal hump running from behind the canopy to the
   // tail, blending the canopy into the fuselage like a real fighter's spine.
   const spine = new THREE.Mesh(geos.spine, hullMat);
@@ -1339,15 +1373,12 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const navR = new THREE.Mesh(navGeo, navGrnMat); navR.position.set(-halfSpan, -0.10, navTipZ); g.add(navR); noShadow.push(navR);
   const strobe = new THREE.Mesh(navGeo, strobeMat); strobe.position.set(0, 0.12, -spec.len * 0.52); g.add(strobe); noShadow.push(strobe);
   g.userData.navLights = [navL, navR, strobe]; g.userData.strobeMat = strobeMat;
-  // Canards (X-02 / ADF-11) and LERX root extensions (F/A-18)
+  // Canards (X-02 / ADF-11) and LERX root extensions (v21: per-spec helper, f16/fa18/f35 + donors)
   if (spec.canard) {
     const cR = new THREE.Mesh(geos.canardR, hullMat); cR.rotation.x = Math.PI / 2; cR.position.set(0, 0.05, spec.len * 0.27); g.add(cR);
     const cL = new THREE.Mesh(geos.canardL, hullMat); cL.rotation.x = Math.PI / 2; cL.position.set(0, 0.05, spec.len * 0.27); g.add(cL);
   }
-  if (spec.lerx) {
-    const lR = new THREE.Mesh(geos.lerxR, hullMat); lR.rotation.x = Math.PI / 2; lR.position.set(0, 0.03, spec.len * 0.14); g.add(lR);
-    const lL = new THREE.Mesh(geos.lerxL, hullMat); lL.rotation.x = Math.PI / 2; lL.position.set(0, 0.03, spec.len * 0.14); g.add(lL);
-  }
+  if (jetId === 'f16' || jetId === 'fa18' || jetId === 'f35' || jetId === 'mx3' || jetId === 'mx4') addLERX(g, spec, hullMat);
   // Vertical tail(s): shaped swept fins — single centre fin or canted twins
   const finBaseY = spec.rad * spec.flat * 0.55;
   const _qYaw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -Math.PI / 2, 0));
@@ -2365,7 +2396,10 @@ function buildGalaxyProps(group, radius, opts) {
     const moon = new THREE.Mesh(new THREE.SphereGeometry(40, 24, 18), moonMat);
     moon.position.set(px + 300, py + 130, pz + 220); group.add(moon);
     // v19: the nebula sky gains a ringed planet on the opposite side + a small teal world
-    addSkyPlanet(group, radius * 0.9, 520, -radius * 0.55, 85, getRingPlanetTexture(), 0xffffff, 0xf472b6, true);
+    const rp19 = addSkyPlanet(group, radius * 0.9, 520, -radius * 0.55, 85, getRingPlanetTexture(), 0xffffff, 0xf472b6, true);
+    // v21: the ringed planet gains a small grey moon companion, riding in its group at a +160 offset
+    const rpMoon = new THREE.Mesh(new THREE.SphereGeometry(14, 20, 14), new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: 1, metalness: 0 }));
+    rpMoon.position.set(165, 26, 55); rp19.add(rpMoon);
     addSkyPlanet(group, radius * 0.35, 640, -radius * 1.05, 55, getOrbitPlanetTexture(), 0x7dd3d8, 0x2dd4bf, false);
   }
 }
@@ -2420,6 +2454,17 @@ function buildSpaceEnvironment(theme, radius, density) {
         es.scale.set(esc, esc * 0.6, 1);
         worldGroup.add(es);
       }
+      // v21: three more far nebula clouds — orange, deep blue, teal — widening the colour field
+      const v21Cols = [0xfb923c, 0x2563eb, 0x14b8a6];
+      for (let vi = 0; vi < 3; vi++) {
+        const vm = new THREE.SpriteMaterial({ map: nebTex, color: v21Cols[vi], transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+        const vs = new THREE.Sprite(vm);
+        const va = Math.random() * Math.PI * 2, vd = radius * 1.25;
+        vs.position.set(Math.cos(va) * vd, (Math.random() - 0.25) * radius * 0.5, Math.sin(va) * vd);
+        const vsc = radius * (0.5 + Math.random() * 0.45);
+        vs.scale.set(vsc, vsc * 0.6, 1);
+        worldGroup.add(vs);
+      }
     }
   })();
   addComet(worldGroup, radius); // v19: one comet streaks through both space themes
@@ -2430,6 +2475,15 @@ function buildSpaceEnvironment(theme, radius, density) {
     buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), radius, 40, 380, null); // density 0.22 at r=1300: 70 -> ~15 rocks (v18: Gun Game thinned again — props carry the scene now)
     buildCrystalSpires(radius, density < 1 ? 6 : 12);
     buildGalaxyProps(worldGroup, radius, { backdrop: true }); // v18: satellites, cargo pods, debris + a backdrop planet for nebula skies
+    // v21: the nebula sky fills out — a large banded gas giant, a red rocky world and a
+    // second (teal) ringed planet join the v18/v19 backdrops. All visual only, all
+    // parked outside the central play cylinder (horizontal distance > 1800).
+    const gg21 = addSkyPlanet(worldGroup, -radius * 1.8, 900, -radius * 1.2, 150, getOrbitPlanetTexture(), 0xffffff, 0xf59e0b, false); // banded gas giant, ~2950 out
+    gg21.userData.svy = 0.02; (worldGroup.userData.spin || (worldGroup.userData.spin = [])).push(gg21); // slow stately spin on the env spin hook
+    addSkyPlanet(worldGroup, radius * 1.3, 480, radius * 0.9, 48, getMoonTexture(), 0xb5502e, null, false); // red rocky world: cratered moon texture under a rust tint, no atmosphere
+    const tealRing21 = addSkyPlanet(worldGroup, radius * 0.9, 1080, radius * 1.6, 65, getOrbitPlanetTexture(), 0x7dd3d8, 0x2dd4bf, true); // second ringed planet, teal palette
+    tealRing21.rotation.z = -0.34; tealRing21.rotation.x = 0.52; // a clearly different tilt from the v19 pink ringed planet (z 0.42 / x 0.15)
+    tealRing21.children.forEach(function(ch2) { if (ch2.geometry && ch2.geometry.type === 'RingGeometry') ch2.material.color.setHex(0x5eead4); }); // teal ring to match
   } else { // orbit: a gas giant fills the sky below + a station to fight around
     const planet = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 32), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
     planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
@@ -2438,6 +2492,7 @@ function buildSpaceEnvironment(theme, radius, density) {
     // v19: two distant worlds join the big below-planet in orbit skies (visual only)
     addSkyPlanet(worldGroup, -radius * 0.8, 700, -radius * 0.9, 110, getOrbitPlanetTexture(), 0xffffff, 0x8b7cf6, false);
     addSkyPlanet(worldGroup, radius * 1.0, 380, -radius * 0.7, 70, getRingPlanetTexture(), 0xffffff, 0xf472b6, true);
+    addSkyPlanet(worldGroup, -radius * 0.7, 620, radius * 1.0, 48, getMoonTexture(), 0xb5502e, null, false); // v21: a lone red rocky world joins the orbit sky (different quadrant from the nebula one)
     buildSpaceStation();
     buildAsteroids(Math.floor(35 * 0.7), radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // v18: 35 x 0.7 -> 24 rocks; keep the station's airspace clear
     buildGalaxyProps(worldGroup, radius, { crystals: 6, avoid: [{ x: 260, z: -260, d: 130 }] }); // v18: satellites, cargo pods, debris + crystal clusters join orbit
@@ -2463,6 +2518,15 @@ function buildEnvironment(theme, radius, densityScale) {
     const _sd = themeSunDir(theme); if (_sd) sun.position.copy(_sd).multiplyScalar(skyR * 0.92); else sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun); // v17: disc sits where the theme's light actually comes from
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: cfg.sun, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
     flare.position.copy(sun.position); flare.scale.setScalar(Math.min(radius * 1.3, 1150)); worldGroup.add(flare);
+    // v21: lens-flare pair — a warm additive glow + a larger, fainter halo ring riding
+    // the theme's sun direction at a fixed 2900 units (never lower than y 500), so
+    // looking sunward reads like a real camera lens, not just a disc sprite
+    const lfPos = _sd ? _sd.clone() : new THREE.Vector3(0.3, 0.55, 0.25).normalize();
+    lfPos.setLength(2900); if (lfPos.y < 500) lfPos.y = 500;
+    const lfGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSunTexture(), color: 0xffe9bb, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
+    lfGlow.position.copy(lfPos); lfGlow.scale.set(700, 700, 1); worldGroup.add(lfGlow);
+    const lfHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: cfg.sun, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
+    lfHalo.position.copy(lfPos); lfHalo.scale.set(1250, 1250, 1); worldGroup.add(lfHalo);
   }
   applyThemeLighting(theme); // v17: sun/hemi/exposure/bloom all come from THEME_LIGHTING now (shadow tracking in animate() re-aims the sun at the player from here)
   // Clouds: soft radial-gradient billboards, slow drift (animated in animate())
@@ -2485,6 +2549,20 @@ function buildEnvironment(theme, radius, densityScale) {
       hs.position.set(Math.cos(ha) * 2000, 500 + Math.random() * 200, Math.sin(ha) * 2000);
       hs.scale.set(700 + Math.random() * 400, 120 + Math.random() * 80, 1);
       worldGroup.add(hs); clouds.push(hs);
+    }
+  }
+  if (!isSpace) { // v21: two high cloud decks — big, faint billboards far above the fight (layer A: 22 at y 560-860, scale 500-1000; layer B: 12 at y 240-380, scale 300-600), drifting slowly east on the v19 drift hook. Visual only — never in obstacles.
+    const drift21 = worldGroup.userData.drift || (worldGroup.userData.drift = []);
+    for (let ci2 = 0; ci2 < 34; ci2++) {
+      const layerA = ci2 < 22;
+      const cm2 = new THREE.SpriteMaterial({ map: cloudTex, color: cfg.cloud, transparent: true, opacity: layerA ? (0.10 + Math.random() * 0.10) : (0.07 + Math.random() * 0.06), depthWrite: false });
+      const sp2 = new THREE.Sprite(cm2);
+      const ca2 = Math.random() * Math.PI * 2, cd2 = 600 + Math.random() * 2200;
+      const cs2 = layerA ? (500 + Math.random() * 500) : (300 + Math.random() * 300);
+      sp2.position.set(Math.cos(ca2) * cd2, layerA ? (560 + Math.random() * 300) : (240 + Math.random() * 140), Math.sin(ca2) * cd2);
+      sp2.scale.set(cs2, cs2 * 0.32, 1);
+      worldGroup.add(sp2);
+      drift21.push({ obj: sp2, vel: new THREE.Vector3(1.5 + Math.random() * 1.5, 0, 0), lim: 3000 });
     }
   }
   // Ground: city themes use a road-grid texture exactly aligned with the building blocks; other themes use natural noise
@@ -2522,6 +2600,19 @@ function buildEnvironment(theme, radius, densityScale) {
     ridge.position.set(Math.cos(ra) * ringR, rh / 2 - 30, Math.sin(ra) * ringR);
     worldGroup.add(ridge);
   }
+  }
+  if (theme === 'city' || theme === 'neon') { // v21: distant skyline ring — flat tower silhouettes (basic material, fog-hazed) so the city reads as endless past the arena edge. Visual only: no obstacles, no shadows.
+    const skyMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(cfg.fog).lerp(new THREE.Color(0x0a0e18), 0.35) });
+    for (let si2 = 0; si2 < 26; si2++) {
+      const sa = (si2 / 26) * Math.PI * 2 + ((si2 * 47) % 10) * 0.03;
+      const sr = 2500 + ((si2 * 211) % 600);
+      const sh2 = 150 + ((si2 * 137) % 270), sw2 = 90 + ((si2 * 89) % 90);
+      const tower = new THREE.Mesh(_boxGeo, skyMat);
+      tower.scale.set(sw2, sh2, sw2);
+      tower.position.set(Math.cos(sa) * sr, sh2 / 2 - 10, Math.sin(sa) * sr);
+      tower.rotation.y = sa;
+      worldGroup.add(tower);
+    }
   }
   // Obstacles / scenery (collision data pushed in lock-step with meshes)
   if (theme === 'mountain' || theme === 'canyon') {
@@ -2846,19 +2937,50 @@ function noteBotHit(ent, ownerId) {
 function botIsAliveTarget(t) { return t === 'player' || (!!t && !!activeGame && activeGame.entities.indexOf(t) !== -1); }
 function pickBotTarget(bot) {
   const p = activeGame.player;
+  // Campaign (v21): bots ONLY ever hunt the player — the old 65/35 player/bot split
+  // and revenge retargeting are gone for this mode. A bot clipped by another bot's
+  // stray fire ignores it completely (the bullet-hit resolution also skips bot-on-bot
+  // damage in campaign, so campaign kills are always earned by the player).
+  if (activeGame.mode === 'campaign') return (p.respawnT > 0) ? null : 'player';
   // Revenge (FFA modes): whoever shot me in the last 6s gets targeted 50% of retargets
-  if (activeGame.mode !== 'campaign' && bot.lastAttacker != null && (gameTime - bot.lastHitAt) < 6 && Math.random() < 0.5) {
+  if (bot.lastAttacker != null && (gameTime - bot.lastHitAt) < 6 && Math.random() < 0.5) {
     if (bot.lastAttacker === 'player' && !(activeGame.player.respawnT > 0)) return 'player';
     const atk = activeGame.entities.find(function(e) { return e.id === bot.lastAttacker; });
     if (atk && atk !== bot) return atk;
   }
-  // Campaign: 65% hunt the player, 35% pick a fight with the nearest other bot
-  if (activeGame.mode === 'campaign' && Math.random() < 0.65 && !(activeGame.player.respawnT > 0)) return 'player';
   let best = null, bestD = Infinity;
-  const includePlayer = activeGame.mode !== 'campaign' && !(activeGame.player.respawnT > 0);
+  const includePlayer = !(activeGame.player.respawnT > 0);
   if (includePlayer) { best = 'player'; bestD = bot.mesh.position.distanceTo(p.mesh.position); }
   for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || e.id === 'remote') continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } }
   return best || ((activeGame.player.respawnT > 0) ? null : 'player');
+}
+// ---- Campaign engagement slots (v21) ----
+// Every campaign bot hunts the player now, so focus fire is capped: at most
+// campaignSlotCap() bots may be in 'engage' against the player at once — 3 in
+// chapters 1-5, 4 in chapters 6-10. The rest fly a 'patrol' circuit (waypoints
+// at mid altitude around the combat area, reusing the reposition steering; the
+// weapons block only fires in 'engage', so patrolling bots never shoot). A bot
+// releases its slot when it dies (it leaves the entities array, so the holder
+// count drops on its own), when it evades, or when it breaks off to reposition.
+// Freed slots are handed to the nearest patrolling bot. Runs once per frame
+// before the bot loop; a no-op in every FFA mode.
+function campaignSlotCap() { return (activeGame && (activeGame.chapter || 1) >= 6) ? 4 : 3; }
+function pickPatrolWaypoint() { const a = Math.random() * Math.PI * 2, d = 320 + Math.random() * 520; return { x: Math.cos(a) * d, y: 170 + Math.random() * 150, z: Math.sin(a) * d }; }
+function sendBotPatrol(bot) { bot.aiState = 'patrol'; bot.stateT = 0; if (!bot.waypoint) bot.waypoint = pickPatrolWaypoint(); }
+function assignCampaignSlots() {
+  if (!activeGame || activeGame.mode !== 'campaign') return;
+  const ents = activeGame.entities, cap = campaignSlotCap();
+  for (let i = 0; i < ents.length; i++) { const e = ents[i]; if (e.slot && (e.aiState === 'evade' || e.aiState === 'reposition')) e.slot = false; } // release: evade / break-off
+  let holders = 0; for (let i = 0; i < ents.length; i++) if (ents[i].slot) holders++;
+  const pPos = activeGame.player.mesh.position;
+  const want = [];
+  for (let i = 0; i < ents.length; i++) { const e = ents[i]; if (!e.slot && (e.aiState === 'engage' || e.aiState === 'patrol')) want.push(e); }
+  want.sort(function(a, b) { return a.mesh.position.distanceToSquared(pPos) - b.mesh.position.distanceToSquared(pPos); }); // nearest first
+  for (let i = 0; i < want.length; i++) {
+    const e = want[i];
+    if (holders < cap) { e.slot = true; holders++; if (e.aiState === 'patrol') { e.aiState = 'engage'; e.stateT = 0; e.engageT = 0; e.closeT = 0; e.waypoint = null; } }
+    else if (e.aiState === 'engage') sendBotPatrol(e); // no free slot: stand down to patrol
+  }
 }
 function botTargetInfo(bot) {
   const t = bot.tgt;
@@ -3091,6 +3213,7 @@ function animate(now) {
     drawMinimap();
   }
   let incomingMissile = false;
+  assignCampaignSlots(); // v21: campaign engagement slots (no-op in FFA modes)
   // ================= BOT AI STATE MACHINE (v4) =================
   // States: 'engage' (intercept + fire when actually pointing at the target),
   // 'extend' (break off a circling merge and open distance), 'reposition'
@@ -3126,6 +3249,11 @@ function animate(now) {
     } else if (bot.aiState === 'reposition') {
       const wp = bot.waypoint; const wpDist = wp ? Math.hypot(wp.x - bp.x, wp.z - bp.z) : 0;
       if (!wp || wpDist < 60 || bot.stateT > 14) { bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0; bot.waypoint = null; }
+    } else if (bot.aiState === 'patrol') {
+      // v21 campaign patrol: circuit waypoint to waypoint until assignCampaignSlots
+      // hands this bot a freed engagement slot (it flips the state back to 'engage')
+      const wp2 = bot.waypoint; const wpDist2 = wp2 ? Math.hypot(wp2.x - bp.x, wp2.z - bp.z) : 0;
+      if (!wp2 || wpDist2 < 70 || bot.stateT > 25) { bot.waypoint = pickPatrolWaypoint(); bot.stateT = 0; }
     } else if (bot.aiState === 'engage') {
       bot.engageT += dt;
       if (dist < 70) bot.closeT += dt; else bot.closeT = Math.max(0, bot.closeT - dt * 2);
@@ -3150,7 +3278,7 @@ function animate(now) {
       spdMul = 1.3;
     } else if (bot.aiState === 'extend') {
       desH = bot.heading; desP = 0.18; spdMul = 1.15; // hold course, slight climb, open the distance
-    } else if (bot.aiState === 'reposition' && bot.waypoint) {
+    } else if ((bot.aiState === 'reposition' || bot.aiState === 'patrol') && bot.waypoint) { // v21: patrol flies the same waypoint steering as reposition
       const wp = bot.waypoint;
       desH = Math.atan2(wp.x - bp.x, wp.z - bp.z);
       desP = clampNum(Math.atan2(wp.y - bp.y, Math.max(1, Math.hypot(wp.x - bp.x, wp.z - bp.z))), -0.6, 0.6);
@@ -3215,7 +3343,7 @@ function animate(now) {
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { if (activeGame.mode === 'campaign' && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
