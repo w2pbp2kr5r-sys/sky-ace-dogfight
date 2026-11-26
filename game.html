@@ -210,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v31 — SPEED & AIM ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v32 — SIGN-IN & LAYOUT ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -309,6 +309,26 @@
 </div>
 <div id="touchZone" class="hidden"><div id="touchKnob"></div></div>
 
+<!-- v32: touch button layout editor — stand-in copies of the mission touch controls over a dim backdrop -->
+<style>
+  #layoutEditor { position: fixed; inset: 0; z-index: 160; background: rgba(3,6,12,0.85); }
+  .layout-editor-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px 14px; background: rgba(10,15,28,0.94); border-bottom: 1px solid rgba(56,189,248,0.35); color: #e2e8f0; font-size: 0.85rem; font-weight: 700; }
+  .layout-editor-bar input[type="range"] { vertical-align: middle; }
+  #layoutStage { position: absolute; inset: 0; }
+  .layout-proxy { position: absolute; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+  .layout-proxy:active { cursor: grabbing; }
+  .tz-proxy { border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: center; }
+  .tz-proxy i { border-radius: 50%; background: rgba(56,189,248,0.7); display: block; }
+</style>
+<div id="layoutEditor" class="hidden">
+  <div class="layout-editor-bar">
+    <span>Drag buttons where you want them</span>
+    <label>Button size: <span id="touchSizeVal">1.0x</span> <input type="range" id="touchSizeSlider" min="0.8" max="1.4" step="0.05" value="1" /></label>
+    <button class="btn btn-play btn-sm" id="btnLayoutDone" type="button">Done</button>
+  </div>
+  <div id="layoutStage"></div>
+</div>
+
 <div id="hangarModal" class="modal hidden">
   <div class="modal-card">
     <div class="modal-header"><h2>Hangar &amp; Upgrades</h2><button class="btn btn-sec btn-sm" onclick="closeModals()">Close</button></div>
@@ -358,6 +378,11 @@
       <label><input type="checkbox" id="musicToggle" checked /> Lobby Music</label>
       <div class="section-label">Touch</div>
       <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
+      <label><input type="checkbox" id="touchLayoutToggle" /> Customize Button Layout</label>
+      <div id="touchLayoutBtns" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sec btn-sm" id="btnEditTouchLayout" type="button">Edit Button Layout</button>
+        <button class="btn btn-sec btn-sm" id="btnResetTouchLayout" type="button">Reset Layout</button>
+      </div>
       <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
       <div id="pauseActions" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-play btn-sm" id="btnResumeGame">Resume Flight</button>
@@ -406,6 +431,7 @@ const defaultState = {
   ownedSkins: ['stock'], equippedSkin: 'stock',
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0 },
   sensitivity: 1.0, mobileTouch: false,
+  touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1, // v32: customizable touch-button layout (editor in Settings)
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   volume: 0.7, muted: false, musicOn: true,
   lastDaily: '', bestWave: 0,
@@ -482,6 +508,11 @@ function loadGameState() {
   // v30 guards: daily reward + wave defense best (old saves default via the merges above too)
   if (typeof state.lastDaily !== 'string') state.lastDaily = '';
   if (typeof state.bestWave !== 'number' || isNaN(state.bestWave)) state.bestWave = 0;
+  // v32 guards: touch layout editor settings (clone the map so per-profile state never shares the default object)
+  if (typeof state.touchLayoutOn !== 'boolean') state.touchLayoutOn = false;
+  if (!state.touchLayout || typeof state.touchLayout !== 'object' || Array.isArray(state.touchLayout)) state.touchLayout = {};
+  state.touchLayout = Object.assign({}, state.touchLayout);
+  if (typeof state.touchBtnScale !== 'number' || isNaN(state.touchBtnScale) || state.touchBtnScale < 0.8 || state.touchBtnScale > 1.4) state.touchBtnScale = 1;
 }
 loadGameState(); // boot: legacy/default state so the menu scene renders behind the gate; re-loaded per profile on sign-in
 function saveState() { try { localStorage.setItem(currentSaveKey(), JSON.stringify(state)); } catch (e) {} cloudNoteSave(); updateTopUI(); } // v23: cloudNoteSave() stamps the local meta + schedules a push when the pilot is a cloud profile (no-op otherwise)
@@ -3299,6 +3330,7 @@ function startMission() {
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('vignette').classList.remove('hidden'); // v17: cinematic vignette lives and dies with the HUD
   document.getElementById('touchZone').classList.toggle('hidden', !state.mobileTouch);
+  applyTouchLayout(); // v32: position/scale the touch controls per the player's saved layout (no-op at defaults)
   document.getElementById('minimap').classList.toggle('hidden', currentMode !== 'royale');
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
@@ -4848,12 +4880,16 @@ function renderKeybinds() {
   const vS = document.getElementById('volSlider'); if (vS) { vS.value = state.volume; const vv = document.getElementById('volVal'); if (vv) vv.textContent = Math.round(state.volume * 100) + '%'; }
   const mT = document.getElementById('muteToggle'); if (mT) mT.checked = !!state.muted;
   const muT = document.getElementById('musicToggle'); if (muT) muT.checked = state.musicOn !== false;
+  const tlT = document.getElementById('touchLayoutToggle'); if (tlT) { tlT.checked = !!state.touchLayoutOn; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); }
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
 window.addEventListener('keydown', function(e) { if (!listeningAction) return; e.preventDefault(); state.binds[listeningAction] = e.code; listeningAction = null; saveState(); renderKeybinds(); });
 document.getElementById('sensSlider').oninput = function(e) { state.sensitivity = parseFloat(e.target.value); document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; saveState(); };
 document.getElementById('mobileToggle').onchange = function(e) { state.mobileTouch = e.target.checked; saveState(); };
+document.getElementById('touchLayoutToggle').onchange = function(e) { state.touchLayoutOn = e.target.checked; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); applyTouchLayout(); saveState(); };
+document.getElementById('btnEditTouchLayout').onclick = function() { closeModals(); openLayoutEditor(); };
+document.getElementById('btnResetTouchLayout').onclick = function() { state.touchLayout = {}; state.touchBtnScale = 1; applyTouchLayout(); saveState(); showBanner('Touch layout reset to defaults', 2200); };
 document.getElementById('fovSlider').oninput = function(e) { state.fov = parseFloat(e.target.value); document.getElementById('fovVal').textContent = state.fov + '°'; applyFov(); saveState(); };
 document.getElementById('camDistSlider').oninput = function(e) { state.camDist = parseFloat(e.target.value); document.getElementById('camDistVal').textContent = state.camDist.toFixed(2).replace(/0$/, '') + 'x'; saveState(); };
 document.getElementById('shakeSlider').oninput = function(e) { state.shake = parseFloat(e.target.value); document.getElementById('shakeVal').textContent = state.shake.toFixed(1); saveState(); };
@@ -4867,10 +4903,116 @@ applyFov(); applyQuality(); // v15: boot with the saved camera + quality setting
 document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
 // Touch joystick & HUD buttons
 const tz = document.getElementById('touchZone'); const tk = document.getElementById('touchKnob');
-tz.addEventListener('touchmove', function(e) { e.preventDefault(); const rect = tz.getBoundingClientRect(); const t = e.touches[0]; const dx = Math.max(-35, Math.min(35, t.clientX - (rect.left + 55))); const dy = Math.max(-35, Math.min(35, t.clientY - (rect.top + 55))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / 35; touchVec.y = dy / 35; }, { passive: false });
+tz.addEventListener('touchmove', function(e) { e.preventDefault(); const rect = tz.getBoundingClientRect(); const t = e.touches[0]; const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, t.clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, t.clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; }, { passive: false }); // v32: center/travel derived from the live rect so the stick stays correct when the layout editor scales it (identical numbers at the default 110px)
 tz.addEventListener('touchend', function() { tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; });
 function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) e.preventDefault(); if (activeGame) activeGame.player[prop] = true; }; const off = function() { if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); }
 bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindHold('btnFireRocket', '_touchRocket'); // v29: holding the touch rocket button now polls like holding R (its onclick tap still works too)
+// ---- v32 touch button layout editor ----
+// The mission touch controls: the FIXED-position joystick base (#touchZone,
+// bottom-left) plus the four HUD action buttons (in the .action-btns flex row,
+// bottom-right). The joystick knob is centered inside the base wherever the
+// base sits, and the stick math reads the base's live rect, so the base is
+// draggable as a whole. Positions are stored as top-left percentages of the
+// viewport in state.touchLayout[key] = {x, y}; state.touchBtnScale scales all
+// of them (the stick via its px size, the buttons via transform scale with a
+// top-left origin, so the stored corner stays the visual corner).
+const TOUCH_CONTROLS = [
+  { key: 'stick', id: 'touchZone', label: '', def: { x: 2, y: 70 } },
+  { key: 'fire', id: 'btnFireGun', label: 'FIRE GUN', def: { x: 55, y: 90 } },
+  { key: 'rocket', id: 'btnFireRocket', label: 'ROCKET (RDY)', def: { x: 66, y: 90 } },
+  { key: 'autoaim', id: 'btnAutoAim', label: 'AUTO-AIM (RDY)', def: { x: 79, y: 90 } },
+  { key: 'boost', id: 'btnBoost', label: 'BOOST', def: { x: 92, y: 90 } }
+];
+function touchLayoutPos(key) { const p = (state && state.touchLayout) ? state.touchLayout[key] : null; return (p && typeof p.x === 'number' && typeof p.y === 'number' && isFinite(p.x) && isFinite(p.y)) ? p : null; }
+function applyTouchLayout() {
+  if (!state) return;
+  const on = !!state.touchLayoutOn;
+  const s = (typeof state.touchBtnScale === 'number' && isFinite(state.touchBtnScale)) ? state.touchBtnScale : 1;
+  TOUCH_CONTROLS.forEach(function(c) {
+    const el = document.getElementById(c.id); if (!el) return;
+    const pos = on ? touchLayoutPos(c.key) : null;
+    if (pos) {
+      el.style.position = 'fixed'; el.style.left = pos.x + '%'; el.style.top = pos.y + '%'; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.margin = '0';
+    } else {
+      el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.right = ''; el.style.bottom = ''; el.style.margin = '';
+    }
+    if (c.key === 'stick') {
+      const knob = document.getElementById('touchKnob');
+      if (on) {
+        const px = Math.round(110 * s), k = Math.round(40 * s);
+        el.style.width = px + 'px'; el.style.height = px + 'px';
+        if (knob) { knob.style.width = k + 'px'; knob.style.height = k + 'px'; knob.style.left = Math.round((px - k) / 2) + 'px'; knob.style.top = Math.round((px - k) / 2) + 'px'; }
+      } else {
+        el.style.width = ''; el.style.height = '';
+        if (knob) { knob.style.width = ''; knob.style.height = ''; knob.style.left = ''; knob.style.top = ''; }
+      }
+    } else {
+      el.style.transform = on ? ('scale(' + s + ')') : '';
+      el.style.transformOrigin = 'top left';
+    }
+  });
+}
+// The editor shows stand-in copies (never the real controls) over a dim
+// backdrop; dragging a proxy writes its top-left % into state.touchLayout.
+let layoutProxies = {};
+function styleLayoutProxy(el, c) {
+  const s = state.touchBtnScale || 1;
+  if (c.key === 'stick') {
+    const px = Math.round(110 * s), k = Math.round(40 * s);
+    el.style.width = px + 'px'; el.style.height = px + 'px';
+    const knob = el.firstChild; if (knob) { knob.style.width = k + 'px'; knob.style.height = k + 'px'; }
+    el.style.transform = '';
+  } else {
+    el.style.transform = 'scale(' + s + ')'; el.style.transformOrigin = 'top left';
+  }
+}
+function attachLayoutDrag(el, c) {
+  el.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    const rect = el.getBoundingClientRect();
+    const startL = rect.left, startT = rect.top, startX = e.clientX, startY = e.clientY;
+    const w = window.innerWidth, h = window.innerHeight;
+    function mv(ev) {
+      let nx = startL + (ev.clientX - startX), ny = startT + (ev.clientY - startY);
+      nx = Math.max(0, Math.min(nx, Math.max(0, w - rect.width))); ny = Math.max(0, Math.min(ny, Math.max(0, h - rect.height)));
+      el.style.left = (nx / w * 100) + '%'; el.style.top = (ny / h * 100) + '%';
+    }
+    function up() {
+      el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      const r2 = el.getBoundingClientRect();
+      if (!state.touchLayout || typeof state.touchLayout !== 'object') state.touchLayout = {};
+      state.touchLayout[c.key] = { x: Math.round(r2.left / w * 1000) / 10, y: Math.round(r2.top / h * 1000) / 10 };
+      saveState(); applyTouchLayout();
+    }
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+}
+function openLayoutEditor() {
+  const ed = document.getElementById('layoutEditor'); if (!ed) return;
+  const stage = document.getElementById('layoutStage'); if (!stage) return;
+  stage.innerHTML = ''; layoutProxies = {};
+  TOUCH_CONTROLS.forEach(function(c) {
+    const pos = touchLayoutPos(c.key) || c.def;
+    const d = document.createElement('div');
+    if (c.key === 'stick') { d.className = 'layout-proxy tz-proxy'; d.innerHTML = '<i></i>'; }
+    else { d.className = 'layout-proxy hud-btn'; d.textContent = c.label; }
+    d.style.left = pos.x + '%'; d.style.top = pos.y + '%';
+    stage.appendChild(d); layoutProxies[c.key] = d;
+    styleLayoutProxy(d, c);
+    attachLayoutDrag(d, c);
+  });
+  const sl = document.getElementById('touchSizeSlider'); if (sl) sl.value = state.touchBtnScale || 1;
+  const sv = document.getElementById('touchSizeVal'); if (sv) sv.textContent = (state.touchBtnScale || 1).toFixed(2).replace(/0$/, '') + 'x';
+  ed.classList.remove('hidden');
+}
+document.getElementById('touchSizeSlider').oninput = function(e) {
+  state.touchBtnScale = parseFloat(e.target.value);
+  const sv = document.getElementById('touchSizeVal'); if (sv) sv.textContent = state.touchBtnScale.toFixed(2).replace(/0$/, '') + 'x';
+  TOUCH_CONTROLS.forEach(function(c) { const p = layoutProxies[c.key]; if (p) styleLayoutProxy(p, c); });
+  applyTouchLayout(); saveState();
+};
+document.getElementById('btnLayoutDone').onclick = function() { document.getElementById('layoutEditor').classList.add('hidden'); applyTouchLayout(); saveState(); };
 // ONLINE 1v1 (PeerJS — optional, no bots)
 let peer = null, conn = null, peerSyncTimer = null;
 // v18 Online Royale state: royalePeerReady = a peer connected while Ranked Royale
@@ -5465,16 +5607,20 @@ function signOut() {
 document.getElementById('btnGuestPlay').addEventListener('click', function() { signInProfile(ensureGuestProfile()); syncPremiumEntitlements('guest'); }); // v27: fire-and-forget entitlement check (usually a no-op for guests)
 document.getElementById('btnSignOut').addEventListener('click', signOut);
 window.addEventListener('beforeunload', function() { accumulatePlayTime(); });
-// Gate on boot. If localStorage is unusable the game must not brick: fall back to a
-// temporary in-memory guest profile and skip the gate entirely.
-if (!storageOK) {
-  currentProfile = { id: 'guest', callsign: 'GUEST', guest: true, createdAt: Date.now(), lastPlayedAt: Date.now(), stats: blankProfileStats() };
-  sessionStart = Date.now();
-  const so = document.getElementById('btnSignOut'); if (so) so.textContent = '⏻ Sign Out (GUEST)';
-  gateEl.classList.add('hidden');
-} else {
-  showGate();
-}
+// Gate on boot (v32 fix). The gate is ALWAYS shown and entry happens ONLY via an
+// explicit tap on it — cloud sign-in, create account, the visible Continue
+// button (live cloud session), or Play as Guest. There is deliberately NO
+// silent entry path. Root cause of the v31 skip: when the localStorage probe
+// failed (blocked cookies/site data, restricted in-app webviews, storage-off
+// embeds), the old code silently created an in-memory guest profile and hid
+// the gate, so fresh visitors on such devices landed straight in the menu
+// without ever seeing a sign-in choice. Now a failed probe just means
+// progress can't persist on this device — the player still lands on the gate
+// and chooses; guest play itself is fully on-device and still works (the
+// registry/save writes are all try/caught, so the guest session runs in
+// memory), and the cloud section reports its own unavailability on use.
+showGate();
+if (!storageOK) gateError('This browser is blocking saved data, so progress will not be kept after this tab closes — you can still play as a guest, but cloud sign-in may not work here.');
 
 // ---- v23 cloud accounts: Firebase Auth + Firestore layered onto the gate ----
 // The SDK loads LAZILY via dynamic import (first cloud interaction, or a deferred
