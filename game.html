@@ -210,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v28 — REALISM & DUELS ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v29 — MUSIC & MISSILES ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -336,6 +336,7 @@
       <div class="section-label">Audio</div>
       <label>Master Volume: <span id="volVal">70%</span> <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.7" /></label>
       <label><input type="checkbox" id="muteToggle" /> Mute All Sound</label>
+      <label><input type="checkbox" id="musicToggle" checked /> Lobby Music</label>
       <div class="section-label">Touch</div>
       <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
       <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
@@ -387,7 +388,7 @@ const defaultState = {
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1 },
   sensitivity: 1.0, mobileTouch: false,
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
-  volume: 0.7, muted: false,
+  volume: 0.7, muted: false, musicOn: true,
   binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
 };
 // ---- v24 accounts: profile registry (guest entry + cloud mirrors) ----
@@ -699,6 +700,122 @@ const SFX = {
 window.addEventListener('pointerdown', function() { SFX.init(); }, { passive: true });
 window.addEventListener('keydown', function() { SFX.init(); });
 document.addEventListener('click', function(e) { const t = e.target; if (t && t.closest && t.closest('.btn')) { SFX.init(); SFX.click(); } });
+// ---- Lobby music (v29): a generative synthwave loop on the SAME audio context
+// and master gain as the SFX — no audio files. Am–F–C–G pads (detuned triangle +
+// saw pairs through a slowly-breathing lowpass), a sub-bass root per chord, and a
+// sparse A-minor-pentatonic arpeggio through a feedback delay. Lookahead
+// scheduler: a 250ms interval keeps 0.6s of audio queued off ctx.currentTime.
+// Music exists only in the lobby: MUS.update() (called from showMenuScene /
+// endMatch / the settings toggle / a slow watchdog) starts it when the context
+// is running, musicOn is set and no mission is live; startMission stops it with
+// a 1s fade. Every entry point is guarded — silence is always a safe outcome.
+const MUS = {
+  playing: false, timer: null, gain: null, delaySend: null,
+  tick: 0, nextT: 0, chord: 0,
+  CHORDS: [ // root sub-bass + pad voicings (Hz): Am, F, C, G
+    { bass: 55.00, pad: [110.00, 220.00, 261.63, 329.63] },
+    { bass: 43.65, pad: [87.31, 174.61, 220.00, 261.63] },
+    { bass: 65.41, pad: [130.81, 196.00, 261.63, 329.63] },
+    { bass: 49.00, pad: [98.00, 196.00, 246.94, 293.66] }
+  ],
+  ARP: [440.00, 523.25, 587.33, 659.25, 783.99, 880.00], // A C D E G pentatonic, octaves 4-5
+  CHORD_T: 4.8, TICK_T: 0.6, // 8 arp ticks per chord
+  _ensure: function() {
+    if (this.gain || !SFX.ctx || !SFX.master) return;
+    try {
+      const ctx = SFX.ctx;
+      this.gain = ctx.createGain(); this.gain.gain.value = 0;
+      this.gain.connect(SFX.master); // master carries state.volume / state.muted for music too
+      const delay = ctx.createDelay(1.0); delay.delayTime.value = 0.375;
+      const fb = ctx.createGain(); fb.gain.value = 0.35;
+      const wet = ctx.createGain(); wet.gain.value = 0.25;
+      this.delaySend = ctx.createGain(); this.delaySend.gain.value = 1;
+      this.delaySend.connect(delay); delay.connect(fb); fb.connect(delay);
+      delay.connect(wet); wet.connect(this.gain);
+    } catch (e) { this.gain = null; this.delaySend = null; }
+  },
+  start: function() {
+    if (this.playing || !SFX.ctx || !SFX.master) return;
+    this._ensure(); if (!this.gain) return;
+    try {
+      const t = SFX.ctx.currentTime;
+      this.gain.gain.cancelScheduledValues(t);
+      this.gain.gain.setTargetAtTime(0.32, t, 0.6); // fade in under the lobby
+      this.tick = 0; this.chord = 0; this.nextT = t + 0.08;
+      const self = this;
+      this.timer = setInterval(function() { self._schedule(); }, 250);
+      this.playing = true;
+    } catch (e) { this.playing = false; }
+  },
+  stop: function() {
+    if (!this.playing) return;
+    this.playing = false;
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.gain && SFX.ctx) { try { const t = SFX.ctx.currentTime; this.gain.gain.cancelScheduledValues(t); this.gain.gain.setTargetAtTime(0, t, 0.3); } catch (e) {} } // ~1s fade; already-queued pads die through it
+  },
+  update: function() {
+    try {
+      const want = !!(SFX.ctx && SFX.ctx.state === 'running' && state && state.musicOn !== false && !activeGame);
+      if (want && !this.playing) this.start();
+      else if (!want && this.playing) this.stop();
+    } catch (e) {}
+  },
+  _schedule: function() {
+    if (!this.playing || !SFX.ctx) return;
+    try {
+      const ct = SFX.ctx.currentTime;
+      if (this.nextT < ct - 0.25) this.nextT = ct + 0.05; // tab was hidden / interval throttled — snap forward instead of burst-scheduling the past
+      while (this.nextT < ct + 0.6) {
+        const t = this.nextT;
+        if (this.tick % 8 === 0) { this._pad(this.CHORDS[this.chord], t); this.chord = (this.chord + 1) % this.CHORDS.length; }
+        if (Math.random() < 0.45) this._arp(t);
+        this.tick++; this.nextT += this.TICK_T;
+      }
+    } catch (e) {}
+  },
+  _pad: function(ch, t) {
+    const ctx = SFX.ctx; if (!ctx || !this.gain) return;
+    const end = t + this.CHORD_T + 2.4; // 2s release tail overlaps the next chord = crossfade
+    const flt = ctx.createBiquadFilter(); flt.type = 'lowpass'; flt.frequency.value = 800; flt.Q.value = 0.4;
+    flt.connect(this.gain);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07;
+    const lfoG = ctx.createGain(); lfoG.gain.value = 260;
+    lfo.connect(lfoG); lfoG.connect(flt.frequency); lfo.start(t); lfo.stop(end);
+    ch.pad.forEach(function(f) {
+      [-5, 5].forEach(function(det, di) {
+        const o = ctx.createOscillator(); o.type = di === 0 ? 'triangle' : 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.026, t + 1.2); // slow attack
+        g.gain.setValueAtTime(0.026, t + this.CHORD_T - 0.4);
+        g.gain.exponentialRampToValueAtTime(0.0001, end); // long release
+        o.connect(g); g.connect(flt); o.start(t); o.stop(end + 0.05);
+      });
+    }, this);
+    const b = ctx.createOscillator(); b.type = 'sine'; b.frequency.value = ch.bass; // sub root
+    const bg = ctx.createGain();
+    bg.gain.setValueAtTime(0.0001, t);
+    bg.gain.exponentialRampToValueAtTime(0.15, t + 0.35);
+    bg.gain.exponentialRampToValueAtTime(0.0001, t + this.CHORD_T - 0.2);
+    b.connect(bg); bg.connect(this.gain); b.start(t); b.stop(t + this.CHORD_T + 0.05);
+  },
+  _arp: function(t) {
+    const ctx = SFX.ctx; if (!ctx || !this.gain) return;
+    const f = this.ARP[Math.floor(Math.random() * this.ARP.length)] * (Math.random() < 0.18 ? 0.5 : 1);
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.10, t + 0.015); // pluck
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+    o.connect(g); g.connect(this.gain);
+    if (this.delaySend) g.connect(this.delaySend); // space echo
+    o.start(t); o.stop(t + 0.6);
+  }
+};
+window.addEventListener('pointerdown', function() { MUS.update(); }, { passive: true });
+window.addEventListener('keydown', function() { MUS.update(); });
+document.addEventListener('visibilitychange', function() { MUS.update(); });
+setInterval(function() { MUS.update(); }, 1200); // watchdog: catches the context reaching 'running' after the first click, toggles, tab returns
 // ---- v20 game feel: hitmarker + damage vignette helpers (hoisted; used by animate) ----
 let _hmTimer = null;
 function showHitmarker(kill) {
@@ -960,6 +1077,26 @@ function getCloudTexture() {
   });
   return _cloudTex;
 }
+// v29: cloud-deck texture — dozens of soft overlapping blobs on a 256 canvas, so
+// a single huge plane reads as a broken cloud layer rather than one gradient
+// blob. The blobs carry real alpha (used as the material map with transparent
+// on), edges fade to nothing.
+let _deckTex = null;
+function getCloudDeckTexture() {
+  if (_deckTex) return _deckTex;
+  _deckTex = makeCanvas(256, 256, function(ctx, w, h) {
+    // canvas stays transparent — the blobs' alpha IS the deck's alpha (an opaque
+    // backing fill would render the whole plane as a tinted rectangle)
+    for (let i = 0; i < 46; i++) {
+      const x = w / 2 + (Math.random() - 0.5) * w * 0.74, y = h / 2 + (Math.random() - 0.5) * h * 0.74, r = 22 + Math.random() * 52;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,' + (0.16 + Math.random() * 0.16).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+  });
+  return _deckTex;
+}
 function getSunTexture() {
   if (_sunTex) return _sunTex;
   _sunTex = makeCanvas(128, 128, function(ctx, w, h) {
@@ -1147,12 +1284,20 @@ function getBillboardTexture() {
   if (THREE.SRGBColorSpace) _bbTex.colorSpace = THREE.SRGBColorSpace;
   return _bbTex;
 }
-function getSkyTexture(top, bottom, cirrus) {
+function getSkyTexture(top, bottom, cirrus, hazeCss) {
   const t = makeCanvas(256, 512, function(ctx, w, h) {
     const g = ctx.createLinearGradient(0, 0, 0, h);
     if (Array.isArray(top)) { top.forEach(function(st) { g.addColorStop(st[0], st[1]); }); }
     else { g.addColorStop(0, top); g.addColorStop(0.55, bottom); g.addColorStop(1, bottom); }
     ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    if (hazeCss) { // v29: aerial-perspective band — the canvas middle is the dome's equator (the horizon), so feather the fog color across the middle ~18% and the ground fog melts into the sky with no visible seam
+      const hn = parseInt(hazeCss.slice(1), 16), hr = (hn >> 16) & 255, hg = (hn >> 8) & 255, hb = hn & 255;
+      const band = ctx.createLinearGradient(0, h * 0.41, 0, h * 0.59);
+      band.addColorStop(0, 'rgba(' + hr + ',' + hg + ',' + hb + ',0)');
+      band.addColorStop(0.5, 'rgba(' + hr + ',' + hg + ',' + hb + ',0.88)');
+      band.addColorStop(1, 'rgba(' + hr + ',' + hg + ',' + hb + ',0)');
+      ctx.fillStyle = band; ctx.fillRect(0, h * 0.41, w, h * 0.18);
+    }
     if (cirrus) { // v20: faint high cirrus streaks on earth skies — soft stretched radial blobs, alpha 0.05-0.1
       for (let s = 0; s < 30; s++) {
         const sx = Math.random() * w, sy = h * (0.08 + Math.random() * 0.5), sl = 50 + Math.random() * 130, sh = 1.4 + Math.random() * 3.4;
@@ -2041,14 +2186,16 @@ function buildMenuScene() {
     const padLight = new THREE.PointLight(0x22d3ee, 120, 70, 1.7); padLight.position.y = 5.5; plat.add(padLight);
     menuGroup.userData.padLight = padLight;
     menuGroup.add(plat); menuGroup.userData.platform = plat;
-    // Floating dust motes drifting around the platform
-    const MN = 120, mPos = new Float32Array(MN * 3);
+    // Floating dust motes drifting around the platform (v29: 120 -> 300 motes,
+    // soft round sprite map + additive blending so they read as glowing dust in
+    // the pad light instead of hard square points, wider volume around the jet)
+    const MN = 300, mPos = new Float32Array(MN * 3);
     for (let mi = 0; mi < MN; mi++) {
-      const ma = Math.random() * Math.PI * 2, mr = 8 + Math.random() * 38;
-      mPos[mi * 3] = Math.cos(ma) * mr; mPos[mi * 3 + 1] = (Math.random() - 0.5) * 26; mPos[mi * 3 + 2] = Math.sin(ma) * mr;
+      const ma = Math.random() * Math.PI * 2, mr = 8 + Math.random() * 52;
+      mPos[mi * 3] = Math.cos(ma) * mr; mPos[mi * 3 + 1] = (Math.random() - 0.5) * 34; mPos[mi * 3 + 2] = Math.sin(ma) * mr;
     }
     const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
-    const motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: 0x9be9ff, size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.55, depthWrite: false }));
+    const motes = new THREE.Points(mg, new THREE.PointsMaterial({ map: getCloudTexture(), color: 0x9be9ff, size: 1.15, sizeAttenuation: true, transparent: true, opacity: 0.42, depthWrite: false, blending: THREE.AdditiveBlending }));
     motes.position.set(ax, jetY - 2, 0); menuGroup.add(motes); menuGroup.userData.motes = motes;
   })();
   // Holo info panels (v15): floating displays left of the jet, angled toward the
@@ -2086,6 +2233,7 @@ function buildMenuScene() {
   rimLight.position.set(180, 120, 240);
   rimLight.target.position.set(46, 160, 0);
   menuGroup.add(rimLight); menuGroup.add(rimLight.target);
+  menuGroup.userData.rimLight = rimLight; // v29: pulsed gently in animateMenuScene so the hero jet's rim breathes
   const nebLight = new THREE.PointLight(0xa855f7, 900, 420, 1.8);
   nebLight.position.set(46, 195, -30);
   menuGroup.add(nebLight);
@@ -2120,6 +2268,7 @@ function showMenuScene() {
   if (worldGroup) worldGroup.visible = false;
   scene.fog = null; scene.background = null;
   baseBloomStrength = 0.47; updateBloom(); // v17: menu gets the default bloom strength back (missions set it per theme) // v18: 0.55 -> 0.47
+  if (typeof MUS !== 'undefined') MUS.update(); // v29: lobby music lives in the menu (no-op until audio unlocks)
 }
 function animateMenuScene(dt) {
   if (!menuGroup || !menuGroup.visible) return;
@@ -2134,6 +2283,8 @@ function animateMenuScene(dt) {
   if (ud.motes) { ud.motes.rotation.y += dt * 0.02; ud.motes.position.y = (150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12)) - 2 + Math.sin(t * 0.4) * 0.8; }
   if (ud.beacons) ud.beacons.forEach(function(bc, bi) { bc.material.opacity = (Math.sin(t * 2.4 + bi * Math.PI) > 0) ? 0.95 : 0.07; });
   if (ud.padLight) ud.padLight.intensity = 120 + Math.sin(t * 2.2) * 28; // downwash glow breathing
+  if (ud.rimLight) ud.rimLight.intensity = 0.8 + Math.sin(t * 1.3) * 0.28; // v29: slow rim pulse on the hero jet (0.52..1.08)
+  if (ud.motes) ud.motes.rotation.x = Math.sin(t * 0.07) * 0.06; // v29: the dust volume itself slowly tilts/drifts, not just spins
   if (ud.holoPanels) ud.holoPanels.forEach(function(hp, hi) { hp.position.y = hp.userData.baseY + Math.sin(t * 0.9 + hi * 1.7) * 1.1; hp.rotation.y = hp.userData.baseRotY + Math.sin(t * 0.5 + hi * 1.3) * 0.05; }); // holo panels bob with the jet
   const mj = menuJet;
   if (mj) {
@@ -2173,11 +2324,17 @@ const ENV_THEMES = {
 // intensity / direction, hemisphere colors, tone-mapping exposure, fog density — applied
 // by applyThemeLighting() at the end of every buildEnvironment(). fogDensity is the v13
 // 0.00038 x1.15 for earth themes (a touch more depth), space stays at its tuned 0.00013.
+// v29: earth fogDensity roughly doubled (city .00078 / canyon .00088 / mountain
+// .00062 / neon .00092) for real aerial perspective. NOTE: three's FogExp2 is
+// quadratic — factor = 1-exp(-(d*density)^2) — so densities in the 0.0016-0.0022
+// range would fog out ~98% of the scene at 1000 units (combat range). These are
+// the strongest values that keep 400-600-unit engagements crisp while the
+// horizon fully dissolves; space themes keep 0.00013.
 const THEME_LIGHTING = {
-  city:     { sun: 0xffe3b3, sunInt: 1.56, sunDir: [0.55, 0.62, 0.35],  hemiSky: 0xbfd9ff, hemiGround: 0x4a4238, hemiInt: 0.45, exposure: 1.06, fogDensity: 0.00044 },
-  canyon:   { sun: 0xffc38a, sunInt: 1.66, sunDir: [0.7, 0.38, 0.2],    hemiSky: 0xffd9b0, hemiGround: 0x6b3a22, hemiInt: 0.41, exposure: 1.08, fogDensity: 0.00044 },
-  mountain: { sun: 0xeaf2ff, sunInt: 1.52, sunDir: [0.35, 0.8, 0.3],    hemiSky: 0xd6e6ff, hemiGround: 0x5a6672, hemiInt: 0.5,  exposure: 1.04, fogDensity: 0.00044 },
-  neon:     { sun: 0x8fb4ff, sunInt: 0.83, sunDir: [-0.4, 0.7, -0.3],   hemiSky: 0x2a3560, hemiGround: 0x0a0a14, hemiInt: 0.45, exposure: 1.12, fogDensity: 0.00044 },
+  city:     { sun: 0xffe3b3, sunInt: 1.56, sunDir: [0.55, 0.62, 0.35],  hemiSky: 0xbfd9ff, hemiGround: 0x4a4238, hemiInt: 0.45, exposure: 1.06, fogDensity: 0.00078 },
+  canyon:   { sun: 0xffc38a, sunInt: 1.66, sunDir: [0.7, 0.38, 0.2],    hemiSky: 0xffd9b0, hemiGround: 0x6b3a22, hemiInt: 0.41, exposure: 1.08, fogDensity: 0.00088 },
+  mountain: { sun: 0xeaf2ff, sunInt: 1.52, sunDir: [0.35, 0.8, 0.3],    hemiSky: 0xd6e6ff, hemiGround: 0x5a6672, hemiInt: 0.5,  exposure: 1.04, fogDensity: 0.00062 },
+  neon:     { sun: 0x8fb4ff, sunInt: 0.83, sunDir: [-0.4, 0.7, -0.3],   hemiSky: 0x2a3560, hemiGround: 0x0a0a14, hemiInt: 0.45, exposure: 1.12, fogDensity: 0.00092 },
   nebula:   { sun: 0xd8ccff, sunInt: 1.38, sunDir: [0.5, 0.65, 0.45],   hemiSky: 0x6a5acd, hemiGround: 0x14042a, hemiInt: 0.54, exposure: 1.06, fogDensity: 0.00013 },
   orbit:    { sun: 0xf3e8ff, sunInt: 1.47, sunDir: [-0.45, 0.6, 0.5],   hemiSky: 0x7a6fe0, hemiGround: 0x180538, hemiInt: 0.54, exposure: 1.08, fogDensity: 0.00013 }
 }; // v18: Jayce asked a touch less bright — exposure -0.06 everywhere, sun x0.92, hemi x0.9
@@ -2845,11 +3002,11 @@ function buildEnvironment(theme, radius, densityScale) {
   const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
   const isSpace = (theme === 'nebula' || theme === 'orbit');
   const _tl = THEME_LIGHTING[theme] || THEME_LIGHTING.city; // v17: fog density is theme-driven (earth 0.00038 x1.15, space unchanged)
-  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, _tl.fogDensity);
+  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(new THREE.Color(cfg.fog).lerp(new THREE.Color(cfg.skyBot), 0.45), _tl.fogDensity); // v29: fog color pulled toward the sky's horizon tone so distant ground fades INTO the sky instead of into a mismatched tint
   if (isSpace) { scene.background = new THREE.Color(0x0a0418); scene.fog = new THREE.FogExp2(0x1a0b2e, _tl.fogDensity); } // v13 deep-space override: dark purple, low density so asteroids stay visible out to ~radius*1.2
   // Gradient sky dome (BackSide sphere with canvas gradient)
   const skyR = Math.min(radius * 2.9, 4200);
-  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot, !isSpace), side: THREE.BackSide, fog: false, depthWrite: false }));
+  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot, !isSpace, !isSpace ? ('#' + cfg.fog.toString(16).padStart(6, '0')) : undefined), side: THREE.BackSide, fog: false, depthWrite: false })); // v29: earth domes carry the horizon haze band in the fog color
   worldGroup.add(skyDome);
   // Sun disc sprite aligned with the directional light
   if (!isSpace) { // space themes have no sun disc — the starfield + nebulae carry the sky
@@ -2903,6 +3060,20 @@ function buildEnvironment(theme, radius, densityScale) {
       sp2.scale.set(cs2, cs2 * 0.32, 1);
       worldGroup.add(sp2);
       drift21.push({ obj: sp2, vel: new THREE.Vector3(1.5 + Math.random() * 1.5, 0, 0), lim: 3000 });
+    }
+  }
+  if (!isSpace) { // v29: ONE true cloud DECK — 6-8 very large, very soft noise-textured planes lying flat at y 700-850, above the fight. From below they read as a real overcast layer breaking up the sky (the billboards alone always read as floating puffs); DoubleSide so diving through the layer looks right from above too. Visual only, slow drift on the same hook, never an obstacle.
+    const deckTex = getCloudDeckTexture();
+    const driftDeck = worldGroup.userData.drift || (worldGroup.userData.drift = []);
+    const deckN = 6 + Math.floor(Math.random() * 3);
+    for (let di = 0; di < deckN; di++) {
+      const dm = new THREE.MeshBasicMaterial({ map: deckTex, color: cfg.cloud, transparent: true, opacity: 0.16 + Math.random() * 0.12, depthWrite: false, side: THREE.DoubleSide });
+      const dp = new THREE.Mesh(new THREE.PlaneGeometry(1300 + Math.random() * 1000, 900 + Math.random() * 700), dm);
+      dp.rotation.x = -Math.PI / 2; dp.rotation.z = Math.random() * Math.PI;
+      const da = Math.random() * Math.PI * 2, dd = Math.random() * 2300;
+      dp.position.set(Math.cos(da) * dd, 700 + Math.random() * 150, Math.sin(da) * dd);
+      worldGroup.add(dp);
+      driftDeck.push({ obj: dp, vel: new THREE.Vector3(1.1 + Math.random() * 0.9, 0, 0.25), lim: 3200 });
     }
   }
   // Ground: city themes use a road-grid texture exactly aligned with the building blocks; other themes use natural noise
@@ -2998,27 +3169,43 @@ function buildEnvironment(theme, radius, densityScale) {
     const tn = terrGeo.attributes.normal;
     const terrCols = new Float32Array(tp.count * 3);
     const cValley = new THREE.Color(0x5a6b52), cRock = new THREE.Color(0x6e6a63), cSnow = new THREE.Color(0xdfe9f4); // snow toned down from blow-out 0xf4f8ff
+    const cScree = new THREE.Color(0x8a7f6d), cCliff = new THREE.Color(0x5e3016), cTalus = new THREE.Color(0xc08a58); // v29: talus/scree + dark cliff tints
     const strata = [0x8a4520, 0x9c5426, 0x74371a, 0xa8683a].map(function(c) { return new THREE.Color(c); });
     const cTop = new THREE.Color(0xb07a48);
     const tmpC = new THREE.Color();
+    // v29 WS4a: slope/height blending stays on the CPU in vertex colors (the v19
+    // architecture) rather than an onBeforeCompile injection — same visual result
+    // at 150x150 density, zero render-time shader-compile risk. This pass deepens
+    // the blends: sharper rock shoulders, a dusty talus/scree band on mid slopes,
+    // brighter high-altitude snow, higher-contrast canyon strata with dark cliff
+    // faces, and a fine fbm lightness grain so big faces stop reading as flat.
     for (let vi = 0; vi < tp.count; vi++) {
       const vx = tp.getX(vi), vy = tp.getY(vi), vz = tp.getZ(vi);
       const slope = 1 - tn.getY(vi); // 0 = flat, grows on steep faces
       if (theme === 'mountain') {
-        tmpC.copy(cValley).lerp(cRock, tSmooth(0.06, 0.38, slope) * 0.85 + tSmooth(60, 160, vy) * 0.15);
+        tmpC.copy(cValley).lerp(cRock, tSmooth(0.04, 0.30, slope) * 0.92 + tSmooth(60, 160, vy) * 0.18); // rock bites earlier and harder
+        const screeBand = tSmooth(0.10, 0.20, slope) * (1 - tSmooth(0.28, 0.44, slope)); // mid-slope apron only
+        tmpC.lerp(cScree, screeBand * 0.38);
         const snowline = 130 + (tFbm(vx * 0.01, vz * 0.01) - 0.5) * 50; // noisy snowline (+/-25)
-        const snowAmt = tSmooth(snowline - 18, snowline + 18, vy) * (1 - tSmooth(0.40, 0.55, slope)); // steep faces stay rock
+        const snowAmt = tSmooth(snowline - 18, snowline + 18, vy) * (1 - tSmooth(0.35, 0.50, slope)); // steep faces stay rock
         tmpC.lerp(cSnow, snowAmt);
+        tmpC.lerp(cSnow, tSmooth(230, 330, vy) * 0.35 * (1 - tSmooth(0.45, 0.60, slope))); // high peaks brighten even below the snowline
+        tmpC.offsetHSL(0, 0, (tFbm(vx * 0.02, vz * 0.02) - 0.5) * 0.05); // fine grain
       } else {
         const band = Math.floor((vy + (tFbm(vx * 0.01, vz * 0.01) - 0.5) * 20) / 28);
         tmpC.copy(strata[((band % 4) + 4) % 4]);
-        if (slope < 0.15) tmpC.lerp(cTop, 0.5 * (1 - slope / 0.15)); // lighter mesa tops
-        tmpC.offsetHSL(0, 0, (tHash(vi, 7) - 0.5) * 0.02); // faint per-vertex variation
+        if (((band % 2) + 2) % 2 === 1) tmpC.multiplyScalar(0.90); // alternating darker bands — strata contrast up
+        const talusBand = tSmooth(0.16, 0.28, slope) * (1 - tSmooth(0.40, 0.55, slope));
+        tmpC.lerp(cTalus, talusBand * 0.32); // dusty debris aprons at cliff feet
+        tmpC.lerp(cCliff, tSmooth(0.30, 0.55, slope) * 0.70); // true cliff faces go dark varnished rock
+        if (slope < 0.15) tmpC.lerp(cTop, 0.55 * (1 - slope / 0.15)); // lighter mesa tops
+        tmpC.offsetHSL(0, 0, (tHash(vi, 7) - 0.5) * 0.03); // faint per-vertex variation
       }
       terrCols[vi * 3] = tmpC.r; terrCols[vi * 3 + 1] = tmpC.g; terrCols[vi * 3 + 2] = tmpC.b;
     }
     terrGeo.setAttribute('color', new THREE.BufferAttribute(terrCols, 3));
-    const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: makeDetailNoiseTexture(90), roughness: 0.95, metalness: 0.02 })); // v28: detail grain multiplies the vertex colors (map x vColor in three.js) so low-altitude rock/snow reads as surface, not plastic
+    const _terrDetail = makeDetailNoiseTexture(90);
+    const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: _terrDetail, bumpMap: _terrDetail, bumpScale: 0.7, roughness: 0.95, metalness: 0.02 })); // v28: detail grain multiplies the vertex colors (map x vColor in three.js) so low-altitude rock/snow reads as surface, not plastic // v29: the same grain also drives a bump map — sun raking across a slope now shows tactile micro-relief instead of smooth shading
     terrain.receiveShadow = true; worldGroup.add(terrain);
     // Invisible peak guards: the terrain mesh itself isn't an obstacle (like the old
     // ground), but the big rim peaks get collision columns so bot weaving and the
@@ -3046,6 +3233,7 @@ window.addEventListener('keydown', function(e) { keys[e.code] = true; if (active
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
 function startMission() {
   closeModals(); clearSmoke();
+  if (typeof MUS !== 'undefined') MUS.stop(); // v29: lobby music fades out as any mission (incl. online) launches
   if (typeof mm !== 'undefined' && mm.searching && !(typeof mmPendingMatch !== 'undefined' && mmPendingMatch)) mmCancelSearch(); // v25: dropping in manually abandons a pending matchmaking search (an mm drop itself carries mmPendingMatch)
   if (typeof duel !== 'undefined' && duel.searching && !duel.started) duelCancelSearch(); // v28: same for duel matchmaking — a duel drop itself arrives via setupPeerConn with duel.started already set, so it is not cancelled
   _missionClock = 0; _autoQDropped = false; _frameEma = 16; // v20: fresh auto-quality window per mission
@@ -3072,7 +3260,7 @@ function startMission() {
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49))); // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
   for (let i = 0; i < botCount; i++) {
@@ -3221,9 +3409,16 @@ function spawnRocket(pos, dir, ownerId, targetObj, dmg) {
   for (let lp = 0; lp < 6; lp++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 2, pos.y + (Math.random() - 0.5) * 2, pos.z + (Math.random() - 0.5) * 2, { color: lp < 3 ? 0xffffff : 0xb9bfc9, size: 1.6, grow: 4, life: 0.55, opacity: 0.5, vx: -dir.x * 10 + (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, vz: -dir.z * 10 + (Math.random() - 0.5) * 6 });
   spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.6, grow: 3, life: 0.14, opacity: 0.95, vx: 0, vy: 0, vz: 0 });
 }
+// v29: the ONE readiness rule for player rockets, shared by the HUD and the fire
+// path so they can never disagree again. p.rocketCd (seconds remaining) is the
+// single source of truth for the timer; this adds the Gun Game tier lock that
+// used to hide inside firePlayerRocket only — the HUD read rocketCd alone, so
+// in Gun Game Tiers 1-4 the button said "ROCKET (RDY)" while the fire gate
+// silently refused every press.
+function rocketLockedOut() { return !!(activeGame && activeGame.mode === 'gungame' && !GUN_GAME_TIERS[activeGame.player.ggTier].rockets); }
 function firePlayerRocket() {
   if (!activeGame || activeGame.player.rocketCd > 0) return;
-  if (activeGame.mode === 'gungame' && !GUN_GAME_TIERS[activeGame.player.ggTier].rockets) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
+  if (rocketLockedOut()) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
   const p = activeGame.player; const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
   if (p.respawnT > 0) return;
   const best = pickFrontTarget(1000); // true lock-on: most-in-front opponent within 1000; no lock = dumbfire straight
@@ -3282,6 +3477,7 @@ function endMatch(victory, title, summary) {
   if (victory && modeAtEnd === 'campaign' && chapterAtEnd < 10) nextBtn = '<button class="btn btn-play" onclick="nextChapter()">Next Chapter</button>';
   document.getElementById('statusBody').innerHTML = `<p style="color:#cbd5e1;line-height:1.5;">${summary}</p><div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">${nextBtn}<button class="btn btn-sec" onclick="returnHome()">Home Menu</button></div>`;
   document.getElementById('statusModal').classList.remove('hidden');
+  if (typeof MUS !== 'undefined') MUS.update(); // v29: the results screen is lobby again — music fades back in
 }
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
 function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
@@ -3496,7 +3692,7 @@ function animate(now) {
     const sd = themeSunDir(currentThemeName);
     if (sd) { sunLight.position.set(ax + sd.x * 800, ay + sd.y * 800, az + sd.z * 800); sunLight.target.position.set(ax, ay, az); sunLight.target.updateMatrixWorld(); }
   }
-  if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 4.5, -13).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderFrame(); return; }
+  if (activeGame.countdown > 0) { const p0 = activeGame.player; if (p0.fireCd > 0) p0.fireCd -= dt; if (p0.rocketCd > 0) p0.rocketCd -= dt; if (p0.autoAimCd > 0) p0.autoAimCd -= dt; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 4.5, -13).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderFrame(); return; } // v29: weapon cooldowns tick through the Royale countdown too — this early-return used to freeze them for the full 3s, so "ready" arrived later than the HUD math promised
   const p = activeGame.player;
   gameTime += dt;
   if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
@@ -3579,6 +3775,16 @@ function animate(now) {
     }
     spawnBullet(muzzle, shotDir, 'player', gunDmg); p.fireCd = fireRate; SFX.gun(); spreadReticle();
   }
+  // v29 ROCKET FIX: rockets used to fire ONLY from the discrete keydown event
+  // (guns are polled every frame). A press landing a frame before the cooldown
+  // hit 0 was thrown away — no poll, no buffer — so at the exact moment the HUD
+  // flipped to RDY the player's input was already gone ("sometimes doesn't
+  // shoot when ready"). Now the held key / held touch button is polled like
+  // the guns: the instant rocketCd reaches 0 the rocket leaves. The keydown
+  // handler still fires taps instantly; the cooldown gate makes the two paths
+  // mutually exclusive in practice. Locked-out Gun Game tiers are excluded so
+  // holding R doesn't spam the unlock banner.
+  if (!rocketLockedOut() && p.rocketCd <= 0 && p.respawnT <= 0 && (keys[state.binds.rocket] || p._touchRocket)) firePlayerRocket();
   for (let i = activeGame.rings.length - 1; i >= 0; i--) { const rg = activeGame.rings[i]; rg.mesh.rotation.y += dt * 1.5; if (p.respawnT <= 0 && rg.mesh.position.distanceTo(p.mesh.position) < 22) { if (rg.info.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + 50); else if (rg.info.type === 'lock') { p.autoAimLeft = 7; p.lockTarget = pickFrontTarget(1200); } else { p.buff = rg.info.type; p.buffTimer = 8; } showBanner(`${rg.info.name}: ${rg.info.desc}`, 3800); scene.remove(rg.mesh); activeGame.rings.splice(i, 1); spawnPowerRing(); } }
   if (activeGame.mode === 'royale') {
     activeGame.zoneTimer -= dt;
@@ -3723,6 +3929,27 @@ function animate(now) {
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
+  // ---- v29: ROCKET-vs-ROCKET interception. Bullets could already shoot rockets
+  // down (radius 12, in the bullet loop above); missiles could not. Now any two
+  // live rockets with DIFFERENT owners that close within 10 units detonate each
+  // other mid-air — neither deals damage. Rockets in flight are few, so the
+  // O(n^2) pair pass is trivial. Pairs are marked _dead and swept BEFORE the
+  // homing/damage loop below so a destroyed rocket can never still hit a jet.
+  for (let ra2 = activeGame.rockets.length - 1; ra2 >= 0; ra2--) {
+    const rkA = activeGame.rockets[ra2]; if (!rkA || rkA._dead) continue;
+    for (let rb2 = ra2 - 1; rb2 >= 0; rb2--) {
+      const rkB = activeGame.rockets[rb2]; if (!rkB || rkB._dead || rkB.ownerId === rkA.ownerId) continue;
+      if (rkA.mesh.position.distanceTo(rkB.mesh.position) < 10) {
+        rkA._dead = true; rkB._dead = true;
+        const mid = rkA.mesh.position.clone().add(rkB.mesh.position).multiplyScalar(0.5);
+        spawnImpactFx(mid); SFX.explosion();
+        for (let sp2 = 0; sp2 < 4; sp2++) spawnSmokePuff(mid.x + (Math.random() - 0.5) * 4, mid.y + (Math.random() - 0.5) * 4, mid.z + (Math.random() - 0.5) * 4, { color: 0xcfd6de, size: 2.2, grow: 5, life: 0.7, opacity: 0.5, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, vz: (Math.random() - 0.5) * 8 });
+        if (rkA.ownerId === 'player' || rkB.ownerId === 'player') { showHitmarker(false); showBanner('🚀 ROCKET INTERCEPTED!', 1500); SFX.kill(); } // your missile killed one of theirs (or died stopping it) — confirm it
+        break;
+      }
+    }
+  }
+  for (let rd = activeGame.rockets.length - 1; rd >= 0; rd--) { const rkD = activeGame.rockets[rd]; if (rkD._dead) { scene.remove(rkD.mesh); activeGame.rockets.splice(rd, 1); } }
   for (let i = activeGame.rockets.length - 1; i >= 0; i--) {
     const rk = activeGame.rockets[i]; rk.life -= dt;
     // True lock-on homing (v5): strong capped steering — sharp turns bleed it, fuel runs out at 9.5s, or shoot it down
@@ -3886,7 +4113,7 @@ function updateHUD(curSpd) {
   const p = activeGame.player;
   document.getElementById('hudHpBar').style.width = `${Math.max(0, (p.hp / p.maxHp) * 100)}%`;
   document.getElementById('hudTelemetry').textContent = `SPD: ${Math.round(curSpd * 6)} KTS | ALT: ${Math.round(p.mesh.position.y * 8)} FT`;
-  document.getElementById('btnFireRocket').textContent = p.rocketCd > 0 ? `ROCKET (${Math.ceil(p.rocketCd)}s)` : 'ROCKET (RDY)';
+  document.getElementById('btnFireRocket').textContent = rocketLockedOut() ? 'ROCKET (TIER 5)' : (p.rocketCd > 0 ? `ROCKET (${Math.ceil(p.rocketCd)}s)` : 'ROCKET (RDY)'); // v29: HUD reads the same readiness rule as the fire gate (rocketLockedOut + rocketCd)
   document.getElementById('btnAutoAim').textContent = p.autoAimCd > 0 ? `LOCK (${Math.ceil(p.autoAimCd)}s)` : 'AUTO-AIM (RDY)';
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
@@ -4294,6 +4521,7 @@ function renderKeybinds() {
   const qS = document.getElementById('qualitySelect'); if (qS) qS.value = state.quality;
   const vS = document.getElementById('volSlider'); if (vS) { vS.value = state.volume; const vv = document.getElementById('volVal'); if (vv) vv.textContent = Math.round(state.volume * 100) + '%'; }
   const mT = document.getElementById('muteToggle'); if (mT) mT.checked = !!state.muted;
+  const muT = document.getElementById('musicToggle'); if (muT) muT.checked = state.musicOn !== false;
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
@@ -4308,6 +4536,7 @@ document.getElementById('assistToggle').onchange = function(e) { state.assist = 
 document.getElementById('qualitySelect').onchange = function(e) { state.quality = e.target.value; _qualityTouched = true; applyQuality(); saveState(); };
 document.getElementById('volSlider').oninput = function(e) { state.volume = parseFloat(e.target.value); const vv = document.getElementById('volVal'); if (vv) vv.textContent = Math.round(state.volume * 100) + '%'; SFX.init(); SFX.setVolume(); saveState(); };
 document.getElementById('muteToggle').onchange = function(e) { state.muted = e.target.checked; SFX.init(); SFX.setVolume(); saveState(); };
+document.getElementById('musicToggle').onchange = function(e) { state.musicOn = e.target.checked; saveState(); if (typeof MUS !== 'undefined') MUS.update(); };
 applyFov(); applyQuality(); // v15: boot with the saved camera + quality settings
 document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
 // Touch joystick & HUD buttons
@@ -4315,7 +4544,7 @@ const tz = document.getElementById('touchZone'); const tk = document.getElementB
 tz.addEventListener('touchmove', function(e) { e.preventDefault(); const rect = tz.getBoundingClientRect(); const t = e.touches[0]; const dx = Math.max(-35, Math.min(35, t.clientX - (rect.left + 55))); const dy = Math.max(-35, Math.min(35, t.clientY - (rect.top + 55))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / 35; touchVec.y = dy / 35; }, { passive: false });
 tz.addEventListener('touchend', function() { tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; });
 function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) e.preventDefault(); if (activeGame) activeGame.player[prop] = true; }; const off = function() { if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); }
-bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost');
+bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindHold('btnFireRocket', '_touchRocket'); // v29: holding the touch rocket button now polls like holding R (its onclick tap still works too)
 // ONLINE 1v1 (PeerJS — optional, no bots)
 let peer = null, conn = null, peerSyncTimer = null;
 // v18 Online Royale state: royalePeerReady = a peer connected while Ranked Royale
