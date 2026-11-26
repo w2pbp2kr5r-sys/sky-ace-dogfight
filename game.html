@@ -210,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v30 — THE EXPANSION ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v31 — SPEED & AIM ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -289,6 +289,24 @@
   </div>
 </div>
 <div id="countdownOverlay" class="hidden">3</div>
+
+<!-- v31: Wave Defense upgrade draft — opened (paused) after every cleared wave -->
+<style>
+  .draft-card { flex: 1 1 200px; max-width: 250px; min-height: 150px; background: rgba(13,20,38,0.95); border-radius: 12px; padding: 16px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; color: #e2e8f0; font-family: inherit; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+  .draft-card:hover { transform: translateY(-3px) scale(1.02); }
+  .draft-rar { font-size: 11px; font-weight: 800; letter-spacing: 2px; }
+  .draft-name { font-size: 17px; font-weight: 800; color: #f8fafc; }
+  .draft-desc { font-size: 13px; color: #cbd5e1; line-height: 1.45; }
+</style>
+<div id="waveDraftModal" class="modal hidden">
+  <div class="modal-card" style="max-width:860px;">
+    <div class="modal-header"><h2 id="waveDraftTitle">Wave Cleared — Choose an Upgrade</h2></div>
+    <div class="modal-body">
+      <div id="waveDraftCards" style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;"></div>
+      <p id="waveDraftBuild" style="margin-top:14px;color:#94a3b8;font-size:13px;text-align:center;"></p>
+    </div>
+  </div>
+</div>
 <div id="touchZone" class="hidden"><div id="touchKnob"></div></div>
 
 <div id="hangarModal" class="modal hidden">
@@ -3252,6 +3270,22 @@ function buildEnvironment(theme, radius, densityScale) {
 let activeGame = null, paused = false; const keys = {}; let touchVec = { x: 0, y: 0 };
 window.addEventListener('keydown', function(e) { keys[e.code] = true; if (activeGame && e.code === state.binds.pause) togglePause(); if (activeGame && !paused && e.code === state.binds.rocket) firePlayerRocket(); if (activeGame && !paused && e.code === state.binds.autoaim) triggerAutoAim(); });
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+// v31 WS1: bot speed anchor. Bot top speed used to be a flat 68 x skill while
+// the player's jet (faster airframes + speed upgrades) cruises far quicker, so
+// bots could never keep pace and fights kept breaking down. Now every bot's
+// top speed is anchored to the PLAYER's actual top speed for this mission
+// (activeGame.playerTopSpeed, set in startMission from the same derivation the
+// flight update uses). Normal bots draw 0.93-1.00x, skilled pilots (skill >=
+// 1.1) up to 1.03x; fixed factors are used for the Ch.15 ACE (1.05x) and Wave
+// elites (1.02x). Nothing exceeds 1.05x — pacing, not rubber-banding. Returns
+// null when no anchor exists, so callers fall back to the legacy 68 x skill.
+function anchoredBotSpd(skill, fixedFactor) {
+  const pt = activeGame ? activeGame.playerTopSpeed : 0;
+  if (!pt || !(pt > 0)) return null;
+  let f = fixedFactor;
+  if (f === undefined || f === null) f = (skill >= 1.1) ? (0.97 + Math.random() * 0.06) : (0.93 + Math.random() * 0.07);
+  return pt * f;
+}
 function startMission() {
   closeModals(); clearSmoke();
   if (typeof MUS !== 'undefined') MUS.stop(); // v29: lobby music fades out as any mission (incl. online) launches
@@ -3282,6 +3316,7 @@ function startMission() {
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
   activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame.playerTopSpeed = activeGame.player.spd * (currentMode === 'gungame' ? GUN_GAME_TIERS[activeGame.player.ggTier].spd : 1); // v31: bot speed anchor — the player's sustained top speed this mission, derived exactly as the flight update derives curSpd (p.spd already carries jet spd x speed-upgrade multiplier; the tier spd is the Gun Game mode multiplier)
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (currentMode === 'waves' ? 0 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49)))); // v30: waves spawn through the wave system below, not this loop // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
   for (let i = 0; i < botCount; i++) {
@@ -3294,7 +3329,8 @@ function startMission() {
     if (currentMode === 'royale') { const prof = rankBotProfile(getRankName(state.rp)); skill = prof.skill * (0.92 + Math.random() * 0.16); botHpMul = prof.hpMul * (0.92 + Math.random() * 0.16); botFireMul = prof.fireMul * (0.92 + Math.random() * 0.16); } // v25: ranked bots — every fill bot scales to YOUR rank (skill / hull / gun damage) with the existing ±8% per-bot variance on top
     const botBaseHp = currentMode === 'campaign' ? (170 + 30 * ch.num) : (currentMode === 'gungame' ? 230 : 380);
     const botHp = botHpMul ? Math.round(380 * botHpMul) : Math.round(botBaseHp * (0.9 + 0.2 * skill));
-    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    const spdAnchor = anchoredBotSpd(skill); // v31: anchored to the player's top speed (Gun Game tier ratios still multiply on top via applyBotTier; Royale hp/fire multipliers untouched)
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   }
   if (currentMode === 'campaign' && ch.ace) {
     // v30 ACE boss (Ch.15): one extra bot flagged ace — hull x3.2, skill at the top
@@ -3307,13 +3343,13 @@ function startMission() {
     aceMesh.scale.setScalar(1.15);
     aceMesh.position.set(0, 260, -700); scene.add(aceMesh);
     const aceHp = Math.round((170 + 30 * ch.num) * (0.9 + 0.2 * aceSkill) * 3.2);
-    activeGame.entities.push({ id: botCount, name: '★ ACE', ace: true, mesh: aceMesh, hp: aceHp, maxHp: aceHp, spd: 68 * aceSkill, skill: aceSkill, fireMul: 1, fireCd: 1, rocketCd: 6, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-aceMesh.position.x, -aceMesh.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    activeGame.entities.push({ id: botCount, name: '★ ACE', ace: true, mesh: aceMesh, hp: aceHp, maxHp: aceHp, spd: anchoredBotSpd(aceSkill, 1.05) || 68 * aceSkill, skill: aceSkill, fireMul: 1, fireCd: 1, rocketCd: 6, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-aceMesh.position.x, -aceMesh.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
     showBanner('⚠ ENEMY ACE DETECTED', 4200);
   }
   if (currentMode === 'waves') {
     // v30 Wave Defense: wave state rides on activeGame; spawnWaveBatch/updateWaves
     // (below) run the escalation. Wave 1 = 4 hostiles over the city map.
-    activeGame.wave = 1; activeGame.wavesCleared = 0; activeGame.waveQuota = 4; activeGame.waveSpawned = 0; activeGame.waveState = 'combat'; activeGame.waveTimer = 0; activeGame.nextBotId = 0;
+    activeGame.wave = 1; activeGame.wavesCleared = 0; activeGame.waveQuota = waveQuotaFor(1); activeGame.waveSpawned = 0; activeGame.waveState = 'combat'; activeGame.waveTimer = 0; activeGame.nextBotId = 0; activeGame.waveMods = freshWaveMods(); activeGame.draftOpen = false; activeGame.draftCards = null; // v31: run-only draft modifiers live here — never written to the save
     spawnWaveBatch();
     showBanner('WAVE 1 INBOUND — SURVIVE!', 3200);
   }
@@ -3367,6 +3403,18 @@ function spawnPowerRing() { if (!activeGame) return; const rt = RING_TYPES[Math.
 const _bulletCoreGeo = (typeof THREE !== 'undefined') ? new THREE.CylinderGeometry(0.16, 0.16, 3.4, 6) : null;
 const _bulletInnerGeo = (typeof THREE !== 'undefined') ? new THREE.CylinderGeometry(0.07, 0.07, 3.6, 6) : null;
 let _playerShotCount = 0;
+// v31 WS2: player accuracy. Hip fire previously flew perfectly straight along
+// the nose (no spread constant existed in the fire path at all — the only
+// spread in player firing is the auto-aim-locked jitter, which stays as-is).
+// PLAYER_GUN_SPREAD is the tightened base spread: a nominal 0.015 per-axis
+// jitter multiplier (same (rand-0.5)*k convention as the locked jitter) cut by
+// 20%. Shots bent by the aim assist get half of it. The assist itself is a soft
+// magnetism: within a 5.5-degree cone and 700 units, a non-locked shot is bent
+// exactly onto the target's predicted intercept point (bullet speed 360, the
+// same lead math as the v5 auto-aim). Outside the cone nothing changes.
+const PLAYER_GUN_SPREAD = 0.015 * 0.8;
+const AIM_ASSIST_CONE = 5.5 * Math.PI / 180;
+const AIM_ASSIST_RANGE = 700;
 let _muzzleLight = null, _muzzleFlash = null, _botFlash = null, _botFlashT = 0;
 function ensureMuzzleFx() {
   if (!scene || _muzzleLight) return;
@@ -3461,7 +3509,7 @@ function rocketLockedOut() { return !!(activeGame && activeGame.mode === 'gungam
 // v30 Armor Plating: the single multiplier applied at every player HP intake
 // from enemy fire (bullets + rockets funnel through exactly two lines below).
 // 4% less damage per level, Lv.6 = x0.76. Bots never benefit — player only.
-function playerDamageMul() { const a = (state && state.upgrades && state.upgrades.armor) || 0; return 1 - 0.04 * a; }
+function playerDamageMul() { const a = (state && state.upgrades && state.upgrades.armor) || 0; let m = 1 - 0.04 * a; if (activeGame && activeGame.mode === 'waves' && activeGame.waveMods) m *= activeGame.waveMods.dmgTakenMul; return m; } // v31: Wave Defense plating perks (Composite Plating / Immortal Frame / Spectre Drive) compound onto this same funnel — waves only, every other mode is byte-identical
 function firePlayerRocket() {
   if (!activeGame || activeGame.player.rocketCd > 0) return;
   if (rocketLockedOut()) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
@@ -3469,9 +3517,9 @@ function firePlayerRocket() {
   if (p.respawnT > 0) return;
   const best = pickFrontTarget(1000); // true lock-on: most-in-front opponent within 1000; no lock = dumbfire straight
   const ggTierDef = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier] : null;
-  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, (55 + state.upgrades.rocket * 12) * (ggTierDef ? ggTierDef.rocketDmg : 1)); SFX.rocket();
+  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, (55 + state.upgrades.rocket * 12) * (ggTierDef ? ggTierDef.rocketDmg : 1) * ((activeGame.mode === 'waves' && activeGame.waveMods) ? activeGame.waveMods.rocketDmgMul : 1)); SFX.rocket(); // v31: Twin Warheads (waves draft) scales rocket damage at this same funnel
   if (best) showBanner('MISSILE AWAY — LOCKED ON', 1500);
-  p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7) * (ggTierDef ? ggTierDef.rocketCd : 1);
+  p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7) * (ggTierDef ? ggTierDef.rocketCd : 1) * ((activeGame.mode === 'waves' && activeGame.waveMods) ? activeGame.waveMods.rocketCdMul : 1); // v31: Fast Loader (waves draft) scales the cooldown here
 }
 // Pick the entity most in front of the player (smallest angle off the nose) within range — used for auto-aim and missile locks
 function pickFrontTarget(range) {
@@ -3495,6 +3543,7 @@ document.getElementById('btnAutoAim').onclick = triggerAutoAim;
 document.getElementById('btnHudPause').onclick = function() { togglePause(true); };
 function togglePause(forceOpen) {
   if (!activeGame) return;
+  if (activeGame.draftOpen) return; // v31: while the Wave Defense draft is open it IS the pause — Esc/pause must not toggle underneath it or the draft soft-locks
   paused = forceOpen !== undefined ? forceOpen : !paused;
   document.getElementById('pauseActions').classList.toggle('hidden', !paused);
   document.getElementById('settingsModal').classList.toggle('hidden', !paused);
@@ -3521,6 +3570,7 @@ function endMatch(victory, title, summary) {
   mmCleanupMatch(); // v25: tear down matchmaking timers/connections (no-op when no mm match ran)
   royaleRemoteRef = null; // v18: the online-royale puppet never outlives its match (the peer link + royalePeerReady stay up for a rematch)
   activeGame = null; paused = false; clearSmoke(); SFX.engineStop();
+  document.getElementById('waveDraftModal').classList.add('hidden'); // v31: the draft overlay never outlives its run (returnHome's closeModals covers the quit path too)
   document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
   applyFov(); // v17: snap FOV back to the player's setting (a boost kick may have left it wide)
   document.getElementById('statusTitle').textContent = title;
@@ -3793,8 +3843,8 @@ function animate(now) {
     }
   }
   const tierTurn = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].turn : 1;
-  const yawRate = 1.06 * (p.turn / 1.45) * sens * tierTurn; // v15: base rates +~12% (was 0.95 / 0.88)
-  const pitchRate = 0.99 * (p.turn / 1.45) * sens * tierTurn;
+  const yawRate = 1.06 * (p.turn / 1.45) * sens * tierTurn * (activeGame.waveMods ? activeGame.waveMods.turnMul : 1); // v15: base rates +~12% (was 0.95 / 0.88) // v31: Wave Defense turn perks multiply in here
+  const pitchRate = 0.99 * (p.turn / 1.45) * sens * tierTurn * (activeGame.waveMods ? activeGame.waveMods.turnMul : 1);
   p.heading = angleWrap(p.heading + p.yawIn * yawRate * dt);
   p.pitch = clampNum(p.pitch + p.pitchIn * pitchRate * dt, -1.05, 1.05);
   if (state.assist && rawPitch === 0 && p.autoAimLeft <= 0) p.pitch += (0 - p.pitch) * Math.min(1, 0.8 * dt); // Flight Assist (v15 setting): gentle pitch auto-level when hands off the pitch controls; OFF = pitch stays where you leave it
@@ -3803,15 +3853,15 @@ function animate(now) {
   orientFlight(p);
   const boosting = keys[state.binds.boost] || p._touchBoost;
   const tierSpd = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].spd : 1;
-  const curSpd = p.spd * tierSpd * (boosting ? 1.45 : 1) * (p.buff === 'speed' ? 1.45 : 1);
+  const curSpd = p.spd * tierSpd * (boosting ? 1.45 : 1) * (p.buff === 'speed' ? 1.45 : 1) * (activeGame.waveMods ? activeGame.waveMods.spdMul : 1); // v31: Wave Defense speed perks multiply into the same top-speed derivation
   const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
   p.fwdVec = fwd;
   if (p.respawnT <= 0) { p.mesh.position.addScaledVector(fwd, curSpd * dt); p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y)); }
   if (p.respawnT <= 0) for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { if (activeGame.mode === 'gungame') { gungamePlayerDown('crash'); } else { endMatch(false, 'AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); } return; } }
   if (p.respawnT <= 0) emitDamageSmoke(p, dt); // player always trails damage smoke when hurt
   const firing = keys[state.binds.fire] || p._touchFire;
-  const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1);
-  const gunDmg = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].dmg : p.dmg;
+  const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1) * (activeGame.waveMods ? 1 / activeGame.waveMods.fireMul : 1); // v31: Wave Defense fire-rate perks divide the interval at this funnel
+  const gunDmg = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].dmg : p.dmg) * (activeGame.waveMods ? activeGame.waveMods.dmgMul : 1); // v31: Wave Defense bullet-damage perks multiply at this funnel
   if (firing && p.fireCd <= 0 && p.respawnT <= 0) {
     const muzzle = p.mesh.position.clone().add(fwd.clone().multiplyScalar(5));
     let shotDir = fwd;
@@ -3822,6 +3872,30 @@ function animate(now) {
       const distToT = lt.mesh.position.distanceTo(muzzle);
       shotDir = lt.mesh.position.clone().add(tv.multiplyScalar(distToT / 360)).sub(muzzle).normalize();
       shotDir.x += (Math.random() - 0.5) * 0.012; shotDir.y += (Math.random() - 0.5) * 0.012; shotDir.z += (Math.random() - 0.5) * 0.012;
+      shotDir.normalize();
+    } else {
+      // v31 soft aim assist (player only, non-locked shots): find the hostile
+      // whose PREDICTED intercept point lies closest to the nose direction;
+      // inside the 5.5-degree cone the round is bent exactly onto that
+      // intercept (full correction), then the tightened spread is applied at
+      // half strength. Out of cone / out of range the shot flies the nose with
+      // the full tightened spread. Bots never come through this path.
+      let spreadAmt = PLAYER_GUN_SPREAD;
+      let assistDir = null, assistAng = AIM_ASSIST_CONE;
+      for (let ai = 0; ai < activeGame.entities.length; ai++) {
+        const ae = activeGame.entities[ai];
+        const aDist = ae.mesh.position.distanceTo(muzzle);
+        if (aDist > AIM_ASSIST_RANGE || aDist < 1) continue;
+        const atv = ae.fwdVec ? ae.fwdVec.clone().multiplyScalar(ae.spd || 0) : new THREE.Vector3();
+        const aDir = ae.mesh.position.clone().add(atv.multiplyScalar(aDist / 360)).sub(muzzle); // intercept lead at bullet speed 360 — the v5 auto-aim math
+        if (aDir.lengthSq() < 1) continue;
+        aDir.normalize();
+        const aAng = Math.acos(clampNum(fwd.dot(aDir), -1, 1));
+        if (aAng < assistAng) { assistAng = aAng; assistDir = aDir; }
+      }
+      if (assistDir) { shotDir = assistDir; spreadAmt = PLAYER_GUN_SPREAD * 0.5; }
+      else shotDir = fwd.clone();
+      shotDir.x += (Math.random() - 0.5) * spreadAmt; shotDir.y += (Math.random() - 0.5) * spreadAmt; shotDir.z += (Math.random() - 0.5) * spreadAmt;
       shotDir.normalize();
     }
     spawnBullet(muzzle, shotDir, 'player', gunDmg); p.fireCd = fireRate; SFX.gun(); spreadReticle();
@@ -3839,7 +3913,7 @@ function animate(now) {
   for (let i = activeGame.rings.length - 1; i >= 0; i--) { const rg = activeGame.rings[i]; rg.mesh.rotation.y += dt * 1.5; if (p.respawnT <= 0 && rg.mesh.position.distanceTo(p.mesh.position) < 22) { if (rg.info.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + 50); else if (rg.info.type === 'lock') { p.autoAimLeft = 7; p.lockTarget = pickFrontTarget(1200); } else { p.buff = rg.info.type; p.buffTimer = 8; } showBanner(`${rg.info.name}: ${rg.info.desc}`, 3800); scene.remove(rg.mesh); activeGame.rings.splice(i, 1); spawnPowerRing(); } }
   // v30 Nano Repair: hull regenerates while the player is alive in a mission —
   // never past maxHp, and not while dead/respawning (Gun Game respawn window).
-  { const rgLvl = (state.upgrades && state.upgrades.regen) || 0; if (rgLvl > 0 && p.respawnT <= 0 && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 0.4 * rgLvl * dt); }
+  { const rgLvl = (state.upgrades && state.upgrades.regen) || 0; const rgRate = 0.4 * rgLvl + (activeGame.waveMods ? activeGame.waveMods.regen : 0); if (rgRate > 0 && p.respawnT <= 0 && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + rgRate * dt); } // v31: Wave Defense regen perks (Shield Generator / Immortal Frame) add onto this same tick
   if (activeGame.mode === 'royale') {
     activeGame.zoneTimer -= dt;
     if (activeGame.zoneTimer <= 0 && activeGame.zoneRadius > 220) { activeGame.zoneRadius = Math.max(220, activeGame.zoneRadius - 320); activeGame.zoneTimer = 35; showBanner('STORM ZONE CLOSING IN!', 2500); }
@@ -4034,7 +4108,15 @@ function animate(now) {
       if (!activeGame) return; // the credited kill was a bot's 15th — match over
     }
     else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame.mmMatch) mmNotifyMyDeath(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; } // v18: place = alive bots + living rival (both sit in entities) + you — and the rival is told you fell
-    else if (activeGame.mode === 'waves') { const sv = activeGame.wavesCleared || 0; if (sv > (state.bestWave || 0)) state.bestWave = sv; saveState(); updateTopUI(); endMatch(false, 'WAVE DEFENSE OVER', `You survived ${sv} wave${sv === 1 ? '' : 's'} over Sunlit Harbor. Kills: ${p.kills} | Best: Wave ${state.bestWave}`); return; } // v30: no respawn in Wave Defense — death ends the run
+    else if (activeGame.mode === 'waves') {
+      // v31 Phoenix Protocol (Legendary draft perk): burn the run's one revive
+      // instead of ending it — back at 50% hull under the existing 2s spawn
+      // protection the bullet/rocket intakes already honour. A second death
+      // (or no Phoenix) falls through to the normal run-over path.
+      const wm = activeGame.waveMods;
+      if (wm && wm.phoenix && !wm.phoenixUsed) { wm.phoenixUsed = true; p.hp = Math.round(p.maxHp * 0.5); p.spawnProtT = 2.0; p.lastHitBy = null; p.lastHitAt = -99; showBanner("🔥 PHOENIX PROTOCOL — YOU'RE BACK", 3200); SFX.explosion(); }
+      else { const sv = activeGame.wavesCleared || 0; if (sv > (state.bestWave || 0)) state.bestWave = sv; saveState(); updateTopUI(); endMatch(false, 'WAVE DEFENSE OVER', `You survived ${sv} wave${sv === 1 ? '' : 's'} over Sunlit Harbor. Kills: ${p.kills} | Best: Wave ${state.bestWave}`); return; } // v30: no respawn in Wave Defense — death ends the run
+    }
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); return; }
   }
   // Afterburner flicker + cloud drift (visual life, no allocations)
@@ -4142,30 +4224,41 @@ function royaleVictory() {
   if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rivalwin' }); } catch (e) {} }
   state.rp += 35; state.coins += 54; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); // v15: royale coins 90 -> 54 (x0.6), RP unchanged
 }
-// ---- Wave Defense system (v30) ----
-// Bots spawn with the exact entity shape of the campaign loop, but their skill
-// and hull escalate per wave: skill = 0.75 + 0.04/wave (cap 1.6), hull +6%/wave.
-// A wave's quota is 3 + wave; at most 8 are alive at once — the rest arrive as
-// reinforcements the moment a slot frees (updateWaves tops up every frame).
+// ---- Wave Defense system (v30, v31 escalation + draft) ----
+// Bots spawn with the exact entity shape of the campaign loop, but v31 makes
+// every wave bite much harder: quota = 3 + N + floor(N/3), hull x1.11 per
+// wave, skill = 0.78 + 0.055/wave (cap 1.75), and every 5th wave is led by an
+// ELITE (hull x2.2, skill +0.15, speed anchor 1.02, deep-red '★ ELITE').
+// Speed is anchored to the player's top speed like every other mode (WS1).
+// At most 8 are alive at once — the rest arrive as reinforcements the moment
+// a slot frees (updateWaves tops up every frame). Clearing a wave still pays
+// +40xN coins and a +25% hull repair — and now also opens the upgrade draft.
+function waveQuotaFor(n) { return 3 + n + Math.floor(n / 3); }
 function spawnWaveBot() {
   const g = activeGame; if (!g || g.mode !== 'waves') return;
   const wave = g.wave;
-  const skill = Math.min(1.6, 0.75 + 0.04 * (wave - 1));
+  const isElite = wave % 5 === 0 && g.waveSpawned === 0; // the first spawn of every 5th wave is its ELITE
+  const baseSkill = Math.min(1.75, 0.78 + 0.055 * (wave - 1));
+  const skill = baseSkill + (isElite ? 0.15 : 0);
   const randJet = JETS[Math.floor(Math.random() * JETS.length)];
-  const m = buildJetMesh(randJet.color, randJet.accent, { hull: 1, damage: 1, agility: 1, speed: 1 }, randJet.id);
+  const m = isElite ? buildJetMesh(0x450a0a, 0xef4444, { hull: 1, damage: 1, agility: 1, speed: 1 }, randJet.id) : buildJetMesh(randJet.color, randJet.accent, { hull: 1, damage: 1, agility: 1, speed: 1 }, randJet.id);
+  if (isElite) m.scale.setScalar(1.08); // the ACE treatment at smaller scale
   const ang = Math.random() * Math.PI * 2, dist = 380 + Math.random() * 500;
   m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
-  const botHp = Math.round(200 * Math.pow(1.06, wave - 1) * (0.9 + 0.2 * skill));
-  g.entities.push({ id: g.nextBotId++, name: 'Hostile-' + (100 + g.waveSpawned), mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireMul: 1, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+  let botHp = Math.round(200 * Math.pow(1.11, wave - 1) * (0.9 + 0.2 * baseSkill));
+  if (isElite) botHp = Math.round(botHp * 2.2);
+  const spdAnchor = anchoredBotSpd(skill, isElite ? 1.02 : undefined);
+  g.entities.push({ id: g.nextBotId++, name: isElite ? '★ ELITE' : 'Hostile-' + (100 + g.waveSpawned), elite: isElite, mesh: m, hp: botHp, maxHp: botHp, spd: spdAnchor !== null ? spdAnchor : 68 * skill, skill: skill, fireMul: 1, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   g.waveSpawned++;
 }
 function spawnWaveBatch() { const g = activeGame; if (!g || g.mode !== 'waves') return; while (g.entities.length < 8 && g.waveSpawned < g.waveQuota) spawnWaveBot(); }
 function updateWaves(dt) {
   const g = activeGame; if (!g || g.mode !== 'waves') return;
+  if (g.waveState === 'draft') return; // v31: the draft overlay holds the game paused; nothing ticks until the pick lands
   const p = g.player;
   if (g.waveState === 'breather') {
     g.waveTimer -= dt;
-    if (g.waveTimer <= 0) { g.wave++; g.waveQuota = 3 + g.wave; g.waveSpawned = 0; g.waveState = 'combat'; spawnWaveBatch(); showBanner(`WAVE ${g.wave} INBOUND!`, 2600); }
+    if (g.waveTimer <= 0) { g.wave++; g.waveQuota = waveQuotaFor(g.wave); g.waveSpawned = 0; g.waveState = 'combat'; spawnWaveBatch(); showBanner(`WAVE ${g.wave} INBOUND!`, 2600); }
     return;
   }
   spawnWaveBatch(); // reinforcements: refill freed slots until the wave quota is out
@@ -4176,14 +4269,151 @@ function updateWaves(dt) {
     p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.25)); // breather repair: +25% hull
     saveState(); updateTopUI();
     showBanner(`WAVE ${g.wave} CLEARED! +${bonus} COINS — HULL REPAIRED`, 3400);
-    g.waveState = 'breather'; g.waveTimer = 5;
+    g.waveState = 'draft'; // v31: the upgrade draft replaces the plain breather — the 3s countdown runs after the pick
+    openWaveDraft();
   }
+}
+// ==== v31 draft data (harness-extractable) ====
+// Run-only perk pool. Effects aggregate on activeGame.waveMods (multipliers
+// compound multiplicatively, regen/lifesteal add) and are read at the existing
+// funnels: gunDmg/fireRate (fire block), curSpd + yaw/pitch rates (flight),
+// playerDamageMul (damage intake), the regen tick, firePlayerRocket
+// (damage/cooldown) and handleEntityEliminated (lifesteal). Nothing here is
+// ever written to the save — waveMods dies with activeGame at run end.
+const WAVE_PERKS = [
+  { id: 'hull1', rar: 'common', name: 'Reinforced Hull', desc: '+15% max hull, and repair 15% now.' },
+  { id: 'guns1', rar: 'common', name: 'Overcharged Guns', desc: '+10% bullet damage.' },
+  { id: 'cycler', rar: 'common', name: 'Rapid Cycler', desc: '+10% gun fire rate.' },
+  { id: 'swift', rar: 'common', name: 'Swift Thrusters', desc: '+7% top speed.' },
+  { id: 'gyro', rar: 'common', name: 'Gyro Servos', desc: '+8% turn rate.' },
+  { id: 'loader', rar: 'common', name: 'Fast Loader', desc: 'Rocket cooldown −12%.' },
+  { id: 'piercing', rar: 'rare', name: 'Piercing Rounds', desc: '+20% bullet damage.' },
+  { id: 'fieldrep', rar: 'rare', name: 'Field Repairs', desc: 'Repair 50% of max hull right now.' },
+  { id: 'agilityfr', rar: 'rare', name: 'Agility Frame', desc: '+12% turn rate, +5% top speed.' },
+  { id: 'twinwar', rar: 'rare', name: 'Twin Warheads', desc: '+35% rocket damage.' },
+  { id: 'composite', rar: 'rare', name: 'Composite Plating', desc: 'Damage taken −10%.' },
+  { id: 'vampire', rar: 'epic', name: 'Vampire Plating', desc: 'Kills restore 10 hull.' },
+  { id: 'overkill', rar: 'epic', name: 'Overkill Core', desc: '+30% bullet damage, +10% fire rate.' },
+  { id: 'shieldgen', rar: 'epic', name: 'Shield Generator', desc: '+3 HP/s hull regeneration.' },
+  { id: 'burnerx', rar: 'epic', name: 'Afterburner X', desc: '+12% top speed, +10% turn rate.' },
+  { id: 'phoenix', rar: 'legendary', name: 'Phoenix Protocol', desc: 'Revive once at 50% hull instead of dying.', unique: true },
+  { id: 'titan', rar: 'legendary', name: 'Titan Hull', desc: '+50% max hull, and repair 50% now.' },
+  { id: 'annihilator', rar: 'legendary', name: 'Annihilator', desc: '+45% bullet damage.' },
+  { id: 'godcannon', rar: 'mythic', name: 'Godcannon', desc: '+80% bullet damage, +25% fire rate.' },
+  { id: 'immortal', rar: 'mythic', name: 'Immortal Frame', desc: '+8 HP/s regeneration, damage taken −25%.' },
+  { id: 'spectre', rar: 'mythic', name: 'Spectre Drive', desc: '+25% top speed, +20% turn rate, damage taken −15%.' }
+];
+// Rarity weights by the wave just cleared: Legendary stays at 0 until wave 4
+// and Mythic at 0 until wave 10, so the top rarities only enter deep runs.
+const WAVE_RARITY_TABLE = [
+  { max: 3, w: { common: 78, rare: 20, epic: 2, legendary: 0, mythic: 0 } },
+  { max: 6, w: { common: 62, rare: 28, epic: 8, legendary: 2, mythic: 0 } },
+  { max: 9, w: { common: 50, rare: 32, epic: 13, legendary: 5, mythic: 0 } },
+  { max: 14, w: { common: 40, rare: 33, epic: 17, legendary: 7, mythic: 3 } },
+  { max: Infinity, w: { common: 32, rare: 32, epic: 20, legendary: 10, mythic: 6 } }
+];
+const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+function freshWaveMods() { return { dmgMul: 1, fireMul: 1, spdMul: 1, turnMul: 1, rocketDmgMul: 1, rocketCdMul: 1, dmgTakenMul: 1, regen: 0, lifesteal: 0, phoenix: false, phoenixUsed: false, picks: [] }; }
+function waveRarityWeights(wave) { for (let bi = 0; bi < WAVE_RARITY_TABLE.length; bi++) { if (wave <= WAVE_RARITY_TABLE[bi].max) return WAVE_RARITY_TABLE[bi].w; } return WAVE_RARITY_TABLE[WAVE_RARITY_TABLE.length - 1].w; }
+function rollWaveDraft(wave) {
+  const wm = activeGame.waveMods;
+  const weights = waveRarityWeights(wave);
+  const ownedUnique = {};
+  wm.picks.forEach(function(id) { const pk = WAVE_PERKS.find(function(x) { return x.id === id; }); if (pk && pk.unique) ownedUnique[id] = true; });
+  const chosen = [];
+  function available(rar) {
+    return WAVE_PERKS.filter(function(pk) { return pk.rar === rar && chosen.indexOf(pk) === -1 && !(pk.unique && ownedUnique[pk.id]); });
+  }
+  for (let c = 0; c < 3; c++) {
+    let roll = Math.random() * 100, acc = 0, rar = 'common';
+    for (let ri2 = 0; ri2 < RARITY_ORDER.length; ri2++) { acc += weights[RARITY_ORDER[ri2]] || 0; if (roll < acc) { rar = RARITY_ORDER[ri2]; break; } }
+    let pool = available(rar);
+    let ri = RARITY_ORDER.indexOf(rar);
+    while (pool.length === 0 && ri > 0) { ri--; pool = available(RARITY_ORDER[ri]); } // rolled rarity exhausted: fall down to the next lower rarity with availability
+    if (pool.length === 0) { for (let rj = 0; rj < RARITY_ORDER.length; rj++) { pool = available(RARITY_ORDER[rj]); if (pool.length) break; } } // paranoia: any rarity at all rather than a short draft
+    if (!pool.length) break;
+    chosen.push(pool[Math.floor(Math.random() * pool.length)]);
+  }
+  return chosen;
+}
+// ==== end v31 draft data ====
+const WAVE_RARITY_STYLE = {
+  common: { label: 'COMMON', color: '#94a3b8', glow: 'rgba(148,163,184,0.25)' },
+  rare: { label: 'RARE', color: '#3b82f6', glow: 'rgba(59,130,246,0.35)' },
+  epic: { label: 'EPIC', color: '#a855f7', glow: 'rgba(168,85,247,0.40)' },
+  legendary: { label: 'LEGENDARY', color: '#f59e0b', glow: 'rgba(245,158,11,0.45)' },
+  mythic: { label: 'MYTHIC', color: '#ec4899', glow: 'rgba(236,72,153,0.55)' }
+};
+function openWaveDraft() {
+  const g = activeGame; if (!g || g.mode !== 'waves' || !g.waveMods) return;
+  const cards = rollWaveDraft(g.wave);
+  if (!cards.length) { g.waveState = 'breather'; g.waveTimer = 3; return; } // pool exhausted (paranoia): never soft-lock on an empty draft
+  g.draftCards = cards; g.draftOpen = true;
+  paused = true; // the draft rides the same freeze as Esc-pause: animate() early-returns while paused, so bots, timers and the world hold still
+  renderWaveDraft(cards);
+  document.getElementById('waveDraftModal').classList.remove('hidden');
+}
+function renderWaveDraft(cards) {
+  const g = activeGame; const wm = g.waveMods;
+  document.getElementById('waveDraftTitle').textContent = `WAVE ${g.wave} CLEARED — CHOOSE AN UPGRADE`;
+  const wrap = document.getElementById('waveDraftCards');
+  wrap.innerHTML = cards.map(function(perk, idx) {
+    const rs = WAVE_RARITY_STYLE[perk.rar];
+    const style = perk.rar === 'mythic'
+      ? `border:2px solid transparent;background:linear-gradient(#141b2e,#141b2e) padding-box,linear-gradient(45deg,#ec4899,#ef4444,#f59e0b) border-box;box-shadow:0 0 22px ${rs.glow};`
+      : `border:2px solid ${rs.color};box-shadow:0 0 18px ${rs.glow};`;
+    return `<button class="draft-card" data-draft-idx="${idx}" style="${style}"><span class="draft-rar" style="color:${rs.color};">${rs.label}</span><span class="draft-name">${perk.name}</span><span class="draft-desc">${perk.desc}</span></button>`;
+  }).join('');
+  wrap.querySelectorAll('.draft-card').forEach(function(btn) { btn.addEventListener('click', function() { pickWavePerk(Number(btn.getAttribute('data-draft-idx'))); }); });
+  const counts = {};
+  wm.picks.forEach(function(id) { counts[id] = (counts[id] || 0) + 1; });
+  const parts = Object.keys(counts).map(function(id) { const pk = WAVE_PERKS.find(function(x) { return x.id === id; }); return (pk ? pk.name : id) + (counts[id] > 1 ? ' ×' + counts[id] : ''); });
+  document.getElementById('waveDraftBuild').textContent = parts.length ? 'YOUR BUILD: ' + parts.join(' · ') : 'YOUR BUILD: no perks yet — this is your first pick.';
+}
+function applyWavePerk(perk) {
+  const g = activeGame; if (!g || !g.waveMods) return;
+  const p = g.player, wm = g.waveMods;
+  wm.picks.push(perk.id);
+  switch (perk.id) {
+    case 'hull1': { const inc = Math.round(p.maxHp * 0.15); p.maxHp += inc; p.hp = Math.min(p.maxHp, p.hp + inc); break; }
+    case 'guns1': wm.dmgMul *= 1.10; break;
+    case 'cycler': wm.fireMul *= 1.10; break;
+    case 'swift': wm.spdMul *= 1.07; break;
+    case 'gyro': wm.turnMul *= 1.08; break;
+    case 'loader': wm.rocketCdMul *= 0.88; break;
+    case 'piercing': wm.dmgMul *= 1.20; break;
+    case 'fieldrep': p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.5)); break;
+    case 'agilityfr': wm.turnMul *= 1.12; wm.spdMul *= 1.05; break;
+    case 'twinwar': wm.rocketDmgMul *= 1.35; break;
+    case 'composite': wm.dmgTakenMul *= 0.90; break;
+    case 'vampire': wm.lifesteal += 10; break;
+    case 'overkill': wm.dmgMul *= 1.30; wm.fireMul *= 1.10; break;
+    case 'shieldgen': wm.regen += 3; break;
+    case 'burnerx': wm.spdMul *= 1.12; wm.turnMul *= 1.10; break;
+    case 'phoenix': wm.phoenix = true; break;
+    case 'titan': { const inc = Math.round(p.maxHp * 0.5); p.maxHp += inc; p.hp = Math.min(p.maxHp, p.hp + inc); break; }
+    case 'annihilator': wm.dmgMul *= 1.45; break;
+    case 'godcannon': wm.dmgMul *= 1.80; wm.fireMul *= 1.25; break;
+    case 'immortal': wm.regen += 8; wm.dmgTakenMul *= 0.75; break;
+    case 'spectre': wm.spdMul *= 1.25; wm.turnMul *= 1.20; wm.dmgTakenMul *= 0.85; break;
+  }
+}
+function pickWavePerk(idx) {
+  const g = activeGame; if (!g || !g.draftOpen) return;
+  const perk = (g.draftCards || [])[idx]; if (!perk) return;
+  applyWavePerk(perk);
+  g.draftOpen = false; g.draftCards = null;
+  document.getElementById('waveDraftModal').classList.add('hidden');
+  g.waveState = 'breather'; g.waveTimer = 3; // the breather countdown runs AFTER the pick
+  paused = false;
+  showBanner(`${perk.name.toUpperCase()} ACQUIRED`, 2000);
 }
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (victim.mesh && p && p.mesh && victim.mesh.position.distanceTo(p.mesh.position) < 900) SFX.explosion(); // v20: deaths are audible when they happen near you
   if (killerId === 'player') {
     SFX.kill(); // v20: kill-confirm blip
+    if (activeGame.waveMods && activeGame.waveMods.lifesteal > 0 && p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + activeGame.waveMods.lifesteal); // v31: Vampire Plating (waves draft) — kills feed the hull, hooked at the one kill funnel
     p.kills++; const coinGain = Math.round((activeGame.mode === 'campaign' ? 20 : 6) * 0.6); const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain); // v15: kill coins x0.6 (12 campaign / 4 other)
     if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); SFX.promotion(); }
   } else {
@@ -4211,10 +4441,10 @@ function updateHUD(curSpd) {
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
   else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = activeGame.mmMatch ? 'Ranked Royale — ONLINE' : (activeGame.onlineRoyale ? 'Ranked Royale — ONLINE (BETA)' : 'Ranked Royale'); document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; } // v18: alive = bots + rival puppet (both in entities) + you
-  else if (activeGame.mode === 'waves') { document.getElementById('hudModeTitle').textContent = 'Wave Defense'; const wLeft = activeGame.entities.length + Math.max(0, (activeGame.waveQuota || 0) - (activeGame.waveSpawned || 0)); document.getElementById('hudCenterInfo').textContent = activeGame.waveState === 'breather' ? `WAVE ${activeGame.wave} CLEARED — NEXT WAVE IN ${Math.max(0, Math.ceil(activeGame.waveTimer))}s` : `WAVE ${activeGame.wave} — HOSTILES LEFT: ${wLeft}`; } // v30
+  else if (activeGame.mode === 'waves') { document.getElementById('hudModeTitle').textContent = 'Wave Defense'; const wLeft = activeGame.entities.length + Math.max(0, (activeGame.waveQuota || 0) - (activeGame.waveSpawned || 0)); document.getElementById('hudCenterInfo').textContent = activeGame.waveState === 'draft' ? `WAVE ${activeGame.wave} CLEARED — CHOOSE AN UPGRADE` : (activeGame.waveState === 'breather' ? `WAVE ${activeGame.wave} CLEARED — NEXT WAVE IN ${Math.max(0, Math.ceil(activeGame.waveTimer))}s` : `WAVE ${activeGame.wave} — HOSTILES LEFT: ${wLeft}`); } // v30 (v31: draft state line)
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
-  activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign' || activeGame.mode === 'waves') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = e.ace ? '#ef4444' : (pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444')); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
+  activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign' || activeGame.mode === 'waves') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = (e.ace || e.elite) ? '#ef4444' : (pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444')); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
 }
 function drawMinimap() {
   const c = document.getElementById('minimap'); if (!c || !activeGame) return; const ctx = c.getContext('2d'); ctx.clearRect(0, 0, 110, 110); const scale = 50 / 2400;
