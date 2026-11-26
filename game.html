@@ -146,6 +146,64 @@
   .t-box.locked { border-color: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
   #touchZone { position: fixed; bottom: 80px; left: 20px; width: 110px; height: 110px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; }
   #touchKnob { position: absolute; top: 35px; left: 35px; width: 40px; height: 40px; border-radius: 50%; background: rgba(56,189,248,0.7); }
+  /* ---- v33 mobile fit: play must not scroll-bounce or double-tap-zoom, and
+     small / touch viewports get a layout that actually fits. Desktop rules
+     above are untouched; everything here is scoped to touch devices (the
+     body.is-touch class from the v33 detector) or narrow viewports. The vh
+     heights in the base rules remain as the fallback where dvh is unknown. */
+  html, body { overscroll-behavior: none; }
+  #gameCanvas { touch-action: none; }
+  body.is-touch #touchZone { bottom: calc(80px + env(safe-area-inset-bottom)); }
+  body.is-touch .hud-bottom { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  body.is-touch .hud-btn { min-height: 44px; }
+  body.is-touch .topnav .btn { min-height: 42px; }
+  @media (max-width: 700px) {
+    .screen { padding: 10px; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .topbar { padding: 9px 10px; border-radius: 14px; gap: 8px; }
+    .logo-mark { width: 34px; height: 34px; border-radius: 8px; }
+    .brand h1 { letter-spacing: 1px; }
+    .brand-sub { display: none; }
+    .ver-chip { font-size: 0.58rem; padding: 3px 7px; }
+    .stats-row { gap: 6px; }
+    .pill { font-size: 0.76rem; padding: 5px 9px; }
+    .topnav { flex-wrap: nowrap; overflow-x: auto; gap: 5px; padding: 5px; margin-top: 8px; }
+    .topnav .btn { flex: 1 0 auto; font-size: 0.78rem; padding: 9px 10px; }
+    .menu-center { padding: 13px; gap: 11px; border-radius: 14px; }
+    .mode-grid { gap: 8px; }
+    .mode-btn { padding: 10px 10px 9px; border-radius: 12px; }
+    .mode-btn strong { font-size: 0.8rem; }
+    .mode-btn small { font-size: 0.68rem; }
+    .mode-btn.active::after { top: 6px; right: 6px; }
+    .sub-controls { padding: 9px; gap: 8px; }
+    select, input[type="text"] { font-size: 0.82rem; padding: 7px 9px; }
+    .modal { padding: 8px; }
+    .modal-card { width: min(94vw, 820px); max-height: 92dvh; border-radius: 14px; }
+    .modal-header { padding: 11px 13px; }
+    .modal-header h2 { font-size: 0.92rem; }
+    .modal-body { padding: 12px 13px; gap: 10px; }
+    .gate-card { max-height: 92dvh; padding: 18px 15px; }
+    #countdownOverlay { font-size: 18vw; }
+    .hud-top { top: calc(6px + env(safe-area-inset-top)); left: 6px; right: 6px; gap: 6px; }
+    .hud-box { padding: 6px 8px; font-size: 0.7rem; border-radius: 8px; min-width: 0; }
+    .hp-wrap { width: 104px; }
+    #hudCenterInfo { text-align: center; overflow-wrap: break-word; }
+    #minimap { width: 96px; height: 96px; }
+    #bannerAlert { top: 64px; font-size: 0.78rem; padding: 7px 11px; max-width: 94vw; overflow-wrap: break-word; }
+    .hud-bottom { bottom: calc(8px + env(safe-area-inset-bottom)); left: 8px; right: 8px; }
+    .action-btns { gap: 6px; }
+    .hud-btn { padding: 9px 10px; font-size: 0.74rem; }
+    #touchZone { bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .draft-card { min-height: 0; padding: 12px 10px; }
+  }
+  @media (max-height: 500px) and (orientation: landscape) {
+    .screen { padding: 8px; }
+    .topbar { padding: 7px 10px; }
+    .menu-center { padding: 11px; gap: 9px; }
+    #countdownOverlay { font-size: 22vh; }
+    .hud-box { font-size: 0.68rem; }
+    #minimap { width: 84px; height: 84px; }
+    #touchZone { bottom: calc(64px + env(safe-area-inset-bottom)); }
+  }
 </style>
 </head>
 <body>
@@ -210,7 +268,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v32 — SIGN-IN & LAYOUT ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v33 — MOBILE & AIM ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -377,7 +435,7 @@
       <label><input type="checkbox" id="muteToggle" /> Mute All Sound</label>
       <label><input type="checkbox" id="musicToggle" checked /> Lobby Music</label>
       <div class="section-label">Touch</div>
-      <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
+      <label>Touch Controls: <select id="touchModeSelect"><option value="auto">Auto — show on touch devices</option><option value="on">On — always show joystick</option><option value="off">Off — never show joystick</option></select></label>
       <label><input type="checkbox" id="touchLayoutToggle" /> Customize Button Layout</label>
       <div id="touchLayoutBtns" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sec btn-sm" id="btnEditTouchLayout" type="button">Edit Button Layout</button>
@@ -430,7 +488,7 @@ const defaultState = {
   ownedJets: ['f16'],
   ownedSkins: ['stock'], equippedSkin: 'stock',
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0 },
-  sensitivity: 1.0, mobileTouch: false,
+  sensitivity: 1.0, mobileTouch: 'auto', // v33: three-way touch-controls mode ('auto' | 'on' | 'off'); legacy boolean saves migrate in loadGameState
   touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1, // v32: customizable touch-button layout (editor in Settings)
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   volume: 0.7, muted: false, musicOn: true,
@@ -513,6 +571,13 @@ function loadGameState() {
   if (!state.touchLayout || typeof state.touchLayout !== 'object' || Array.isArray(state.touchLayout)) state.touchLayout = {};
   state.touchLayout = Object.assign({}, state.touchLayout);
   if (typeof state.touchBtnScale !== 'number' || isNaN(state.touchBtnScale) || state.touchBtnScale < 0.8 || state.touchBtnScale > 1.4) state.touchBtnScale = 1;
+  // v33 migration: the touch-joystick toggle was a boolean. true -> 'on' (the
+  // player explicitly enabled the stick), false -> 'auto' (the old default-off
+  // now means "show it when the device actually has touch"), so a phone player
+  // who never touched the setting gains the stick instead of losing it.
+  if (state.mobileTouch === true) state.mobileTouch = 'on';
+  else if (state.mobileTouch === false) state.mobileTouch = 'auto';
+  if (['auto', 'on', 'off'].indexOf(state.mobileTouch) === -1) state.mobileTouch = 'auto';
 }
 loadGameState(); // boot: legacy/default state so the menu scene renders behind the gate; re-loaded per profile on sign-in
 function saveState() { try { localStorage.setItem(currentSaveKey(), JSON.stringify(state)); } catch (e) {} cloudNoteSave(); updateTopUI(); } // v23: cloudNoteSave() stamps the local meta + schedules a push when the pilot is a cloud profile (no-op otherwise)
@@ -960,6 +1025,11 @@ if (typeof THREE !== 'undefined') {
   camera = new THREE.PerspectiveCamera(state.fov || 65, window.innerWidth / window.innerHeight, 0.5, 4500);
   camera.up.set(0, 1, 0);
   window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (composer) composer.setSize(window.innerWidth, window.innerHeight); });
+  // v33: on phones the browser chrome (URL bar) showing/hiding resizes the
+  // VISUAL viewport without always firing a window resize — follow it too, so
+  // the canvas and camera always match what is actually on screen. Rotation
+  // still arrives through the window resize handler above.
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (composer) composer.setSize(window.innerWidth, window.innerHeight); });
   // Post-processing (v16): RenderPass -> UnrealBloom -> OutputPass. OutputPass applies
   // the renderer's ACES tone mapping + sRGB conversion to the HDR composer buffer
   // (the standard r160 recipe — no double tonemapping). Any failure here just leaves
@@ -3299,6 +3369,24 @@ function buildEnvironment(theme, radius, densityScale) {
   scene.add(worldGroup);
 }
 let activeGame = null, paused = false; const keys = {}; let touchVec = { x: 0, y: 0 };
+// ---- v33 device detection: mobile vs desktop, sampled at boot and kept live ----
+// DETECTED_TOUCH is the answer to "does this device have a touch screen right
+// now" — a coarse pointer, a touch event surface, or hardware touch points.
+// It drives the 'auto' touch-controls mode and the body classes the v33 mobile
+// CSS keys off ('is-touch', and 'is-small' under 700px wide). Pointer type can
+// change mid-session (rotate the phone, dock a tablet, plug in a mouse), so it
+// is recomputed on resize / orientationchange rather than sampled once.
+function isTouchDevice() { return !!((window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)); }
+let DETECTED_TOUCH = false;
+function touchControlsVisible() { const m = state ? state.mobileTouch : 'auto'; if (m === 'on' || m === true) return true; if (m === 'off' || m === false) return false; return DETECTED_TOUCH; } // 'auto' (and any legacy value): the stick shows exactly when the device has touch
+function refreshDeviceDetect() {
+  DETECTED_TOUCH = isTouchDevice();
+  if (document.body) { document.body.classList.toggle('is-touch', DETECTED_TOUCH); document.body.classList.toggle('is-small', window.innerWidth < 700); }
+  if (activeGame) { const tzNow = document.getElementById('touchZone'); if (tzNow) tzNow.classList.toggle('hidden', !touchControlsVisible()); } // mid-mission device change: re-apply the stick's visibility in place
+}
+window.addEventListener('resize', refreshDeviceDetect);
+window.addEventListener('orientationchange', refreshDeviceDetect);
+refreshDeviceDetect();
 window.addEventListener('keydown', function(e) { keys[e.code] = true; if (activeGame && e.code === state.binds.pause) togglePause(); if (activeGame && !paused && e.code === state.binds.rocket) firePlayerRocket(); if (activeGame && !paused && e.code === state.binds.autoaim) triggerAutoAim(); });
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
 // v31 WS1: bot speed anchor. Bot top speed used to be a flat 68 x skill while
@@ -3329,7 +3417,7 @@ function startMission() {
   document.getElementById('menuScreen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('vignette').classList.remove('hidden'); // v17: cinematic vignette lives and dies with the HUD
-  document.getElementById('touchZone').classList.toggle('hidden', !state.mobileTouch);
+  document.getElementById('touchZone').classList.toggle('hidden', !touchControlsVisible()); // v33: three-way mode — 'on' always, 'off' never, 'auto' when the device has touch
   applyTouchLayout(); // v32: position/scale the touch controls per the player's saved layout (no-op at defaults)
   document.getElementById('minimap').classList.toggle('hidden', currentMode !== 'royale');
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
@@ -3440,13 +3528,15 @@ let _playerShotCount = 0;
 // spread in player firing is the auto-aim-locked jitter, which stays as-is).
 // PLAYER_GUN_SPREAD is the tightened base spread: a nominal 0.015 per-axis
 // jitter multiplier (same (rand-0.5)*k convention as the locked jitter) cut by
-// 20%. Shots bent by the aim assist get half of it. The assist itself is a soft
-// magnetism: within a 5.5-degree cone and 700 units, a non-locked shot is bent
-// exactly onto the target's predicted intercept point (bullet speed 360, the
-// same lead math as the v5 auto-aim). Outside the cone nothing changes.
-const PLAYER_GUN_SPREAD = 0.015 * 0.8;
-const AIM_ASSIST_CONE = 5.5 * Math.PI / 180;
-const AIM_ASSIST_RANGE = 700;
+// 20% in v31, then by a further 25% in v33 (x0.75 of the v31 value). Shots bent
+// by the aim assist get half of it. The assist itself is a soft magnetism:
+// within a 9-degree cone and 950 units (v33: widened from v31's 5.5 degrees /
+// 700), a non-locked shot is bent exactly onto the target's predicted
+// intercept point (bullet speed 360, the same lead math as the v5 auto-aim).
+// Outside the cone nothing changes. Player only — bots never come through here.
+const PLAYER_GUN_SPREAD = 0.015 * 0.8 * 0.75;
+const AIM_ASSIST_CONE = 9 * Math.PI / 180;
+const AIM_ASSIST_RANGE = 950;
 let _muzzleLight = null, _muzzleFlash = null, _botFlash = null, _botFlashT = 0;
 function ensureMuzzleFx() {
   if (!scene || _muzzleLight) return;
@@ -3906,12 +3996,14 @@ function animate(now) {
       shotDir.x += (Math.random() - 0.5) * 0.012; shotDir.y += (Math.random() - 0.5) * 0.012; shotDir.z += (Math.random() - 0.5) * 0.012;
       shotDir.normalize();
     } else {
-      // v31 soft aim assist (player only, non-locked shots): find the hostile
-      // whose PREDICTED intercept point lies closest to the nose direction;
-      // inside the 5.5-degree cone the round is bent exactly onto that
-      // intercept (full correction), then the tightened spread is applied at
-      // half strength. Out of cone / out of range the shot flies the nose with
-      // the full tightened spread. Bots never come through this path.
+      // v31 soft aim assist (player only, non-locked shots; v33: cone widened
+      // to 9 degrees, reach extended to 950): find the hostile whose PREDICTED
+      // intercept point lies closest to the nose direction (smallest angle
+      // wins, so with two hostiles in the cone the one the crosshair is most
+      // centered on is chosen); inside the cone the round is bent exactly onto
+      // that intercept (full correction), then the tightened spread is applied
+      // at half strength. Out of cone / out of range the shot flies the nose
+      // with the full tightened spread. Bots never come through this path.
       let spreadAmt = PLAYER_GUN_SPREAD;
       let assistDir = null, assistAng = AIM_ASSIST_CONE;
       for (let ai = 0; ai < activeGame.entities.length; ai++) {
@@ -4067,6 +4159,36 @@ function animate(now) {
 
     // ---- Building scrape: push out to the edge, 5 hp, can never kill ----
     for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = bp.x - o.x, dz = bp.z - o.z; const d2 = dx * dx + dz * dz; if (bp.y < o.h && d2 < o.r * o.r && d2 > 0.01) { const d = Math.sqrt(d2); bp.x = o.x + (dx / d) * o.r; bp.z = o.z + (dz / d) * o.r; bot.hp = Math.max(1, bot.hp - 5); } }
+
+    // ---- v33 freeze watchdog ----
+    // The state machine above has no recovery invariant: it trusts bot.spd and
+    // its own state transitions completely, so any bot whose speed degenerates
+    // (zeroed / NaN'd / ratio'd down to nothing) or whose steering state stops
+    // producing travel hangs in the air forever — nothing ever re-validates
+    // that an alive bot is actually MOVING. This watchdog is that invariant:
+    // sample the bot's position every 1.5s of mission time; if it travelled
+    // less than 1.5 units (a healthy bot covers 75+), force recovery — fresh
+    // target, 'engage', a waypoint 300 units ahead of the nose, and cruise
+    // speed restored from the v31 anchor (or the legacy 68 x skill). It can
+    // only run inside this loop, so it never fires on network puppets (the
+    // isRemoteId continue above skips them — a stalled packet feed must not
+    // let the AI teleport a live rival), never on dead bots (eliminated bots
+    // leave the array; Gun Game victims respawn in place, alive), and never
+    // while paused or in the Royale countdown (animate() early-returns before
+    // this loop in both states, so _wdT simply doesn't accumulate).
+    if (!bot._wdPos) { bot._wdPos = bp.clone(); bot._wdT = 0; }
+    bot._wdT += dt;
+    if (bot._wdT >= 1.5) {
+      if (bp.distanceTo(bot._wdPos) < 1.5) {
+        bot.tgt = pickBotTarget(bot); bot.retargetT = 2 + Math.random() * 2;
+        bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0; bot.closeT = 0; bot.slot = false; // campaign: hand the engagement slot back — assignCampaignSlots re-grants or re-patrols next frame
+        bot.waypoint = { x: bp.x + Math.sin(bot.heading) * 300, y: Math.max(60, Math.min(400, bp.y)), z: bp.z + Math.cos(bot.heading) * 300 };
+        const wdAnchor = anchoredBotSpd(bot.skill);
+        const wdCruise = wdAnchor !== null ? wdAnchor : 68 * bot.skill;
+        if (!(bot.spd > 1) || bot.spd < wdCruise * 0.5) bot.spd = wdCruise;
+      }
+      bot._wdPos.copy(bp); bot._wdT = 0;
+    }
 
     if (bp.distanceTo(p.mesh.position) < 700) emitDamageSmoke(bot, dt); // bots smoke too, but only when near enough to see
     if (bp.distanceTo(p.mesh.position) < 500) emitContrails(bot, bot.spd * spdMul, bot.turning || 0, dt); // wingtip vapor in hard turns
@@ -4870,7 +4992,7 @@ function applyQuality() {
 function applyFov() { if (camera) { camera.fov = state.fov || 65; camera.updateProjectionMatrix(); } }
 function renderKeybinds() {
   const slider = document.getElementById('sensSlider'); if (!slider) return;
-  slider.value = state.sensitivity; document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; document.getElementById('mobileToggle').checked = state.mobileTouch;
+  slider.value = state.sensitivity; document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; const tmS = document.getElementById('touchModeSelect'); if (tmS) tmS.value = (['auto', 'on', 'off'].indexOf(state.mobileTouch) !== -1) ? state.mobileTouch : 'auto'; // v33: three-way select replaces the old checkbox
   const fovS = document.getElementById('fovSlider'); if (fovS) { fovS.value = state.fov; document.getElementById('fovVal').textContent = state.fov + '°'; }
   const cdS = document.getElementById('camDistSlider'); if (cdS) { cdS.value = state.camDist; document.getElementById('camDistVal').textContent = Number(state.camDist).toFixed(2).replace(/0$/, '') + 'x'; }
   const shS = document.getElementById('shakeSlider'); if (shS) { shS.value = state.shake; document.getElementById('shakeVal').textContent = Number(state.shake).toFixed(1); }
@@ -4886,7 +5008,7 @@ function renderKeybinds() {
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
 window.addEventListener('keydown', function(e) { if (!listeningAction) return; e.preventDefault(); state.binds[listeningAction] = e.code; listeningAction = null; saveState(); renderKeybinds(); });
 document.getElementById('sensSlider').oninput = function(e) { state.sensitivity = parseFloat(e.target.value); document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; saveState(); };
-document.getElementById('mobileToggle').onchange = function(e) { state.mobileTouch = e.target.checked; saveState(); };
+document.getElementById('touchModeSelect').onchange = function(e) { state.mobileTouch = e.target.value; if (activeGame) { const tzEl2 = document.getElementById('touchZone'); if (tzEl2) tzEl2.classList.toggle('hidden', !touchControlsVisible()); } saveState(); }; // v33: applies live if a mission is running
 document.getElementById('touchLayoutToggle').onchange = function(e) { state.touchLayoutOn = e.target.checked; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); applyTouchLayout(); saveState(); };
 document.getElementById('btnEditTouchLayout').onclick = function() { closeModals(); openLayoutEditor(); };
 document.getElementById('btnResetTouchLayout').onclick = function() { state.touchLayout = {}; state.touchBtnScale = 1; applyTouchLayout(); saveState(); showBanner('Touch layout reset to defaults', 2200); };
@@ -4903,8 +5025,28 @@ applyFov(); applyQuality(); // v15: boot with the saved camera + quality setting
 document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
 // Touch joystick & HUD buttons
 const tz = document.getElementById('touchZone'); const tk = document.getElementById('touchKnob');
-tz.addEventListener('touchmove', function(e) { e.preventDefault(); const rect = tz.getBoundingClientRect(); const t = e.touches[0]; const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, t.clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, t.clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; }, { passive: false }); // v32: center/travel derived from the live rect so the stick stays correct when the layout editor scales it (identical numbers at the default 110px)
-tz.addEventListener('touchend', function() { tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; });
+// v33 multi-touch fix: the old stick had NO touchstart and steered from
+// e.touches[0] on touchmove — the first finger ANYWHERE on the screen, not
+// the finger on the stick. Hold FIRE with one thumb and land the other on the
+// stick, and every stick move read the FIRE finger's position: the stick
+// slammed to a corner and "tweaked out"; its touchend also recentered the
+// stick when ANY zone-born touch ended, whichever finger was steering. The
+// stick is now Pointer Events with a claimed id: only a pointer that BEGINS
+// inside #touchZone can steer (pointerdown on the zone itself), that single
+// pointerId is tracked exclusively (setPointerCapture keeps its moves
+// flowing here even when the thumb slides off the base), every other
+// pointer's moves are ignored, and only the claimed pointer's up/cancel
+// recenters. The FIRE / ROCKET / BOOST / AUTO-AIM buttons keep their own
+// bindHold handlers and never touch this state, so thumb-on-stick +
+// thumb-on-buttons works simultaneously, the normal way people play. The
+// zone's CSS already sets touch-action: none, so no scroll/gesture hijack.
+let stickPointerId = null;
+function steerStick(clientX, clientY) { const rect = tz.getBoundingClientRect(); const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; } // v32: center/travel derived from the live rect so the stick stays correct when the layout editor moves/scales it (identical numbers at the default 110px)
+function releaseStick() { stickPointerId = null; tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; }
+tz.addEventListener('pointerdown', function(e) { if (stickPointerId !== null) return; stickPointerId = e.pointerId; try { tz.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); steerStick(e.clientX, e.clientY); });
+tz.addEventListener('pointermove', function(e) { if (e.pointerId !== stickPointerId) return; e.preventDefault(); steerStick(e.clientX, e.clientY); });
+tz.addEventListener('pointerup', function(e) { if (e.pointerId === stickPointerId) releaseStick(); });
+tz.addEventListener('pointercancel', function(e) { if (e.pointerId === stickPointerId) releaseStick(); });
 function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) e.preventDefault(); if (activeGame) activeGame.player[prop] = true; }; const off = function() { if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); }
 bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindHold('btnFireRocket', '_touchRocket'); // v29: holding the touch rocket button now polls like holding R (its onclick tap still works too)
 // ---- v32 touch button layout editor ----
