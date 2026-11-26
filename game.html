@@ -110,7 +110,7 @@
   @keyframes bootSlide { 0% { transform: translateX(-110%); } 100% { transform: translateX(330%); } }
   .boot-text { font-size: 0.62rem; font-weight: 700; letter-spacing: 4px; color: #7d8aa5; animation: bootPulse 1.2s ease-in-out infinite; }
   @keyframes bootPulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-  /* ---- v22 pilot sign-in gate + admin panel ---- */
+  /* ---- v24 sign-in gate (cloud account + guest) ---- */
   #loginGate { position: fixed; inset: 0; z-index: 150; background: rgba(4,7,15,0.78); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 16px; transition: opacity 0.45s ease; }
   #loginGate.done { opacity: 0; pointer-events: none; }
   .gate-card { width: 100%; max-width: 430px; max-height: 92vh; overflow-y: auto; background: linear-gradient(180deg, rgba(24,32,56,0.98), rgba(10,14,27,0.98)); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,0.65); padding: 26px 24px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
@@ -119,22 +119,15 @@
   .gate-title { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-weight: 800; letter-spacing: 3px; font-size: 1.2rem; color: #e0f2fe; text-align: center; }
   .gate-sub { color: #94a3b8; font-size: 0.85rem; text-align: center; line-height: 1.45; }
   .gate-error { background: rgba(220,38,38,0.14); border: 1px solid rgba(220,38,38,0.5); color: #fca5a5; border-radius: 10px; padding: 8px 12px; font-size: 0.83rem; font-weight: 600; text-align: center; }
-  .gate-card label, #adminModal label { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #94a3b8; }
-  .gate-card input[type="text"], .gate-card input[type="password"], .gate-card input[type="email"], #adminModal input[type="text"], #adminModal input[type="password"] { background: #0b1120; border: 1px solid #334155; border-radius: 10px; padding: 11px 12px; color: #f8fafc; font-size: 1rem; width: 100%; box-sizing: border-box; text-transform: none; letter-spacing: normal; }
-  .gate-card input:focus, #adminModal input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,0.2); }
-  #gateProfileList { display: flex; flex-direction: column; gap: 8px; }
-  .profile-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 12px 14px; cursor: pointer; color: #f8fafc; transition: 0.15s; }
-  .profile-card:hover { border-color: #38bdf8; background: #243349; }
-  .profile-card .pc-name { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-weight: 700; font-size: 0.98rem; letter-spacing: 0.5px; }
-  .profile-card .pc-meta { font-size: 0.76rem; color: #94a3b8; margin-top: 3px; }
-  .profile-card .pc-arrow { color: #38bdf8; font-size: 1.3rem; font-weight: 900; }
+  .gate-card label { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #94a3b8; }
+  .gate-card input[type="text"], .gate-card input[type="password"], .gate-card input[type="email"] { background: #0b1120; border: 1px solid #334155; border-radius: 10px; padding: 11px 12px; color: #f8fafc; font-size: 1rem; width: 100%; box-sizing: border-box; text-transform: none; letter-spacing: normal; }
+  .gate-card input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,0.2); }
   .gate-view { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
   .gate-row { display: flex; gap: 10px; }
   .gate-row .btn { flex: 1; }
   .gate-who { color: #cbd5e1; font-size: 0.92rem; text-align: center; }
-  .gate-admin-link { align-self: center; background: none; border: none; color: #7d8aa5; font-size: 0.78rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; padding: 4px 8px; }
-  .gate-admin-link:hover { color: #38bdf8; }
   .gate-note { color: #7d8aa5; font-size: 0.78rem; line-height: 1.5; text-align: center; }
+  #btnGuestPlay { width: 100%; }
   /* ---- v23 cloud accounts (Firebase) ---- */
   .gate-divider { display: flex; align-items: center; gap: 12px; color: #7d8aa5; font-size: 0.72rem; font-weight: 700; letter-spacing: 2px; }
   .gate-divider::before, .gate-divider::after { content: ''; flex: 1; height: 1px; background: rgba(148,163,255,0.22); }
@@ -142,15 +135,6 @@
   .cloud-title { font-family: 'Orbitron', 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: 2px; font-size: 0.82rem; color: #7dd3fc; text-align: center; }
   .cloud-msg { border-radius: 10px; padding: 8px 12px; font-size: 0.83rem; font-weight: 600; text-align: center; background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.45); color: #bae6fd; }
   .cloud-msg.err { background: rgba(220,38,38,0.14); border-color: rgba(220,38,38,0.5); color: #fca5a5; }
-  .pc-cloud { color: #38bdf8; font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; }
-  #adminModal { z-index: 160; }
-  #adminModal .modal-card { max-width: 980px; }
-  .admin-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
-  .admin-table th, .admin-table td { padding: 8px; border-bottom: 1px solid #1e293b; text-align: left; vertical-align: top; }
-  .admin-table th { color: #94a3b8; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-  .admin-table td { color: #e2e8f0; }
-  .admin-del { background: #7f1d1d; color: #fecaca; border: 1px solid #b91c1c; border-radius: 8px; padding: 5px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
-  .admin-del:hover { background: #991b1b; }
   #bannerAlert { position: absolute; top: 75px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.9); border: 1px solid #fbbf24; color: #fbbf24; padding: 8px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; text-align: center; max-width: 90vw; z-index: 12; }
   #countdownOverlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 900; color: #38bdf8; text-shadow: 0 0 25px rgba(56,189,248,0.8); background: rgba(5,9,18,0.45); }
   #minimap { width: 110px; height: 110px; border-radius: 50%; border: 2px solid #38bdf8; background: rgba(7,11,20,0.85); }
@@ -177,29 +161,33 @@
 <div id="loginGate">
   <div class="gate-card">
     <div class="gate-logo"><svg viewBox="0 0 24 24"><polygon points="22 2 15 22 11 13 2 9 22 2" fill="currentColor" /></svg></div>
-    <div class="gate-title">PILOT SIGN-IN</div>
-    <p class="gate-sub" id="gateSub">Sign in to load your hangar, coins and progress.</p>
+    <div class="gate-title">SIGN IN</div>
+    <p class="gate-sub" id="gateSub">Sign in with a cloud account, or jump straight in as a guest.</p>
     <div id="gateError" class="gate-error hidden"></div>
-    <div id="gateListView" class="gate-view">
-      <div id="gateProfileList"></div>
-      <button class="btn btn-play" id="btnGateNew" type="button">＋ New Pilot</button>
-    </div>
-    <div id="gatePinView" class="gate-view hidden">
-      <p class="gate-who">Enter PIN for <strong id="gatePinName">PILOT</strong></p>
-      <label>PIN<input type="password" id="gatePinInput" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-      <div class="gate-row">
-        <button class="btn btn-sec" id="btnGatePinBack" type="button">Back</button>
-        <button class="btn btn-play" id="btnGatePinGo" type="button">Sign In</button>
+    <div id="gateMainView" class="gate-view">
+      <div id="cloudSection">
+        <div class="cloud-title">☁ CLOUD ACCOUNT</div>
+        <p class="gate-note">One account on every device — your hangar, coins and career stats sync to the cloud.</p>
+        <div id="cloudForm" class="gate-view">
+          <label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com" /></label>
+          <label>Password<input type="password" id="cloudPass" autocomplete="current-password" placeholder="••••••••" /></label>
+          <div class="gate-row">
+            <button class="btn btn-sec" id="btnCloudSignIn" type="button">Sign In</button>
+            <button class="btn btn-play" id="btnCloudCreate" type="button">Create Account</button>
+          </div>
+        </div>
+        <div id="cloudSession" class="hidden">
+          <p class="gate-who" id="cloudSessionText">Signed in to cloud</p>
+          <div class="gate-row">
+            <button class="btn btn-play" id="btnCloudContinue" type="button">Continue</button>
+            <button class="btn btn-sec" id="btnCloudSwitch" type="button">Use a different account</button>
+          </div>
+        </div>
+        <div id="cloudMsg" class="cloud-msg hidden"></div>
       </div>
-    </div>
-    <div id="gateCreateView" class="gate-view hidden">
-      <label>Callsign<input type="text" id="gateNewName" maxlength="16" autocomplete="off" placeholder="3–16 characters" /></label>
-      <label>PIN (4–6 digits)<input type="password" id="gateNewPin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-      <label>Confirm PIN<input type="password" id="gateNewPin2" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-      <div class="gate-row">
-        <button class="btn btn-sec" id="btnGateCreateBack" type="button">Back</button>
-        <button class="btn btn-play" id="btnGateCreateGo" type="button">Create &amp; Sign In</button>
-      </div>
+      <div class="gate-divider"><span>— OR —</span></div>
+      <button class="btn btn-play" id="btnGuestPlay" type="button">▶ Play as Guest</button>
+      <p class="gate-note">Guest progress saves on this device only.</p>
     </div>
     <div id="gateCloudNameView" class="gate-view hidden">
       <p class="gate-who">Cloud account ready — pick your pilot callsign</p>
@@ -208,28 +196,6 @@
         <button class="btn btn-play" id="btnCloudNameGo" type="button">Confirm Callsign</button>
       </div>
     </div>
-    <div class="gate-divider"><span>— OR —</span></div>
-    <div id="cloudSection">
-      <div class="cloud-title">☁ CLOUD ACCOUNT</div>
-      <p class="gate-note">One account on every device — your hangar, coins and career stats sync to the cloud.</p>
-      <div id="cloudForm" class="gate-view">
-        <label>Email<input type="email" id="cloudEmail" autocomplete="email" placeholder="you@example.com" /></label>
-        <label>Password<input type="password" id="cloudPass" autocomplete="current-password" placeholder="••••••••" /></label>
-        <div class="gate-row">
-          <button class="btn btn-sec" id="btnCloudSignIn" type="button">Sign In</button>
-          <button class="btn btn-play" id="btnCloudCreate" type="button">Create Account</button>
-        </div>
-      </div>
-      <div id="cloudSession" class="hidden">
-        <p class="gate-who" id="cloudSessionText">Signed in to cloud</p>
-        <div class="gate-row">
-          <button class="btn btn-play" id="btnCloudContinue" type="button">Continue</button>
-          <button class="btn btn-sec" id="btnCloudSwitch" type="button">Use a different account</button>
-        </div>
-      </div>
-      <div id="cloudMsg" class="cloud-msg hidden"></div>
-    </div>
-    <button class="gate-admin-link" id="btnGateAdmin" type="button">Admin</button>
   </div>
 </div>
 
@@ -241,7 +207,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v23 — CLOUD ACCOUNTS ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v24 — CLOUD & GUEST ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -375,30 +341,6 @@
   </div>
 </div>
 
-<div id="adminModal" class="modal hidden">
-  <div class="modal-card">
-    <div class="modal-header"><h2>Admin — Pilot Registry</h2><button class="btn btn-sec btn-sm" id="btnAdminClose">Close</button></div>
-    <div class="modal-body">
-      <div id="adminSetupView" class="gate-view hidden">
-        <p class="gate-sub">This PIN protects the admin panel on this device.</p>
-        <label>New Admin PIN (4–6 digits)<input type="password" id="adminNewPin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-        <label>Confirm Admin PIN<input type="password" id="adminNewPin2" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-        <div id="adminSetupError" class="gate-error hidden"></div>
-        <button class="btn btn-play" id="btnAdminSetupGo" type="button">Set Admin PIN</button>
-      </div>
-      <div id="adminPinView" class="gate-view hidden">
-        <label>Admin PIN<input type="password" id="adminPinInput" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" /></label>
-        <div id="adminPinError" class="gate-error hidden"></div>
-        <button class="btn btn-play" id="btnAdminPinGo" type="button">Unlock Panel</button>
-      </div>
-      <div id="adminPanelView" class="hidden">
-        <div id="adminTableWrap" style="overflow-x:auto;"></div>
-        <p class="gate-note">Shows pilots who signed in on this device. A cloud backend is needed to see players on other devices.</p>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script type="module">
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -417,29 +359,48 @@ const defaultState = {
   volume: 0.7, muted: false,
   binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
 };
-// ---- v22 pilot accounts: local profile registry + per-profile saves ----
-// Sign-in is local to this device/browser (localStorage). PINs are stored only as
-// an FNV-1a hash (hashPin) — obfuscation-grade, NOT cryptographic security.
+// ---- v24 accounts: profile registry (guest entry + cloud mirrors) ----
+// The registry now only backs the built-in guest pilot and the local mirrors of
+// cloud accounts (stats accumulation + sign-out/topbar plumbing). The v22/v23
+// local PIN profiles are gone from the UI; any leftover entries stay in storage
+// untouched — never shown, never selectable, their save keys never deleted.
 const PROFILES_KEY = 'skyace_profiles_v1';
 let storageOK = true;
 try { localStorage.setItem('__nd_probe__', '1'); localStorage.removeItem('__nd_probe__'); } catch (e) { storageOK = false; }
-function hashPin(str) { let h = 0x811c9dc5; const s = String(str); for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return ('0000000' + (h >>> 0).toString(16)).slice(-8); }
-let registry = { adminPinHash: null, profiles: [] };
+let registry = { profiles: [] };
 let currentProfile = null; // the signed-in registry profile object (null while at the gate)
 let sessionStart = 0; // ms timestamp the current play-time segment began (0 = not counting)
 function loadRegistry() {
-  try { const r = JSON.parse(localStorage.getItem(PROFILES_KEY) || 'null'); if (r && Array.isArray(r.profiles)) { registry = { adminPinHash: (typeof r.adminPinHash === 'string' ? r.adminPinHash : null), profiles: r.profiles.filter(function(p) { return p && p.id && p.callsign; }) }; return; } } catch (e) {}
-  registry = { adminPinHash: null, profiles: [] }; // corrupt registry -> fresh empty one, never crash the game
+  try { const r = JSON.parse(localStorage.getItem(PROFILES_KEY) || 'null'); if (r && Array.isArray(r.profiles)) { registry = { profiles: r.profiles.filter(function(p) { return p && p.id && p.callsign; }) }; return; } } catch (e) {}
+  registry = { profiles: [] }; // corrupt registry -> fresh empty one, never crash the game
 }
 function saveRegistry() { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(registry)); } catch (e) {} }
 function blankProfileStats() { return { sessions: 0, playSeconds: 0, kills: 0, deaths: 0, missionsWon: 0 }; }
 function profileStats(p) { if (!p.stats || typeof p.stats !== 'object') p.stats = blankProfileStats(); ['sessions', 'playSeconds', 'kills', 'deaths', 'missionsWon'].forEach(function(k) { if (typeof p.stats[k] !== 'number' || isNaN(p.stats[k])) p.stats[k] = 0; }); return p.stats; }
-function currentSaveKey() { return currentProfile ? SAVE_KEY + '::' + currentProfile.id : SAVE_KEY; }
+function currentSaveKey() {
+  if (!currentProfile) return SAVE_KEY;
+  if (currentProfile.guest) return guestSaveKeyOverride || SAVE_KEY;
+  return SAVE_KEY + '::' + currentProfile.id;
+}
 function readProfileSave(id) { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY + '::' + id) || 'null'); return (s && typeof s === 'object') ? s : null; } catch (e) { return null; } }
-function fmtPlayTime(sec) { sec = Math.max(0, Math.round(sec || 0)); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return h > 0 ? h + 'h ' + m + 'm' : (m > 0 ? m + 'm' : sec + 's'); }
-function fmtDate(ts) { if (!ts) return 'never'; try { return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); } catch (e) { return '—'; } }
 function accumulatePlayTime() { if (currentProfile && sessionStart) { profileStats(currentProfile).playSeconds += Math.max(0, Math.round((Date.now() - sessionStart) / 1000)); sessionStart = Date.now(); saveRegistry(); cloudSchedulePush(); } } // v23: stats snapshot rides the debounced cloud push
 loadRegistry();
+// v24 guest save-key rule: the guest pilot has no save key of its own. So a
+// returning player's progress stays reachable, guest resolves — read-only, once
+// at boot — to the save key of the most recently played leftover LOCAL profile
+// (non-cloud, non-guest) from the v22/v23 PIN era; if none exists, guest uses
+// the plain legacy key 'skyace_save_v1'. No keys are copied or deleted.
+let guestSaveKeyOverride = SAVE_KEY;
+(function resolveGuestSaveKey() {
+  let best = null;
+  registry.profiles.forEach(function(p) { if (p && !p.cloud && !p.guest && p.id !== 'guest') { if (!best || (p.lastPlayedAt || 0) > (best.lastPlayedAt || 0)) best = p; } });
+  if (best) guestSaveKeyOverride = SAVE_KEY + '::' + best.id;
+})();
+function ensureGuestProfile() { // the built-in guest pilot, created on demand
+  let g = registry.profiles.find(function(x) { return x.id === 'guest'; });
+  if (!g) { g = { id: 'guest', callsign: 'GUEST', guest: true, createdAt: Date.now(), lastPlayedAt: 0, stats: blankProfileStats() }; registry.profiles.push(g); saveRegistry(); }
+  return g;
+}
 // ---- v23 cloud accounts (Firebase) — state holders declared here, next to the local
 // account state, so saveState()/accumulatePlayTime() can consult them at any moment.
 // All cloud logic lives in the v23 block beside the gate code (bottom of this module);
@@ -4002,35 +3963,12 @@ document.getElementById('btnJoinRoom').onclick = function() { const c = document
 // v16: this script is now an ES module, so its top-level functions are NOT globals.
 // The HTML (static markup + template strings in the renderers above) calls these 15
 // functions from inline onclick handlers — re-expose exactly those on window.
-// ---- v22 pilot sign-in gate + admin panel (all new UI wired with addEventListener) ----
+// ---- v24 sign-in gate: cloud account or guest (all UI wired with addEventListener) ----
 const gateEl = document.getElementById('loginGate');
-let gatePinProfileId = null;
 function escHtml(s) { return String(s).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function gateError(msg) { const e = document.getElementById('gateError'); if (!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); }
-function gateShow(viewId) { ['gateListView', 'gatePinView', 'gateCreateView', 'gateCloudNameView'].forEach(function(v) { document.getElementById(v).classList.toggle('hidden', v !== viewId); }); gateError(''); }
-function renderGateList() {
-  const wrap = document.getElementById('gateProfileList'); if (!wrap) return; wrap.innerHTML = '';
-  registry.profiles.forEach(function(p) {
-    const sv = readProfileSave(p.id);
-    const meta = sv ? `Lv ${sv.level || 1} · ${getRankName(sv.rp || 0)} · ${sv.coins || 0} coins` : 'New pilot — no flights yet';
-    const btn = document.createElement('button'); btn.className = 'profile-card'; btn.type = 'button';
-    btn.innerHTML = `<span><span class="pc-name">${escHtml(p.callsign)}${p.cloud ? ' <span class="pc-cloud">☁ CLOUD</span>' : ''}</span><div class="pc-meta">${meta} · Last played: ${fmtDate(p.lastPlayedAt)}</div></span><span class="pc-arrow">›</span>`;
-    btn.addEventListener('click', function() {
-      if (p.cloud) { // v23: cloud pilots have no local PIN — route to the cloud section
-        gateShow('gateListView');
-        if (cloudUser && cloudUser.uid === p.uid) { cloudEnter(cloudUser); return; }
-        cloudMsg('☁ ' + p.callsign + ' is a cloud pilot — sign in with the cloud form below.', false);
-        const em = document.getElementById('cloudEmail'); if (em && p.email) em.value = p.email;
-        const pw = document.getElementById('cloudPass'); if (pw) pw.focus();
-        return;
-      }
-      gatePinProfileId = p.id; document.getElementById('gatePinName').textContent = p.callsign; document.getElementById('gatePinInput').value = ''; gateShow('gatePinView'); setTimeout(function() { const i = document.getElementById('gatePinInput'); if (i) i.focus(); }, 60);
-    });
-    wrap.appendChild(btn);
-  });
-  document.getElementById('gateSub').textContent = registry.profiles.length ? 'Choose your pilot and enter your PIN.' : 'No pilots on this device yet — create the first pilot profile.';
-}
-function showGate() { renderGateList(); gateEl.classList.remove('hidden'); gateEl.classList.remove('done'); gateShow(registry.profiles.length ? 'gateListView' : 'gateCreateView'); }
+function gateShow(viewId) { ['gateMainView', 'gateCloudNameView'].forEach(function(v) { document.getElementById(v).classList.toggle('hidden', v !== viewId); }); gateError(''); }
+function showGate() { gateEl.classList.remove('hidden'); gateEl.classList.remove('done'); gateShow('gateMainView'); }
 function hideGate() { gateEl.classList.add('done'); setTimeout(function() { gateEl.classList.add('hidden'); }, 500); }
 function refreshStateUI() { // re-run the boot state->UI sync after a per-profile load
   updateTopUI(); renderKeybinds(); applyQuality(); applyFov();
@@ -4046,29 +3984,6 @@ function signInProfile(p) {
   hideGate();
   showBanner(`Welcome, ${p.callsign}!`, 2600);
 }
-function tryPinSignIn() {
-  const p = registry.profiles.find(function(x) { return x.id === gatePinProfileId; });
-  if (!p) { renderGateList(); gateShow('gateListView'); return; }
-  const pin = document.getElementById('gatePinInput').value.trim();
-  if (hashPin(p.callsign.toLowerCase() + ':' + pin) !== p.pinHash) { gateError('Wrong PIN — try again.'); return; }
-  signInProfile(p);
-}
-function tryCreateProfile() {
-  const name = document.getElementById('gateNewName').value.trim().replace(/\s+/g, ' ');
-  const pin = document.getElementById('gateNewPin').value.trim();
-  const pin2 = document.getElementById('gateNewPin2').value.trim();
-  if (!/^[A-Za-z0-9 ]{3,16}$/.test(name)) { gateError('Callsign must be 3–16 characters (letters, numbers, spaces).'); return; }
-  if (registry.profiles.some(function(x) { return x.callsign.toLowerCase() === name.toLowerCase(); })) { gateError('That callsign is taken on this device — pick another.'); return; }
-  if (!/^\d{4,6}$/.test(pin)) { gateError('PIN must be 4–6 digits.'); return; }
-  if (pin !== pin2) { gateError('PINs do not match.'); return; }
-  const isFirst = registry.profiles.length === 0;
-  const p = { id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e5).toString(36), callsign: name, pinHash: hashPin(name.toLowerCase() + ':' + pin), createdAt: Date.now(), lastPlayedAt: 0, stats: blankProfileStats() };
-  registry.profiles.push(p); saveRegistry();
-  if (isFirst) { // v22 migration: the FIRST pilot inherits the pre-accounts save (legacy key left in place, harmless)
-    try { const legacy = localStorage.getItem(SAVE_KEY); if (legacy) localStorage.setItem(SAVE_KEY + '::' + p.id, legacy); } catch (e) {}
-  }
-  signInProfile(p);
-}
 function signOut() {
   if (activeGame) return; // the topbar is menu-only; never yank a pilot out mid-flight
   const cloudP = (currentProfile && currentProfile.cloud) ? currentProfile : null; // v23
@@ -4080,65 +3995,15 @@ function signOut() {
   const so = document.getElementById('btnSignOut'); if (so) so.textContent = '⏻ Sign Out';
   showGate();
 }
-// ---- admin panel ----
-function adminError(id, msg) { const e = document.getElementById(id); if (!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); }
-function openAdmin() {
-  document.getElementById('adminModal').classList.remove('hidden');
-  ['adminSetupView', 'adminPinView', 'adminPanelView'].forEach(function(v) { document.getElementById(v).classList.add('hidden'); });
-  document.getElementById(registry.adminPinHash ? 'adminPinView' : 'adminSetupView').classList.remove('hidden');
-  document.getElementById('adminPinInput').value = ''; document.getElementById('adminNewPin').value = ''; document.getElementById('adminNewPin2').value = '';
-  adminError('adminPinError', ''); adminError('adminSetupError', '');
-}
-function renderAdminPanel() {
-  document.getElementById('adminSetupView').classList.add('hidden');
-  document.getElementById('adminPinView').classList.add('hidden');
-  document.getElementById('adminPanelView').classList.remove('hidden');
-  const wrap = document.getElementById('adminTableWrap');
-  if (!registry.profiles.length) { wrap.innerHTML = '<p class="gate-note">No pilot profiles on this device yet.</p>'; return; }
-  let rows = '';
-  registry.profiles.forEach(function(p) {
-    const sv = readProfileSave(p.id); const st = profileStats(p);
-    rows += `<tr><td><strong>${escHtml(p.callsign)}</strong><br><span style="color:#7d8aa5;font-size:0.74rem;">joined ${fmtDate(p.createdAt)}</span></td><td>${sv ? 'Lv ' + (sv.level || 1) + ' · ' + getRankName(sv.rp || 0) + '<br>' + (sv.coins || 0) + ' coins' : '—'}</td><td>${st.sessions}</td><td>${fmtPlayTime(st.playSeconds)}</td><td>${st.kills}</td><td>${st.deaths}</td><td>${st.missionsWon}</td><td>${fmtDate(p.lastPlayedAt)}</td><td><button class="admin-del" type="button" data-del="${p.id}">Delete</button></td></tr>`;
-  });
-  wrap.innerHTML = `<table class="admin-table"><thead><tr><th>Pilot</th><th>Progress</th><th>Sessions</th><th>Play Time</th><th>Kills</th><th>Deaths</th><th>Missions Won</th><th>Last Played</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-  wrap.querySelectorAll('[data-del]').forEach(function(b) { b.addEventListener('click', function() { deleteProfile(b.getAttribute('data-del')); }); });
-}
-function deleteProfile(id) {
-  const p = registry.profiles.find(function(x) { return x.id === id; }); if (!p) return;
-  if (currentProfile && currentProfile.id === id) { alert('That pilot is signed in right now — sign out first.'); return; }
-  if (!confirm(`Delete pilot "${p.callsign}" and all their saved progress on this device? This cannot be undone.`)) return;
-  registry.profiles = registry.profiles.filter(function(x) { return x.id !== id; });
-  try { localStorage.removeItem(SAVE_KEY + '::' + id); } catch (e) {}
-  saveRegistry(); renderAdminPanel(); renderGateList();
-}
-document.getElementById('btnGateNew').addEventListener('click', function() { gateShow('gateCreateView'); });
-document.getElementById('btnGateAdmin').addEventListener('click', openAdmin);
-document.getElementById('btnGatePinBack').addEventListener('click', function() { renderGateList(); gateShow('gateListView'); });
-document.getElementById('btnGatePinGo').addEventListener('click', tryPinSignIn);
-document.getElementById('gatePinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryPinSignIn(); });
-document.getElementById('btnGateCreateBack').addEventListener('click', function() { if (registry.profiles.length) { renderGateList(); gateShow('gateListView'); } });
-document.getElementById('btnGateCreateGo').addEventListener('click', tryCreateProfile);
+document.getElementById('btnGuestPlay').addEventListener('click', function() { signInProfile(ensureGuestProfile()); });
 document.getElementById('btnSignOut').addEventListener('click', signOut);
-document.getElementById('btnAdminClose').addEventListener('click', function() { document.getElementById('adminModal').classList.add('hidden'); });
-document.getElementById('btnAdminSetupGo').addEventListener('click', function() {
-  const a = document.getElementById('adminNewPin').value.trim(), b = document.getElementById('adminNewPin2').value.trim();
-  if (!/^\d{4,6}$/.test(a)) { adminError('adminSetupError', 'Admin PIN must be 4–6 digits.'); return; }
-  if (a !== b) { adminError('adminSetupError', 'PINs do not match.'); return; }
-  registry.adminPinHash = hashPin('admin:' + a); saveRegistry(); renderAdminPanel();
-});
-function tryAdminPin() {
-  const a = document.getElementById('adminPinInput').value.trim();
-  if (hashPin('admin:' + a) !== registry.adminPinHash) { adminError('adminPinError', 'Wrong admin PIN.'); return; }
-  renderAdminPanel();
-}
-document.getElementById('btnAdminPinGo').addEventListener('click', tryAdminPin);
-document.getElementById('adminPinInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryAdminPin(); });
 window.addEventListener('beforeunload', function() { accumulatePlayTime(); });
 // Gate on boot. If localStorage is unusable the game must not brick: fall back to a
-// temporary in-memory 'PILOT' profile and skip the gate entirely.
+// temporary in-memory guest profile and skip the gate entirely.
 if (!storageOK) {
-  currentProfile = { id: 'temp', callsign: 'PILOT', pinHash: '', createdAt: Date.now(), lastPlayedAt: Date.now(), stats: blankProfileStats() };
+  currentProfile = { id: 'guest', callsign: 'GUEST', guest: true, createdAt: Date.now(), lastPlayedAt: Date.now(), stats: blankProfileStats() };
   sessionStart = Date.now();
+  const so = document.getElementById('btnSignOut'); if (so) so.textContent = '⏻ Sign Out (GUEST)';
   gateEl.classList.add('hidden');
 } else {
   showGate();
@@ -4205,7 +4070,7 @@ async function cloudAuthAction(create) {
   if (!email || !pass) { cloudMsg('Enter your email and password first.', true); return; }
   cloudMsg(create ? 'Creating your cloud account…' : 'Signing in…', false);
   let c;
-  try { c = await cloudInit(); } catch (e) { cloudMsg('Cloud unavailable (offline?) — local pilots still work.', true); return; }
+  try { c = await cloudInit(); } catch (e) { cloudMsg('Cloud unavailable (offline?) — you can still play as a guest.', true); return; }
   try {
     const cred = create ? await c.authMod.createUserWithEmailAndPassword(c.auth, email, pass) : await c.authMod.signInWithEmailAndPassword(c.auth, email, pass);
     cloudMsg('', false);
@@ -4217,7 +4082,7 @@ async function cloudEnter(user) {
   cloudEnterBusy = true;
   try {
     let c = CLOUD;
-    if (!c) { try { c = await cloudInit(); } catch (e) { cloudMsg('Cloud unavailable (offline?) — local pilots still work.', true); return; } }
+    if (!c) { try { c = await cloudInit(); } catch (e) { cloudMsg('Cloud unavailable (offline?) — you can still play as a guest.', true); return; } }
     cloudMsg('Loading your hangar…', false);
     let snap = null;
     try { snap = await c.fsMod.getDoc(c.fsMod.doc(c.db, 'users', user.uid)); }
@@ -4240,7 +4105,7 @@ function finishCloudSignIn(user, data) {
   const id = 'fb_' + user.uid; // the v22 per-profile save key becomes skyace_save_v1::fb_<uid>
   let p = registry.profiles.find(function(x) { return x.id === id; });
   if (!p) { // mirror the cloud pilot into the local registry so stats/sign-out/topbar work unchanged
-    p = { id: id, callsign: data.callsign, pinHash: '', cloud: true, uid: user.uid, email: user.email || '', createdAt: Date.now(), lastPlayedAt: 0, stats: blankProfileStats() };
+    p = { id: id, callsign: data.callsign, cloud: true, uid: user.uid, email: user.email || '', createdAt: Date.now(), lastPlayedAt: 0, stats: blankProfileStats() };
     if (data.stats) p.stats = Object.assign(blankProfileStats(), data.stats); // fresh device: adopt the cloud career stats
     registry.profiles.push(p);
   } else {
@@ -4261,7 +4126,7 @@ function finishCloudSignIn(user, data) {
 }
 async function cloudNameConfirm() {
   const user = cloudPendingUser;
-  if (!user || !CLOUD) { gateShow(registry.profiles.length ? 'gateListView' : 'gateCreateView'); return; }
+  if (!user || !CLOUD) { gateShow('gateMainView'); return; }
   const name = document.getElementById('cloudNameInput').value.trim().replace(/\s+/g, ' ');
   if (!/^[A-Za-z0-9 ]{3,16}$/.test(name)) { gateError('Callsign must be 3–16 characters (letters, numbers, spaces).'); return; }
   try {
