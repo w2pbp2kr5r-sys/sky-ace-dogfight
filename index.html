@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SKY ACE: 3D Fighter Jet Dogfight</title>
+<meta name="description" content="Play SKY ACE 3D in your browser. Campaign, Gun Game, Ranked Royale and Online 1v1." />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070b14; color: #f1f5f9; }
+  #gameCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; background: radial-gradient(circle at center, rgba(10,18,34,0.45) 0%, rgba(5,9,18,0.88) 100%); overflow-y: auto; }
+  .hidden { display: none !important; }
+  .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: rgba(15,23,42,0.85); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px; padding: 10px 16px; }
+  .brand h1 { font-size: clamp(1.1rem, 2.5vw, 1.6rem); letter-spacing: 2px; color: #38bdf8; text-transform: uppercase; }
+  .brand span { font-size: 0.78rem; color: #94a3b8; }
+  .stats-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .pill { background: #1e293b; border: 1px solid #334155; padding: 6px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; white-space: nowrap; }
+  .pill.coins { color: #fbbf24; border-color: rgba(251,191,36,0.4); }
+  .pill.rank { color: #a78bfa; border-color: rgba(167,139,250,0.4); }
+  .menu-center { max-width: 760px; width: 100%; margin: auto; background: rgba(15,23,42,0.88); border: 1px solid rgba(148,163,184,0.25); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .section-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }
+  .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .mode-btn { background: #1e293b; border: 2px solid #334155; color: #e2e8f0; border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; transition: 0.15s; }
+  .mode-btn.active { border-color: #38bdf8; background: rgba(56,189,248,0.15); }
+  .mode-btn strong { display: block; font-size: 0.95rem; margin-bottom: 3px; color: #fff; }
+  .mode-btn small { font-size: 0.75rem; color: #94a3b8; line-height: 1.2; display: block; }
+  .sub-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; background: #0f172a; padding: 12px; border-radius: 10px; border: 1px solid #1e293b; }
+  select, input[type="text"] { background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 8px; padding: 8px 12px; font-size: 0.88rem; }
+  .nav-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .btn { border: none; border-radius: 10px; padding: 12px 16px; font-size: 0.95rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.15s; }
+  .btn-play { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; font-size: 1.05rem; }
+  .btn-sec { background: #1e293b; color: #f8fafc; border: 1px solid #475569; }
+  .btn-gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-sm { padding: 7px 12px; font-size: 0.8rem; }
+  .modal { position: fixed; inset: 0; z-index: 25; background: rgba(5,9,18,0.92); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal-card { width: 100%; max-width: 820px; max-height: 88vh; background: #0f172a; border: 1px solid #334155; border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: #1e293b; border-bottom: 1px solid #334155; }
+  .modal-header h2 { font-size: 1.15rem; color: #38bdf8; }
+  .tabs { display: flex; gap: 6px; padding: 10px 18px; background: #0b1120; border-bottom: 1px solid #1e293b; overflow-x: auto; }
+  .tab-btn { background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; padding: 7px 14px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .tab-btn.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+  .modal-body { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .item-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+  .item-card h3 { font-size: 1rem; color: #fff; }
+  .item-card p { font-size: 0.8rem; color: #94a3b8; line-height: 1.35; }
+  .stat-bar { height: 6px; background: #0f172a; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  .stat-fill { height: 100%; background: #38bdf8; }
+  .bind-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .bind-table th, .bind-table td { padding: 9px 10px; border-bottom: 1px solid #1e293b; text-align: left; }
+  .bind-table th { color: #94a3b8; font-size: 0.78rem; text-transform: uppercase; }
+  .key-badge { display: inline-block; background: #0f172a; border: 1px solid #475569; padding: 4px 10px; border-radius: 6px; font-family: monospace; color: #38bdf8; min-width: 70px; text-align: center; }
+  #hud { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
+  .hud-top { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .hud-box { background: rgba(15,23,42,0.72); border: 1px solid rgba(56,189,248,0.35); border-radius: 10px; padding: 8px 12px; font-size: 0.82rem; pointer-events: auto; }
+  .hp-wrap { width: 170px; height: 10px; background: #1e293b; border-radius: 6px; overflow: hidden; margin-top: 4px; }
+  #hudHpBar { width: 100%; height: 100%; background: #22c55e; transition: width 0.1s; }
+  .hud-bottom { position: absolute; bottom: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+  .action-btns { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  .hud-btn { background: rgba(15,23,42,0.85); border: 1px solid #38bdf8; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+  .hud-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 2px solid rgba(56,189,248,0.8); border-radius: 50%; }
+  #reticle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); }
+  #bannerAlert { position: absolute; top: 75px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.9); border: 1px solid #fbbf24; color: #fbbf24; padding: 8px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 700; text-align: center; max-width: 90vw; z-index: 12; }
+  #countdownOverlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; font-size: 5rem; font-weight: 900; color: #38bdf8; text-shadow: 0 0 25px rgba(56,189,248,0.8); background: rgba(5,9,18,0.45); }
+  #minimap { width: 110px; height: 110px; border-radius: 50%; border: 2px solid #38bdf8; background: rgba(7,11,20,0.85); }
+  #targetBoxes { position: fixed; inset: 0; pointer-events: none; z-index: 7; }
+  .t-box { position: absolute; width: 38px; height: 38px; border: 2px solid #ef4444; transform: translate(-50%, -50%); border-radius: 4px; }
+  .t-box.locked { border-color: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
+  #touchZone { position: fixed; bottom: 80px; left: 20px; width: 110px; height: 110px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; }
+  #touchKnob { position: absolute; top: 35px; left: 35px; width: 40px; height: 40px; border-radius: 50%; background: rgba(56,189,248,0.7); }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="targetBoxes"></div>
+
+<div id="menuScreen" class="screen">
+  <div class="topbar">
+    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span></div>
+    <div class="stats-row">
+      <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
+      <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
+      <div class="pill coins" id="uiCoins">Coins: 300</div>
+    </div>
+  </div>
+  <div class="menu-center">
+    <div>
+      <div class="section-label">1. Select Game Mode</div>
+      <div class="mode-grid">
+        <button class="mode-btn active" data-mode="campaign"><strong>Campaign</strong><small>10 chapters across cities &amp; peaks</small></button>
+        <button class="mode-btn" data-mode="gungame"><strong>Gun Game</strong><small>10-bot FFA, 15 jets, first to 15 kills</small></button>
+        <button class="mode-btn" data-mode="royale"><strong>Ranked Royale</strong><small>50-pilot storm zone, Silver to Global</small></button>
+        <button class="mode-btn" data-mode="online1v1"><strong>Online 1v1</strong><small>Real players only — zero bots</small></button>
+      </div>
+    </div>
+    <div class="sub-controls">
+      <label id="chapterSelectWrap">Chapter: <select id="chapterSelect"></select></label>
+      <label id="diffSelectWrap">Bot Difficulty:
+        <select id="diffSelect"><option value="rookie">Rookie</option><option value="veteran" selected>Veteran</option><option value="ace">Ace</option></select>
+      </label>
+      <div id="onlineRoomWrap" class="hidden">
+        <button class="btn btn-sec btn-sm" id="btnHostRoom">Host Room</button>
+        <input type="text" id="joinCodeInput" placeholder="Room code" style="width:110px" />
+        <button class="btn btn-sec btn-sm" id="btnJoinRoom">Join</button>
+      </div>
+      <div id="activeJetLabel">Equipped: F-16 Falcon</div>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn btn-play" id="btnStartPlay">Start Mission</button>
+      <button class="btn btn-sec" id="btnOpenHangar">Upgrades &amp; Jets</button>
+      <button class="btn btn-gold" id="btnOpenShop">Shop</button>
+      <button class="btn btn-sec" id="btnOpenSettings">Settings &amp; Controls</button>
+    </div>
+    <p style="color:#94a3b8;font-size:0.82rem;text-align:center">PC: W/S Pitch • A/D Turn • Space Fire • R Rocket • E Auto-Aim • Shift Boost • Esc Pause</p>
+  </div>
+  <div></div>
+</div>
+
+<div id="hud" class="hidden">
+  <div class="hud-top">
+    <div class="hud-box"><div id="hudModeTitle">Chapter 1</div><div class="hp-wrap"><div id="hudHpBar"></div></div><div id="hudTelemetry">SPD: 420 KTS | ALT: 1,200 FT</div></div>
+    <div class="hud-box" id="hudCenterInfo">Enemies Left: 4</div>
+    <div class="hud-box"><button class="hud-btn" id="btnHudPause">Settings</button><div id="hudWarning" style="margin-top:6px">RADAR CLEAR</div><canvas id="minimap" width="110" height="110" class="hidden"></canvas></div>
+  </div>
+  <div id="bannerAlert" class="hidden"></div>
+  <div id="reticle"></div>
+  <div class="hud-bottom">
+    <div></div>
+    <div class="action-btns">
+      <button class="hud-btn" id="btnFireGun">FIRE GUN</button>
+      <button class="hud-btn" id="btnFireRocket">ROCKET (RDY)</button>
+      <button class="hud-btn" id="btnAutoAim">AUTO-AIM (RDY)</button>
+      <button class="hud-btn" id="btnBoost">BOOST</button>
+    </div>
+  </div>
+</div>
+<div id="countdownOverlay" class="hidden">3</div>
+<div id="touchZone" class="hidden"><div id="touchKnob"></div></div>
+
+<div id="hangarModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>Hangar &amp; Upgrades</h2><button class="btn btn-sec btn-sm" onclick="closeModals()">Close</button></div>
+    <div class="tabs"><button class="tab-btn active" onclick="switchHangarTab('jets', this)">Fighter Jets</button><button class="tab-btn" onclick="switchHangarTab('upgrades', this)">Performance &amp; Tech</button></div>
+    <div class="modal-body" id="hangarBody"></div>
+  </div>
+</div>
+
+<div id="shopModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>Armory Store (Coins &amp; Prototypes)</h2><button class="btn btn-sec btn-sm" onclick="closeModals()">Close</button></div>
+    <div class="modal-body" id="shopBody"></div>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>Settings &amp; Controls</h2><button class="btn btn-sec btn-sm" id="btnCloseSettings">Resume / Close</button></div>
+    <div class="modal-body">
+      <label>Flight Sensitivity: <span id="sensVal">1.0x</span> <input type="range" id="sensSlider" min="0.3" max="2" step="0.1" value="1" /></label>
+      <label><input type="checkbox" id="mobileToggle" /> Enable On-Screen Touch Joystick</label>
+      <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
+      <div id="pauseActions" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-play btn-sm" id="btnResumeGame">Resume Flight</button>
+        <button class="btn btn-sec btn-sm" id="btnRestartMission">Restart Mission</button>
+        <button class="btn btn-danger btn-sm" id="btnQuitHome">Quit to Home</button>
+      </div>
+      <table class="bind-table"><thead><tr><th>Action</th><th>Current Key</th><th>Customize</th></tr></thead><tbody id="bindTableBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div id="statusModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2 id="statusTitle">Status</h2></div>
+    <div class="modal-body" id="statusBody"></div>
+  </div>
+</div>
+
+<script>
+const SAVE_KEY = 'skyace_save_v1';
+const defaultState = {
+  coins: 300, xp: 0, level: 1, rp: 0,
+  unlockedChapter: 1, selectedJet: 'f16',
+  ownedJets: ['f16'],
+  upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1 },
+  sensitivity: 1.0, mobileTouch: false,
+  binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
+};
+let state;
+try { state = Object.assign({}, defaultState, JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); } catch (e) { state = Object.assign({}, defaultState); }
+state.upgrades = Object.assign({}, defaultState.upgrades, state.upgrades || {});
+state.binds = Object.assign({}, defaultState.binds, state.binds || {});
+if (!Array.isArray(state.ownedJets) || !state.ownedJets.length) state.ownedJets = ['f16'];
+function saveState() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {} updateTopUI(); }
+
+const JETS = [
+  { id: 'f16', name: 'F-16 Falcon', cost: 0, premium: false, color: 0x94a3b8, accent: 0x38bdf8, hp: 120, spd: 1.0, turn: 1.05, dmg: 14, desc: 'Balanced agile multirole fighter.' },
+  { id: 'fa18', name: 'F/A-18 Hornet', cost: 450, premium: false, color: 0x64748b, accent: 0x22c55e, hp: 155, spd: 1.06, turn: 1.0, dmg: 18, desc: 'Carrier twin-tail strike jet with heavier hull.' },
+  { id: 'f35', name: 'F-35 Lightning', cost: 950, premium: false, color: 0x475569, accent: 0xa855f7, hp: 185, spd: 1.14, turn: 1.12, dmg: 23, desc: 'Stealth airframe with upgraded sensors.' },
+  { id: 'f22', name: 'F-22 Raptor', cost: 1600, premium: false, color: 0x334155, accent: 0xf59e0b, hp: 220, spd: 1.24, turn: 1.22, dmg: 28, desc: 'Air-superiority stealth twin-engine apex jet.' },
+  { id: 'su57', name: 'Su-57 Felon', cost: 2400, premium: false, color: 0x1e293b, accent: 0xef4444, hp: 250, spd: 1.30, turn: 1.28, dmg: 33, desc: 'Super-maneuverable fifth-gen interceptor.' },
+  { id: 'x02', name: 'X-02 Wyvern Prototype', cost: '$2.99', premium: true, color: 0x0f172a, accent: 0x38bdf8, hp: 290, spd: 1.38, turn: 1.35, dmg: 38, desc: 'Exclusive switch-blade experimental fighter.' },
+  { id: 'adf11', name: 'ADF-11 Raven Darkstar', cost: '$6.99', premium: true, color: 0x111827, accent: 0xf43f5e, hp: 340, spd: 1.48, turn: 1.42, dmg: 45, desc: 'Exclusive hypersonic black-ops prototype.' }
+];
+const GUN_GAME_TIERS = [
+  { name: 'T-1 Trainer', ability: 'Standard Twin Guns', color: 0x94a3b8, dmg: 16, fireRate: 0.16, spd: 1.0, rockets: false },
+  { name: 'T-2 Hawk', ability: 'Rapid Autocannon', color: 0x38bdf8, dmg: 14, fireRate: 0.10, spd: 1.05, rockets: false },
+  { name: 'T-3 Viper', ability: 'High Velocity Rounds', color: 0x22c55e, dmg: 20, fireRate: 0.14, spd: 1.10, rockets: false },
+  { name: 'T-4 Mirage', ability: 'Turbo Afterburner', color: 0xeab308, dmg: 18, fireRate: 0.13, spd: 1.25, rockets: false },
+  { name: 'T-5 Hornet', ability: 'Homing Rocket Pod', color: 0xf97316, dmg: 18, fireRate: 0.14, spd: 1.12, rockets: true },
+  { name: 'T-6 Fulcrum', ability: 'Heavy Armor Plating', color: 0xef4444, dmg: 22, fireRate: 0.14, spd: 1.10, rockets: true },
+  { name: 'T-7 Typhoon', ability: 'Tight Turn Thrusters', color: 0xa855f7, dmg: 21, fireRate: 0.12, spd: 1.18, rockets: true },
+  { name: 'T-8 Rafale', ability: 'Gatling Burst', color: 0xec4899, dmg: 17, fireRate: 0.08, spd: 1.16, rockets: true },
+  { name: 'T-9 Eagle', ability: 'Long-Range Cannon', color: 0x14b8a6, dmg: 26, fireRate: 0.15, spd: 1.22, rockets: true },
+  { name: 'T-10 Flanker', ability: 'Twin Rocket Salvo', color: 0x6366f1, dmg: 24, fireRate: 0.13, spd: 1.20, rockets: true },
+  { name: 'T-11 Lightning', ability: 'Stealth Overdrive', color: 0x64748b, dmg: 26, fireRate: 0.11, spd: 1.26, rockets: true },
+  { name: 'T-12 Raptor', ability: 'Precision Lock', color: 0x3b82f6, dmg: 28, fireRate: 0.11, spd: 1.28, rockets: true },
+  { name: 'T-13 Felon', ability: 'Plasma Tracers', color: 0xd946ef, dmg: 32, fireRate: 0.10, spd: 1.30, rockets: true },
+  { name: 'T-14 Wyvern', ability: 'Hyper Agility', color: 0xf59e0b, dmg: 35, fireRate: 0.09, spd: 1.35, rockets: true },
+  { name: 'T-15 Darkstar Final', ability: 'Golden Ace Railgun (1 Kill to Win!)', color: 0xfacc15, dmg: 45, fireRate: 0.12, spd: 1.40, rockets: true }
+];
+const CHAPTERS = [
+  { num: 1, name: 'Ch.1: Sunlit Harbor City', theme: 'city', sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x1e293b, enemies: 3, reward: 60 },
+  { num: 2, name: 'Ch.2: Alpine Snow Peaks', theme: 'mountain', sky: 0x93c5fd, fog: 0xdbeafe, ground: 0xe2e8f0, enemies: 4, reward: 85 },
+  { num: 3, name: 'Ch.3: Red Rock Canyon', theme: 'canyon', sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, enemies: 5, reward: 110 },
+  { num: 4, name: 'Ch.4: Sunset Bay Metropolis', theme: 'city', sky: 0xf43f5e, fog: 0xfda4af, ground: 0x1e1b4b, enemies: 6, reward: 140 },
+  { num: 5, name: 'Ch.5: Glacier Ridge', theme: 'mountain', sky: 0x0284c7, fog: 0xbae6fd, ground: 0xcbd5e1, enemies: 7, reward: 170 },
+  { num: 6, name: 'Ch.6: Neon Night Skyline', theme: 'neon', sky: 0x090d16, fog: 0x1e1b4b, ground: 0x0f172a, enemies: 8, reward: 210 },
+  { num: 7, name: 'Ch.7: Scorched Mesa', theme: 'canyon', sky: 0xd97706, fog: 0xfde68a, ground: 0x78350f, enemies: 9, reward: 250 },
+  { num: 8, name: 'Ch.8: Storm Front Capital', theme: 'city', sky: 0x334155, fog: 0x64748b, ground: 0x0f172a, enemies: 10, reward: 300 },
+  { num: 9, name: 'Ch.9: Everest Summit Assault', theme: 'mountain', sky: 0x1e3a8a, fog: 0x93c5fd, ground: 0xf8fafc, enemies: 11, reward: 360 },
+  { num: 10, name: 'Ch.10: Cyber Core Citadel', theme: 'neon', sky: 0x050811, fog: 0x311042, ground: 0x090d16, enemies: 12, reward: 450 }
+];
+function getRankName(rp) { if (rp >= 1200) return 'Ranked Global'; if (rp >= 700) return 'Diamond'; if (rp >= 300) return 'Gold'; return 'Silver'; }
+let currentMode = 'campaign';
+const chSel = document.getElementById('chapterSelect');
+CHAPTERS.forEach(function(c) { const o = document.createElement('option'); o.value = c.num; o.textContent = c.name; chSel.appendChild(o); });
+function updateTopUI() {
+  const xpReq = state.level * 250;
+  document.getElementById('uiPilotLvl').textContent = `Pilot Lv. ${state.level} (${state.xp}/${xpReq} XP)`;
+  document.getElementById('uiRank').textContent = `Rank: ${getRankName(state.rp)} (${state.rp} RP)`;
+  document.getElementById('uiCoins').textContent = `Coins: ${state.coins}`;
+  const j = JETS.find(function(x) { return x.id === state.selectedJet; }) || JETS[0];
+  document.getElementById('activeJetLabel').textContent = `Equipped: ${j.name}`;
+  Array.from(chSel.options).forEach(function(opt) { opt.disabled = Number(opt.value) > state.unlockedChapter; });
+}
+updateTopUI();
+document.querySelectorAll('.mode-btn').forEach(function(btn) {
+  btn.onclick = function() {
+    document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active'); currentMode = btn.dataset.mode;
+    document.getElementById('chapterSelectWrap').classList.toggle('hidden', currentMode !== 'campaign');
+    document.getElementById('diffSelectWrap').classList.toggle('hidden', currentMode === 'royale' || currentMode === 'online1v1');
+    document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1');
+  };
+});
+function showBanner(msg, ms) {
+  if (ms === undefined) ms = 3200;
+  const b = document.getElementById('bannerAlert'); if (!b) return;
+  b.textContent = msg; b.classList.remove('hidden'); clearTimeout(b._t);
+  b._t = setTimeout(function() { b.classList.add('hidden'); }, ms);
+}
+function awardXP(amount) {
+  state.xp += amount; let req = state.level * 250;
+  while (state.xp >= req) { state.xp -= req; state.level++; const bonus = state.level * 50; state.coins += bonus; showBanner(`LEVEL UP! Pilot Lv.${state.level} (+${bonus} Coins Reward!)`, 4000); req = state.level * 250; }
+  saveState();
+}
+
+// THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
+let renderer = null, scene = null, camera = null;
+const canvas = document.getElementById('gameCanvas');
+if (typeof THREE !== 'undefined') {
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 4500);
+  window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.05));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.1); dirLight.position.set(300, 600, 250); scene.add(dirLight);
+} else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
+function buildJetMesh(baseColor, accentColor, upg) {
+  upg = upg || { hull: 1, damage: 1, agility: 1, speed: 1 };
+  const g = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({ color: upg.hull >= 3 ? 0x1e293b : baseColor, metalness: 0.65, roughness: 0.3 });
+  const accMat = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.25, metalness: 0.5, roughness: 0.3 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.1 });
+  const body = new THREE.Mesh(new THREE.ConeGeometry(1.1, 8.5, 8), hullMat); body.rotation.x = Math.PI / 2; g.add(body);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8), glassMat); cockpit.scale.set(0.85, 0.7, 2.1); cockpit.position.set(0, 0.65, 0.8); g.add(cockpit);
+  const wingSpan = 9.5 + (upg.agility - 1) * 0.6;
+  const wings = new THREE.Mesh(new THREE.BoxGeometry(wingSpan, 0.16, 2.4), hullMat); wings.position.set(0, 0, -0.4); g.add(wings);
+  const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.9, 1.4), accMat); tailL.position.set(-1.1, 0.9, -3.1); tailL.rotation.z = 0.25;
+  const tailR = tailL.clone(); tailR.position.x = 1.1; tailR.rotation.z = -0.25; g.add(tailL, tailR);
+  if (upg.damage >= 2) { const podL = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.6, 6), accMat); podL.rotation.x = Math.PI / 2; podL.position.set(-3.2, -0.2, 0); const podR = podL.clone(); podR.position.x = 3.2; g.add(podL, podR); }
+  const nozzleScale = 1 + (upg.speed - 1) * 0.18;
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.55 * nozzleScale, 2.2 * nozzleScale, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); flame.rotation.x = -Math.PI / 2; flame.position.set(0, 0, -5.0); g.add(flame); g.userData.flame = flame;
+  return g;
+}
+let worldGroup = (typeof THREE !== 'undefined') ? new THREE.Group() : null;
+if (scene && worldGroup) scene.add(worldGroup);
+let obstacles = [];
+function buildEnvironment(theme, radius) {
+  if (!scene) return; radius = radius || 1400;
+  scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
+  const cfgs = { city: { sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x1e293b, bColor: 0x334155 }, mountain: { sky: 0x7dd3fc, fog: 0xe0f2fe, ground: 0xdbeafe, bColor: 0x94a3b8 }, canyon: { sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, bColor: 0x7c2d12 }, neon: { sky: 0x050811, fog: 0x1e1b4b, ground: 0x090d16, bColor: 0x1e1b4b } };
+  const cfg = cfgs[theme] || cfgs.city;
+  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, 0.00042);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: cfg.ground, roughness: 0.9 })); ground.rotation.x = -Math.PI / 2; worldGroup.add(ground);
+  const count = (theme === 'mountain' || theme === 'canyon') ? 75 : 110;
+  for (let i = 0; i < count; i++) {
+    const angle = (i * 2.39996) % (Math.PI * 2); const dist = 160 + ((i * 73) % Math.max(1, radius - 180));
+    const x = Math.cos(angle) * dist, z = Math.sin(angle) * dist; if (Math.abs(x) < 90 && Math.abs(z) < 90) continue;
+    const w = 26 + (i % 5) * 12, d = 26 + ((i * 3) % 5) * 12, h = 55 + ((i * 19) % 165); let mesh;
+    if (theme === 'mountain') { mesh = new THREE.Mesh(new THREE.ConeGeometry(w * 0.9, h * 1.4, 5), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 })); mesh.position.set(x, (h * 1.4) / 2, z); obstacles.push({ x: x, z: z, r: w * 0.65, h: h * 1.3 }); }
+    else { const mat = new THREE.MeshStandardMaterial({ color: cfg.bColor, emissive: theme === 'neon' ? 0x38bdf8 : 0x000000, emissiveIntensity: theme === 'neon' ? 0.25 : 0 }); mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); mesh.position.set(x, h / 2, z); obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.55, h: h }); }
+    worldGroup.add(mesh);
+  }
+  scene.add(worldGroup);
+}
+let activeGame = null, paused = false; const keys = {}; let touchVec = { x: 0, y: 0 };
+window.addEventListener('keydown', function(e) { keys[e.code] = true; if (activeGame && e.code === state.binds.pause) togglePause(); if (activeGame && !paused && e.code === state.binds.rocket) firePlayerRocket(); if (activeGame && !paused && e.code === state.binds.autoaim) triggerAutoAim(); });
+window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+function startMission() {
+  closeModals();
+  if (currentMode === 'online1v1') { startOnlineMatchmaking(); return; }
+  if (!renderer) { alert('3D engine failed to load. Check connection and reload.'); return; }
+  document.getElementById('menuScreen').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('touchZone').classList.toggle('hidden', !state.mobileTouch);
+  document.getElementById('minimap').classList.toggle('hidden', currentMode !== 'royale');
+  const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
+  const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
+  const mapRadius = currentMode === 'royale' ? 2400 : 1300;
+  const theme = currentMode === 'gungame' ? 'canyon' : (currentMode === 'royale' ? 'city' : ch.theme);
+  buildEnvironment(theme, mapRadius);
+  if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
+  const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
+  const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
+  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  const diff = document.getElementById('diffSelect').value;
+  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : 49);
+  for (let i = 0; i < botCount; i++) {
+    const ang = (i / botCount) * Math.PI * 2; const dist = currentMode === 'royale' ? (350 + Math.random() * 1650) : (320 + Math.random() * 550);
+    const randJet = JETS[i % JETS.length];
+    const botUpg = currentMode === 'royale' ? { hull: 1 + (i % 4), damage: 1 + (i % 3), agility: 1 + (i % 3), speed: 1 } : { hull: 1, damage: 1, agility: 1, speed: 1 };
+    const m = buildJetMesh(randJet.color, randJet.accent, botUpg); m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
+    let botHp = currentMode === 'campaign' ? (55 + ch.num * 10) : (currentMode === 'gungame' ? 75 : 165);
+    let skill = diff === 'rookie' ? 0.55 : (diff === 'ace' ? 1.15 : 0.85);
+    if (currentMode === 'royale') { const rName = getRankName(state.rp); skill = rName === 'Silver' ? 0.65 : (rName === 'Gold' ? 0.9 : (rName === 'Diamond' ? 1.15 : 1.35)); }
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28 });
+  }
+  if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
+  paused = false;
+}
+function runCountdown() {
+  const cdEl = document.getElementById('countdownOverlay'); cdEl.classList.remove('hidden'); cdEl.textContent = activeGame.countdown;
+  const iv = setInterval(function() { if (!activeGame) { clearInterval(iv); cdEl.classList.add('hidden'); return; } activeGame.countdown--; if (activeGame.countdown > 0) cdEl.textContent = activeGame.countdown; else if (activeGame.countdown === 0) cdEl.textContent = 'ENGAGE!'; else { cdEl.classList.add('hidden'); clearInterval(iv); } }, 900);
+}
+const RING_TYPES = [
+  { name: 'OVERDRIVE THRUST', desc: '+45% Top Speed & Turn Agility for 8s!', color: 0x38bdf8, type: 'speed' },
+  { name: 'RAPID VULCAN', desc: 'Double Cannon Fire Rate for 8s!', color: 0xf59e0b, type: 'rapid' },
+  { name: 'NANITE REPAIR', desc: '+50 Hull Armor Restored Immediately!', color: 0x22c55e, type: 'heal' },
+  { name: 'OMEGA TARGET LOCK', desc: 'Instant Super Auto-Aim Lock for 7s!', color: 0xa855f7, type: 'lock' }
+];
+function spawnPowerRing() { if (!activeGame) return; const rt = RING_TYPES[Math.floor(Math.random() * RING_TYPES.length)]; const mesh = new THREE.Mesh(new THREE.TorusGeometry(14, 1.4, 8, 24), new THREE.MeshBasicMaterial({ color: rt.color })); const a = Math.random() * Math.PI * 2; const d = Math.random() * (activeGame.zoneRadius * 0.75); mesh.position.set(Math.cos(a) * d, 140 + Math.random() * 180, Math.sin(a) * d); scene.add(mesh); activeGame.rings.push({ mesh: mesh, info: rt }); }
+function spawnBullet(pos, dir, ownerId, dmg, color) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 3.2), new THREE.MeshBasicMaterial({ color: color || 0xfef08a })); m.position.copy(pos); m.lookAt(pos.clone().add(dir)); scene.add(m); activeGame.bullets.push({ mesh: m, dir: dir.clone().normalize(), ownerId: ownerId, dmg: dmg, life: 2.2 }); }
+function spawnRocket(pos, dir, ownerId, targetObj, dmg) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 4.2, 6), new THREE.MeshBasicMaterial({ color: 0xef4444 })); m.rotation.x = Math.PI / 2; const wrap = new THREE.Group(); wrap.add(m); wrap.position.copy(pos); scene.add(wrap); activeGame.rockets.push({ mesh: wrap, dir: dir.clone().normalize(), ownerId: ownerId, target: targetObj, dmg: dmg, hp: 10, life: 6.5 }); }
+function firePlayerRocket() {
+  if (!activeGame || activeGame.player.rocketCd > 0) return;
+  if (activeGame.mode === 'gungame' && !GUN_GAME_TIERS[activeGame.player.ggTier].rockets) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
+  const p = activeGame.player; const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
+  let best = null, bestDot = 0.65;
+  activeGame.entities.forEach(function(e) { const toE = e.mesh.position.clone().sub(p.mesh.position).normalize(); const d = fwd.dot(toE); if (d > bestDot) { bestDot = d; best = e; } });
+  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, 55 + state.upgrades.rocket * 12);
+  p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7);
+}
+function triggerAutoAim() { if (!activeGame) return; const p = activeGame.player; if (p.autoAimCd > 0 || p.autoAimLeft > 0) return; p.autoAimLeft = 1.6 + (state.upgrades.autoaim - 1) * 0.35; p.autoAimCd = 11; }
+
+document.getElementById('btnFireRocket').onclick = firePlayerRocket;
+document.getElementById('btnAutoAim').onclick = triggerAutoAim;
+document.getElementById('btnHudPause').onclick = function() { togglePause(true); };
+function togglePause(forceOpen) {
+  if (!activeGame) return;
+  paused = forceOpen !== undefined ? forceOpen : !paused;
+  document.getElementById('pauseActions').classList.toggle('hidden', !paused);
+  document.getElementById('settingsModal').classList.toggle('hidden', !paused);
+  if (paused) renderKeybinds();
+}
+function endMatch(victory, title, summary) {
+  const modeAtEnd = currentMode; const chapterAtEnd = activeGame ? activeGame.chapter : Number(chSel.value);
+  activeGame = null; paused = false;
+  document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
+  document.getElementById('statusTitle').textContent = title;
+  let nextBtn = '';
+  if (victory && modeAtEnd === 'campaign' && chapterAtEnd < 10) nextBtn = '<button class="btn btn-play" onclick="nextChapter()">Next Chapter</button>';
+  document.getElementById('statusBody').innerHTML = `<p style="color:#cbd5e1;line-height:1.5;">${summary}</p><div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">${nextBtn}<button class="btn btn-sec" onclick="returnHome()">Home Menu</button></div>`;
+  document.getElementById('statusModal').classList.remove('hidden');
+}
+function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
+function returnHome() { activeGame = null; paused = false; closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); updateTopUI(); }
+let lastTime = performance.now();
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
+  if (!renderer) return;
+  if (!activeGame || paused) { renderer.render(scene, camera); return; }
+  if (activeGame.countdown > 0) { const p0 = activeGame.player; const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 6, -18).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderer.render(scene, camera); return; }
+  const p = activeGame.player;
+  if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
+  if (p.buffTimer > 0) { p.buffTimer -= dt; if (p.buffTimer <= 0) p.buff = null; }
+  let pitch = touchVec.y, yaw = -touchVec.x;
+  if (keys[state.binds.pitchUp]) pitch -= 1; if (keys[state.binds.pitchDown]) pitch += 1; if (keys[state.binds.turnLeft]) yaw += 1; if (keys[state.binds.turnRight]) yaw -= 1;
+  const sens = state.sensitivity * (p.buff === 'speed' ? 1.35 : 1.0);
+  p.mesh.rotateY(yaw * p.turn * sens * dt); p.mesh.rotateX(pitch * p.turn * 0.85 * sens * dt); p.mesh.rotation.z = THREE.MathUtils.lerp(p.mesh.rotation.z, -yaw * 0.55, 5 * dt);
+  if (p.autoAimLeft > 0 && activeGame.entities.length > 0) {
+    let closest = activeGame.entities[0], bestD = 999999;
+    activeGame.entities.forEach(function(e) { const d = e.mesh.position.distanceTo(p.mesh.position); if (d < bestD) { bestD = d; closest = e; } });
+    const desired = closest.mesh.position.clone().sub(p.mesh.position).normalize();
+    const qTarget = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), desired);
+    p.mesh.quaternion.slerp(qTarget, 0.08 + state.upgrades.autoaim * 0.035);
+  }
+  const boosting = keys[state.binds.boost] || p._touchBoost;
+  const tierSpd = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].spd : 1;
+  const curSpd = p.spd * tierSpd * (boosting ? 1.45 : 1) * (p.buff === 'speed' ? 1.45 : 1);
+  const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
+  p.mesh.position.addScaledVector(fwd, curSpd * dt); p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y));
+  for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { endMatch(false, 'AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); return; } }
+  const firing = keys[state.binds.fire] || p._touchFire;
+  const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1);
+  const gunDmg = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].dmg : p.dmg;
+  if (firing && p.fireCd <= 0) { spawnBullet(p.mesh.position.clone().add(fwd.clone().multiplyScalar(5)), fwd, 'player', gunDmg); p.fireCd = fireRate; }
+  for (let i = activeGame.rings.length - 1; i >= 0; i--) { const rg = activeGame.rings[i]; rg.mesh.rotation.y += dt * 1.5; if (rg.mesh.position.distanceTo(p.mesh.position) < 22) { if (rg.info.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + 50); else if (rg.info.type === 'lock') { p.autoAimLeft = 7; } else { p.buff = rg.info.type; p.buffTimer = 8; } showBanner(`${rg.info.name}: ${rg.info.desc}`, 3800); scene.remove(rg.mesh); activeGame.rings.splice(i, 1); spawnPowerRing(); } }
+  if (activeGame.mode === 'royale') {
+    activeGame.zoneTimer -= dt;
+    if (activeGame.zoneTimer <= 0 && activeGame.zoneRadius > 220) { activeGame.zoneRadius = Math.max(220, activeGame.zoneRadius - 320); activeGame.zoneTimer = 35; showBanner('STORM ZONE CLOSING IN!', 2500); }
+    const distCenter = Math.hypot(p.mesh.position.x, p.mesh.position.z);
+    if (distCenter > activeGame.zoneRadius) { p.hp -= 12 * dt; document.getElementById('hudWarning').textContent = 'OUTSIDE SAFE ZONE — TAKING STORM DAMAGE!'; }
+    else { document.getElementById('hudWarning').textContent = `ZONE RADIUS: ${Math.round(activeGame.zoneRadius)}M`; }
+    drawMinimap();
+  }
+  let incomingMissile = false;
+  for (let i = activeGame.entities.length - 1; i >= 0; i--) {
+    const bot = activeGame.entities[i]; bot.fireCd -= dt; bot.rocketCd -= dt;
+    let tgtPos = p.mesh.position, bestDist = bot.mesh.position.distanceTo(p.mesh.position);
+    if (activeGame.mode !== 'campaign') { for (let j = 0; j < activeGame.entities.length; j++) { if (i === j) continue; const d = bot.mesh.position.distanceTo(activeGame.entities[j].mesh.position); if (d < bestDist * 0.95) { bestDist = d; tgtPos = activeGame.entities[j].mesh.position; } } }
+    bot.wanderAng += dt * 1.4;
+    const weave = new THREE.Vector3(Math.sin(bot.wanderAng) * 45, Math.cos(bot.wanderAng * 0.8) * 28, Math.cos(bot.wanderAng) * 45);
+    const aimPoint = tgtPos.clone().add(weave); const desired = aimPoint.sub(bot.mesh.position).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), desired);
+    bot.mesh.quaternion.slerp(q, 1.6 * dt * bot.skill);
+    const bFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bot.mesh.quaternion);
+    bot.mesh.position.addScaledVector(bFwd, bot.spd * dt); bot.mesh.position.y = Math.max(40, Math.min(850, bot.mesh.position.y));
+    if (bestDist < 420 && bot.fireCd <= 0) { spawnBullet(bot.mesh.position.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill, 0xf87171); bot.fireCd = 0.45 / bot.skill; }
+    if (bestDist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { let tgtObj = 'player'; if (tgtPos !== p.mesh.position) { for (let k = 0; k < activeGame.entities.length; k++) { if (activeGame.entities[k].mesh.position === tgtPos) tgtObj = activeGame.entities[k]; } } spawnRocket(bot.mesh.position.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, tgtObj, 35); bot.rocketCd = 11 / bot.skill; }
+  }
+  for (let i = activeGame.bullets.length - 1; i >= 0; i--) {
+    const b = activeGame.bullets[i]; b.life -= dt; b.mesh.position.addScaledVector(b.dir, 360 * dt);
+    if (b.life <= 0) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
+    let hit = false;
+    for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 9) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
+    if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
+    if (b.ownerId !== 'player' && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; hit = true; }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; hit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
+    if (!activeGame) return;
+  }
+  for (let i = activeGame.rockets.length - 1; i >= 0; i--) {
+    const rk = activeGame.rockets[i]; rk.life -= dt;
+    if (rk.target === 'player') { incomingMissile = true; const toP = p.mesh.position.clone().sub(rk.mesh.position).normalize(); rk.dir.lerp(toP, 2.4 * dt).normalize(); }
+    else if (rk.target && rk.target.mesh && activeGame.entities.includes(rk.target)) { const toT = rk.target.mesh.position.clone().sub(rk.mesh.position).normalize(); rk.dir.lerp(toT, 2.8 * dt).normalize(); }
+    rk.mesh.position.addScaledVector(rk.dir, 185 * dt); rk.mesh.lookAt(rk.mesh.position.clone().add(rk.dir));
+    if (rk.ownerId !== 'player' && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    let rHit = false;
+    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
+    if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
+    if (!activeGame) return;
+  }
+  if (activeGame.mode !== 'royale') { document.getElementById('hudWarning').textContent = incomingMissile ? 'MISSILE LOCK! TURN & SHOOT ROCKET TO DETONATE!' : (p.autoAimLeft > 0 ? `AUTO-AIM ACTIVE (${p.autoAimLeft.toFixed(1)}s)` : 'RADAR CLEAR'); }
+  if (p.hp <= 0) {
+    if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); }
+    else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); }
+    return;
+  }
+  const camOffset = new THREE.Vector3(0, 4.5, -15).applyQuaternion(p.mesh.quaternion);
+  camera.position.lerp(p.mesh.position.clone().add(camOffset), Math.min(1, 10 * dt)); camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(25)));
+  updateHUD(curSpd); renderer.render(scene, camera);
+}
+function handleEntityEliminated(eIdx, killerId) {
+  if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
+  if (killerId === 'player') {
+    p.kills++; const coinGain = activeGame.mode === 'campaign' ? 20 : 6; const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain);
+    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; showBanner(`PROMOTED: ${tier.name} — ${tier.ability}`, 3000); }
+  } else {
+    const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
+    if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; killerBot.ggTier = Math.min(14, killerBot.kills); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
+  }
+  if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); }
+  else {
+    scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
+    if (activeGame.entities.length === 0) {
+      if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; state.coins += ch.reward; state.unlockedChapter = Math.min(10, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${ch.reward} Coins & +90 XP!`); }
+      else if (activeGame.mode === 'royale') { state.rp += 35; state.coins += 90; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); }
+      else if (activeGame.mode === 'online1v1' || currentMode === 'online1v1') { endMatch(true, '1V1 VICTORY!', 'You shot down your online rival!'); }
+    }
+  }
+}
+function updateHUD(curSpd) {
+  const p = activeGame.player;
+  document.getElementById('hudHpBar').style.width = `${Math.max(0, (p.hp / p.maxHp) * 100)}%`;
+  document.getElementById('hudTelemetry').textContent = `SPD: ${Math.round(curSpd * 6)} KTS | ALT: ${Math.round(p.mesh.position.y * 8)} FT`;
+  document.getElementById('btnFireRocket').textContent = p.rocketCd > 0 ? `ROCKET (${Math.ceil(p.rocketCd)}s)` : 'ROCKET (RDY)';
+  document.getElementById('btnAutoAim').textContent = p.autoAimCd > 0 ? `LOCK (${Math.ceil(p.autoAimCd)}s)` : 'AUTO-AIM (RDY)';
+  if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
+  else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Top Bot: ${topBot}/15`; }
+  else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = 'Ranked Royale'; document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; }
+  else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
+  const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
+  activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + (p.autoAimLeft > 0 ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; boxWrap.appendChild(div); });
+}
+function drawMinimap() {
+  const c = document.getElementById('minimap'); if (!c || !activeGame) return; const ctx = c.getContext('2d'); ctx.clearRect(0, 0, 110, 110); const scale = 50 / 2400;
+  ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(55, 55, Math.max(4, activeGame.zoneRadius * scale), 0, Math.PI * 2); ctx.stroke();
+  const px = 55 + activeGame.player.mesh.position.x * scale, pz = 55 + activeGame.player.mesh.position.z * scale;
+  ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(px, pz, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ef4444'; activeGame.entities.forEach(function(e) { const ex = 55 + e.mesh.position.x * scale, ez = 55 + e.mesh.position.z * scale; if ((ex - 55) * (ex - 55) + (ez - 55) * (ez - 55) < 2500) { ctx.beginPath(); ctx.arc(ex, ez, 2, 0, Math.PI * 2); ctx.fill(); } });
+}
+
+// HANGAR, SHOP & SETTINGS UI
+function closeModals() { document.querySelectorAll('.modal').forEach(function(m) { m.classList.add('hidden'); }); }
+document.getElementById('btnStartPlay').onclick = startMission;
+document.getElementById('btnOpenHangar').onclick = function() { switchHangarTab('jets'); document.getElementById('hangarModal').classList.remove('hidden'); };
+document.getElementById('btnOpenShop').onclick = function() { renderShop(); document.getElementById('shopModal').classList.remove('hidden'); };
+document.getElementById('btnOpenSettings').onclick = function() { renderKeybinds(); document.getElementById('pauseActions').classList.add('hidden'); document.getElementById('settingsModal').classList.remove('hidden'); };
+document.getElementById('btnCloseSettings').onclick = function() { if (activeGame) togglePause(false); else closeModals(); };
+document.getElementById('btnResumeGame').onclick = function() { togglePause(false); };
+document.getElementById('btnRestartMission').onclick = function() { closeModals(); paused = false; currentMode = activeGame ? activeGame.mode : currentMode; if (currentMode === 'online1v1') currentMode = 'campaign'; startMission(); };
+document.getElementById('btnQuitHome').onclick = returnHome;
+function switchHangarTab(tab, btnEl) {
+  if (btnEl) { document.querySelectorAll('#hangarModal .tab-btn').forEach(function(b) { b.classList.remove('active'); }); btnEl.classList.add('active'); }
+  const body = document.getElementById('hangarBody');
+  if (tab === 'jets') {
+    body.innerHTML = '<div class="card-grid">' + JETS.map(function(j) {
+      const owned = state.ownedJets.includes(j.id); const eq = state.selectedJet === j.id; let btnHtml = '';
+      if (eq) btnHtml = '<button class="btn btn-sec btn-sm" disabled>Equipped</button>';
+      else if (owned) btnHtml = `<button class="btn btn-play btn-sm" onclick="equipJet('${j.id}')">Equip</button>`;
+      else if (j.premium) btnHtml = `<button class="btn btn-gold btn-sm" onclick="openModalsShop()">Store Only (${j.cost})</button>`;
+      else btnHtml = `<button class="btn btn-gold btn-sm" onclick="buyJet('${j.id}')">Buy (${j.cost} Coins)</button>`;
+      const pct = Math.round(j.spd * 100);
+      return `<div class="item-card"><h3>${j.name}</h3><p>${j.desc}</p><p>Hull: ${j.hp} | DMG: ${j.dmg} | SPD: ${pct}%</p><div class="stat-bar"><div class="stat-fill" style="width:${Math.min(100, j.hp / 3.4)}%"></div></div>${btnHtml}</div>`;
+    }).join('') + '</div>';
+  } else {
+    const upgs = [
+      { key: 'hull', name: 'Reinforced Armor Hull', desc: 'Adds +35 Max HP & dark stealth plating.' },
+      { key: 'damage', name: 'Heavy Wing Pods', desc: 'Adds +6 Cannon DMG & mounts wing pods.' },
+      { key: 'agility', name: 'Vector Control Flaps', desc: 'Increases turn rate & widens wing span.' },
+      { key: 'speed', name: 'Afterburner Nozzles', desc: 'Boosts top airspeed & thruster size.' },
+      { key: 'autoaim', name: 'Target Lock Computer', desc: 'Boosts Auto-Aim accuracy cone & lock time.' },
+      { key: 'rocket', name: 'Homing Missile Rack', desc: 'Boosts rocket damage & cuts reload time.' }
+    ];
+    body.innerHTML = '<div class="card-grid">' + upgs.map(function(u) {
+      const lvl = state.upgrades[u.key]; const cost = lvl * 140;
+      const btn = lvl >= 6 ? '<button class="btn btn-sec btn-sm" disabled>MAXED</button>' : `<button class="btn btn-gold btn-sm" onclick="buyUpgrade('${u.key}', ${cost})">Upgrade (${cost} Coins)</button>`;
+      return `<div class="item-card"><h3>${u.name} (Lv.${lvl}/6)</h3><p>${u.desc}</p><div class="stat-bar"><div class="stat-fill" style="width:${lvl / 6 * 100}%"></div></div>${btn}</div>`;
+    }).join('') + '</div>';
+  }
+}
+function openModalsShop() { closeModals(); renderShop(); document.getElementById('shopModal').classList.remove('hidden'); }
+function equipJet(id) { state.selectedJet = id; saveState(); switchHangarTab('jets'); }
+function buyJet(id) { const j = JETS.find(function(x) { return x.id === id; }); if (!j || typeof j.cost !== 'number') return; if (state.coins < j.cost) { alert('Not enough coins!'); return; } state.coins -= j.cost; state.ownedJets.push(id); state.selectedJet = id; saveState(); switchHangarTab('jets'); }
+function buyUpgrade(key, cost) { if (state.coins < cost) { alert('Not enough coins!'); return; } if (state.upgrades[key] >= 6) return; state.coins -= cost; state.upgrades[key]++; saveState(); switchHangarTab('upgrades'); }
+function renderShop() {
+  const packs = [ { name: 'Pilot Coin Pouch', coins: 600, price: '$0.99' }, { name: 'Squadron War Chest', coins: 1800, price: '$2.99' }, { name: 'Commander Vault', coins: 5000, price: '$6.99' } ];
+  const premJets = JETS.filter(function(j) { return j.premium; });
+  document.getElementById('shopBody').innerHTML =
+    '<div class="section-label">Coin Bundles</div><div class="card-grid">' + packs.map(function(pk) { return `<div class="item-card"><h3>${pk.name}</h3><p>Instant +${pk.coins} Coins for upgrades & jets.</p><button class="btn btn-gold btn-sm" onclick="simulateIAP('${pk.name}', ${pk.coins}, '')">Buy ${pk.price}</button></div>`; }).join('') + '</div>' +
+    '<div class="section-label" style="margin-top:8px;">Exclusive Prototype Aircraft (Real-Money Only)</div><div class="card-grid">' + premJets.map(function(j) { const owned = state.ownedJets.includes(j.id); const btn = owned ? '<button class="btn btn-sec btn-sm" disabled>Owned</button>' : `<button class="btn btn-gold btn-sm" onclick="simulateIAP('${j.name}', 0, '${j.id}')">Unlock ${j.cost}</button>`; return `<div class="item-card"><h3>${j.name}</h3><p>${j.desc}</p>${btn}</div>`; }).join('') + '</div>' +
+    '<p style="color:#94a3b8;font-size:0.8rem;">Note: This is a simulated/test purchase flow. Connect Stripe Payment Links or App Store billing when deployed live.</p>';
+}
+function simulateIAP(title, coins, jetId) { if (!confirm(`Confirm test purchase of ${title}?`)) return; if (coins) state.coins += coins; if (jetId && !state.ownedJets.includes(jetId)) { state.ownedJets.push(jetId); state.selectedJet = jetId; } saveState(); renderShop(); }
+const BIND_LABELS = [ ['pitchUp', 'Pitch Nose Up'], ['pitchDown', 'Pitch Nose Down'], ['turnLeft', 'Bank / Turn Left'], ['turnRight', 'Bank / Turn Right'], ['fire', 'Fire Primary Guns'], ['rocket', 'Launch Homing Rocket'], ['autoaim', 'Activate Auto-Aim Lock'], ['boost', 'Engage Afterburner'], ['pause', 'Pause / Settings Menu'] ];
+let listeningAction = null;
+function renderKeybinds() {
+  const slider = document.getElementById('sensSlider'); if (!slider) return;
+  slider.value = state.sensitivity; document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; document.getElementById('mobileToggle').checked = state.mobileTouch;
+  document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
+}
+function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
+window.addEventListener('keydown', function(e) { if (!listeningAction) return; e.preventDefault(); state.binds[listeningAction] = e.code; listeningAction = null; saveState(); renderKeybinds(); });
+document.getElementById('sensSlider').oninput = function(e) { state.sensitivity = parseFloat(e.target.value); document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; saveState(); };
+document.getElementById('mobileToggle').onchange = function(e) { state.mobileTouch = e.target.checked; saveState(); };
+document.getElementById('btnResetBinds').onclick = function() { state.binds = Object.assign({}, defaultState.binds); saveState(); renderKeybinds(); };
+// Touch joystick & HUD buttons
+const tz = document.getElementById('touchZone'); const tk = document.getElementById('touchKnob');
+tz.addEventListener('touchmove', function(e) { e.preventDefault(); const rect = tz.getBoundingClientRect(); const t = e.touches[0]; const dx = Math.max(-35, Math.min(35, t.clientX - (rect.left + 55))); const dy = Math.max(-35, Math.min(35, t.clientY - (rect.top + 55))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / 35; touchVec.y = dy / 35; }, { passive: false });
+tz.addEventListener('touchend', function() { tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; });
+function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) e.preventDefault(); if (activeGame) activeGame.player[prop] = true; }; const off = function() { if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); }
+bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost');
+// ONLINE 1v1 (PeerJS — optional, no bots)
+let peer = null, conn = null, peerSyncTimer = null;
+function startOnlineMatchmaking(roomCodeToJoin, isHost) {
+  document.getElementById('statusTitle').textContent = 'Online 1v1 (No Bots)';
+  if (typeof Peer === 'undefined') { document.getElementById('statusBody').innerHTML = '<p style="color:#cbd5e1;line-height:1.5;">PeerJS failed to load, so online play is unavailable right now. All offline modes still work.</p><div style="margin-top:12px;"><button class="btn btn-sec" onclick="returnHome()">Home Menu</button></div>'; document.getElementById('statusModal').classList.remove('hidden'); return; }
+  const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const peerId = isHost ? `SKYACE-${code}` : undefined;
+  const hostMsg = `<p style="font-size:0.9rem;">Share Room Code with your friend: <strong style="color:#fbbf24;font-size:1.2rem;">${code}</strong></p>`;
+  const joinMsg = '<p style="font-size:0.85rem;color:#94a3b8;">Searching live 1v1 queue (Zero AI Bots)...</p>';
+  document.getElementById('statusBody').innerHTML = `<p style="color:#cbd5e1;">Waiting for online players...</p>${isHost ? hostMsg : joinMsg}<div style="margin-top:12px;"><button class="btn btn-danger btn-sm" onclick="cancelOnline()">Cancel Search</button></div>`;
+  document.getElementById('statusModal').classList.remove('hidden');
+  try {
+    if (peer) peer.destroy();
+    peer = peerId ? new Peer(peerId) : new Peer();
+    peer.on('open', function() { if (roomCodeToJoin) { conn = peer.connect(`SKYACE-${roomCodeToJoin.toUpperCase()}`); setupPeerConn(conn); } });
+    peer.on('connection', function(c) { conn = c; setupPeerConn(conn); });
+    peer.on('error', function(err) { showBanner(`Online error: ${err.type || 'connection failed'}`, 4000); });
+  } catch (e) { showBanner('Online unavailable right now.', 3000); }
+}
+function setupPeerConn(c) {
+  if (!c) return;
+  c.on('open', function() {
+    closeModals(); showBanner('OPPONENT CONNECTED! 1v1 DOGFIGHT STARTING!', 3000);
+    const savedMode = currentMode; currentMode = 'campaign'; startMission(); currentMode = 'online1v1'; if (activeGame) activeGame.mode = 'campaign';
+    if (!activeGame) return;
+    activeGame.entities.forEach(function(e) { scene.remove(e.mesh); }); activeGame.entities = [];
+    const oppMesh = buildJetMesh(0xef4444, 0xfbbf24); oppMesh.position.set(0, 220, 450); scene.add(oppMesh);
+    const remoteEnt = { id: 'remote', name: 'Online Rival', mesh: oppMesh, hp: 180, maxHp: 180, spd: 0, skill: 0, fireCd: 99, rocketCd: 99, wanderAng: 0, kills: 0, ggTier: 0 };
+    activeGame.entities.push(remoteEnt);
+    if (peerSyncTimer) clearInterval(peerSyncTimer);
+    peerSyncTimer = setInterval(function() { if (activeGame && conn && conn.open) { try { conn.send({ pos: activeGame.player.mesh.position.toArray(), quat: activeGame.player.mesh.quaternion.toArray() }); } catch (e) {} } }, 50);
+    c.on('data', function(d) { if (d && d.pos && remoteEnt.mesh) { remoteEnt.mesh.position.fromArray(d.pos); if (d.quat) remoteEnt.mesh.quaternion.fromArray(d.quat); } });
+  });
+}
+function cancelOnline() { if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); }
+document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
+document.getElementById('btnJoinRoom').onclick = function() { const c = document.getElementById('joinCodeInput').value.trim(); if (c) startOnlineMatchmaking(c, false); else startOnlineMatchmaking(); };
+// Idle background scene on menu
+if (renderer) { buildEnvironment('city', 1200); camera.position.set(0, 220, -350); camera.lookAt(0, 120, 0); }
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
