@@ -210,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v26 — PREMIUM JETS ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v28 — REALISM & DUELS ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -242,6 +242,12 @@
         <select id="diffSelect"><option value="rookie">Rookie</option><option value="veteran" selected>Veteran</option><option value="ace">Ace</option></select>
       </label>
       <div id="onlineRoomWrap" class="hidden">
+        <div id="duelWrap" class="hidden">
+          <button class="btn btn-sec btn-sm" id="btnFindDuel">🌐 FIND ONLINE MATCH</button>
+          <button class="btn btn-danger btn-sm hidden" id="btnCancelDuel">Cancel Search</button>
+          <div id="duelMmStatus" style="margin-top:6px;font-size:0.8rem;color:#7dd3fc;line-height:1.45;"></div>
+          <div style="margin-top:8px;font-size:0.78rem;color:#94a3b8;">Private match (room code):</div>
+        </div>
         <div id="mmWrap" class="hidden">
           <button class="btn btn-sec btn-sm" id="btnFindMatch">🌐 FIND ONLINE MATCH</button>
           <button class="btn btn-danger btn-sm hidden" id="btnCancelMatch">Cancel Search</button>
@@ -294,7 +300,7 @@
 
 <div id="shopModal" class="modal hidden">
   <div class="modal-card">
-    <div class="modal-header"><h2>Armory Store (Coins &amp; Prototypes)</h2><button class="btn btn-sec btn-sm" onclick="closeModals()">Close</button></div>
+    <div class="modal-header"><h2>Armory Store (Coins &amp; Prototypes)</h2><span style="display:inline-flex;gap:6px;"><button class="btn btn-sec btn-sm" id="btnCheckPurchases">↻ Check Purchases</button><button class="btn btn-sec btn-sm" onclick="closeModals()">Close</button></span></div>
     <div class="modal-body" id="shopBody"></div>
   </div>
 </div>
@@ -371,6 +377,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
@@ -577,8 +584,10 @@ document.querySelectorAll('.mode-btn').forEach(function(btn) {
     document.getElementById('onlineRoomWrap').classList.toggle('hidden', currentMode !== 'online1v1' && currentMode !== 'royale'); // v18: room controls also serve Online Royale
     document.getElementById('royaleOnlineNote').classList.toggle('hidden', currentMode !== 'royale'); // v18
     document.getElementById('mmWrap').classList.toggle('hidden', currentMode !== 'royale'); // v25: public matchmaking lives with the Royale controls
+    document.getElementById('duelWrap').classList.toggle('hidden', currentMode !== 'online1v1'); // v28: duel matchmaking lives with the 1v1 controls
     if (currentMode !== 'royale') royalePeerReady = false; // v18: leaving Royale drops the online-royale pairing (the peer link itself is untouched)
     if (currentMode !== 'royale' && typeof mm !== 'undefined' && mm.searching) mmCancelSearch(); // v25: leaving Royale abandons a pending search
+    if (currentMode !== 'online1v1' && typeof duel !== 'undefined' && duel.searching) duelCancelSearch(); // v28: leaving Online 1v1 abandons a pending duel search
   };
 });
 updateStartLabel();
@@ -726,6 +735,9 @@ setTimeout(hideBootOverlay, 4000);
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
 let renderer = null, scene = null, camera = null, sunLight = null, hemiLight = null, fillLight = null;
 let composer = null, bloomPass = null; // v16: post-processing pipeline (UnrealBloom) — null-safe, plain rendering is the fallback
+let filmPass = null, composerSamples = 0; // v28: film-finish ShaderPass (high quality only) + the MSAA sample count the live composer target was built with
+let menuEnvTexture = null, themeEnvRT = null, themeEnvPMREM = null; // v28: startup PMREM env (menu) vs the per-theme env RT baked per mission
+let _waterNormTex = null; // v28: harbor water ripple normal map (module-level so animate() can drift its offset)
 let baseBloomStrength = 0.47, bloomQualityFactor = 1, currentThemeName = 'city'; // v17: theme-driven bloom (updateBloom = base x quality factor) + active theme for shadow tracking // v18: menu default 0.55 -> 0.47 (x0.85)
 const canvas = document.getElementById('gameCanvas');
 if (typeof THREE !== 'undefined') {
@@ -759,7 +771,8 @@ if (typeof THREE !== 'undefined') {
     const soft2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 7), new THREE.MeshBasicMaterial());
     soft2.material.color.setRGB(4, 5, 9); // cooler blue fill softbox
     soft2.position.set(-16, 6, -10); soft2.lookAt(0, 0, 0); envScene.add(soft2);
-    scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    menuEnvTexture = pmrem.fromScene(envScene, 0.04).texture; // v28: kept so the menu can restore it after a mission's per-theme env bake
+    scene.environment = menuEnvTexture;
     pmrem.dispose();
   } catch (envErr) { /* reflections are cosmetic; game runs fine without them */ }
   camera = new THREE.PerspectiveCamera(state.fov || 65, window.innerWidth / window.innerHeight, 0.5, 4500);
@@ -773,15 +786,12 @@ if (typeof THREE !== 'undefined') {
     // v19: the default EffectComposer target has NO MSAA samples, so everything routed
     // through the composer since v16 rendered without anti-aliasing (jagged edges) even
     // though the renderer was created with antialias:true. An explicit HalfFloat target
-    // with samples: 4 restores MSAA inside the bloom pipeline; composer.setSize() on
+    // with samples restores MSAA inside the bloom pipeline; composer.setSize() on
     // resize resizes this target and preserves its samples.
-    const composerRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: 4 });
-    composer = new EffectComposer(renderer, composerRT);
-    composer.addPass(new RenderPass(scene, camera));
-    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.47, 0.55, 0.6); // v17: threshold 0.82 -> 0.6 so bloom actually engages in daylight missions, not just the dark menu // v18: initial strength matches the 0.47 menu default
-    composer.addPass(bloomPass);
-    composer.addPass(new OutputPass());
-  } catch (compErr) { composer = null; bloomPass = null; }
+    // v28: assembly lives in buildComposer() (below) so applyQuality can rebuild the
+    // pipeline at a different MSAA sample count (high quality gets up to 8x).
+    buildComposer(4);
+  } catch (compErr) { composer = null; bloomPass = null; filmPass = null; }
   hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85); scene.add(hemiLight); // v17: named so applyThemeLighting can drive it per theme
   scene.add(new THREE.AmbientLight(0xffffff, 0.18));
   sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6); sunLight.position.set(300, 600, 250);
@@ -799,6 +809,53 @@ if (typeof THREE !== 'undefined') {
   fillLight.position.set(0, 0, 0); fillLight.target.position.set(0, 0, -10);
   camera.add(fillLight); camera.add(fillLight.target); fillLight.visible = false;
 } else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
+// ---- v28 film finish: a final ShaderPass after OutputPass — animated film grain,
+// a gentle saturation lift and a whisper of teal-shadow / warm-highlight split tone.
+// High quality only (applyQuality toggles .enabled); creation is fail-safe — if the
+// pass can't be built the composer simply runs without it.
+const FilmFinishShader = {
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uGrain: { value: 0.028 } },
+  vertexShader: [
+    'varying vec2 vUv;',
+    'void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }'
+  ].join('\n'),
+  fragmentShader: [
+    'uniform sampler2D tDiffuse;',
+    'uniform float uTime;',
+    'uniform float uGrain;',
+    'varying vec2 vUv;',
+    'float ffHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7)) + fract(uTime) * 61.7) * 43758.5453); }',
+    'void main() {',
+    '  vec4 src = texture2D(tDiffuse, vUv);',
+    '  vec3 col = src.rgb;',
+    '  float luma = dot(col, vec3(0.299, 0.587, 0.114));',
+    '  col = mix(vec3(luma), col, 1.06);', // saturation lift x1.06
+    '  vec3 tint = mix(vec3(0.95, 1.02, 1.05), vec3(1.05, 1.01, 0.95), smoothstep(0.08, 0.92, luma));', // teal shadows -> warm highlights (0.05-strength tints)
+    '  col *= tint;',
+    '  float g = ffHash(floor(vUv * vec2(1440.0, 810.0)));',
+    '  col += (g - 0.5) * uGrain;', // animated grain, amount 0.028
+    '  gl_FragColor = vec4(col, src.a);',
+    '}'
+  ].join('\n')
+};
+// (Re)builds the post pipeline with an MSAA composer target of `samples` samples.
+// Pass objects (bloom, film) are reused across rebuilds — only the composer's own
+// render targets are recreated and the old ones disposed.
+function buildComposer(samples) {
+  const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: samples });
+  const old = composer;
+  const nc = new EffectComposer(renderer, rt);
+  nc.addPass(new RenderPass(scene, camera));
+  if (!bloomPass) bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.47, 0.55, 0.6); // v17: threshold 0.6 // v18: initial strength matches the 0.47 menu default
+  nc.addPass(bloomPass);
+  nc.addPass(new OutputPass());
+  if (!filmPass) { try { filmPass = new ShaderPass(FilmFinishShader); } catch (e) { filmPass = null; } }
+  if (filmPass) { filmPass.enabled = ((state.quality || 'high') === 'high'); nc.addPass(filmPass); }
+  nc.setPixelRatio(old ? old.getPixelRatio() : renderer.getPixelRatio());
+  nc.setSize(window.innerWidth, window.innerHeight);
+  composer = nc; composerSamples = samples;
+  if (old) { try { old.renderTarget1.dispose(); old.renderTarget2.dispose(); } catch (e) {} }
+}
 // ---- Procedural texture helpers (canvas-generated, no external assets) ----
 function makeCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; }
 let _winTex = null, _cloudTex = null, _sunTex = null;
@@ -841,14 +898,15 @@ function makeFacadeTexture(style) {
         ctx.fillStyle = r < 0.30 ? '#ffd98a' : (r < 0.62 ? '#9fd0ea' : (r < 0.85 ? '#5d8dab' : '#2c4256'));
         ctx.fillRect(x, y, 36, 20);
       }
-    } else if (style === 1) { // red brick block
-      ctx.fillStyle = '#6d4630'; ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
-      for (let y = 0; y < h; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-      ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let i = 0; i < 300; i++) ctx.fillRect(Math.random() * w, Math.random() * h, 8, 3);
-      for (let y = 22; y < h - 20; y += 52) for (let x = 26; x < w - 20; x += 78) {
-        ctx.fillStyle = '#c8ccd2'; ctx.fillRect(x - 4, y - 4, 44, 34);
-        ctx.fillStyle = Math.random() < 0.4 ? '#ffdf9e' : '#33424f'; ctx.fillRect(x, y, 36, 26);
+    } else if (style === 1) { // warm sandstone (v28: replaces the old red brick — sand panels, medium grid, warm-lit windows)
+      const sg = ctx.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, '#a8895c'); sg.addColorStop(1, '#8a6c42'); ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(62,44,20,0.4)'; ctx.lineWidth = 2;
+      for (let y = 0; y <= h; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      for (let x = 0; x <= w; x += 128) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let i = 0; i < 700; i++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.05)' : 'rgba(255,240,210,0.05)'; ctx.fillRect(Math.random() * w, Math.random() * h, 4, 3); }
+      for (let y = 20; y < h - 20; y += 44) for (let x = 24; x < w - 20; x += 62) {
+        ctx.fillStyle = '#6e573a'; ctx.fillRect(x - 3, y - 3, 40, 28);
+        ctx.fillStyle = Math.random() < 0.45 ? '#ffd98f' : '#3d3428'; ctx.fillRect(x, y, 34, 22);
       }
     } else if (style === 2) { // concrete offices (v16: darker base so lit windows pop)
       ctx.fillStyle = '#59636d'; ctx.fillRect(0, 0, w, h);
@@ -926,6 +984,72 @@ function getWaterTexture() {
   _waterTex.wrapS = _waterTex.wrapT = THREE.RepeatWrapping; _waterTex.repeat.set(5, 10);
   if (THREE.SRGBColorSpace) _waterTex.colorSpace = THREE.SRGBColorSpace;
   return _waterTex;
+}
+// v28: seamless (toroidal) value noise — the lattice wraps at `period`, so textures
+// built from it tile perfectly at any repeat. Shared by the water normal map and
+// the terrain detail grain below.
+function _pnoiseLat(ix, iz, seed) { const s = Math.sin(ix * 127.1 + iz * 311.7 + seed * 74.7) * 43758.5453; return s - Math.floor(s); }
+function _pnoise(x, z, period, seed) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+  const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+  const w = function(a, b) { return _pnoiseLat(((a % period) + period) % period, ((b % period) + period) % period, seed); };
+  const a = w(ix, iz), b = w(ix + 1, iz), c = w(ix, iz + 1), d = w(ix + 1, iz + 1);
+  return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+}
+// v28: harbor water ripple normals — a two-octave periodic heightfield converted to
+// a tangent-space normal map via Sobel. The material drifts its offset in animate()
+// so the harbor surface shimmers instead of sliding as one flat sheet.
+function getWaterNormalTexture() {
+  if (_waterNormTex) return _waterNormTex;
+  const S = 256, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+  const ctx = cv.getContext('2d');
+  const H = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) H[y * S + x] = _pnoise(x / S * 6, y / S * 6, 6, 5) * 0.6 + _pnoise(x / S * 12, y / S * 12, 12, 17) * 0.4;
+  const img = ctx.createImageData(S, S), strength = 2.4;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const xm = (x - 1 + S) % S, xp = (x + 1) % S, ym = (y - 1 + S) % S, yp = (y + 1) % S;
+    const nx = -(H[y * S + xp] - H[y * S + xm]) * strength;
+    const ny = (H[yp * S + x] - H[ym * S + x]) * strength;
+    const inv = 1 / (Math.hypot(nx, ny, 1) || 1);
+    const i = (y * S + x) * 4;
+    img.data[i] = Math.round((nx * inv * 0.5 + 0.5) * 255);
+    img.data[i + 1] = Math.round((ny * inv * 0.5 + 0.5) * 255);
+    img.data[i + 2] = Math.round((inv * 0.5 + 0.5) * 255);
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(14, 28); // ~14 ripples across the harbor, aspect-matched along its length
+  _waterNormTex = t;
+  return t;
+}
+// v28: terrain close-up grain — near-white (0.82..1.0) multi-octave speckle used as
+// a multiplying map over the v19 vertex colors, so rock/snow/sand stop looking like
+// smooth plastic at low altitude. Deliberately NOT sRGB-flagged: the texel values
+// are the literal multiplier range. One shared canvas; each caller gets its own
+// CanvasTexture so repeats can differ (terrain 90, valley floor 140).
+let _detailNoiseCv = null;
+function getDetailNoiseCanvas() {
+  if (_detailNoiseCv) return _detailNoiseCv;
+  const S = 256, cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const n = _pnoise(x / S * 8, y / S * 8, 8, 3) * 0.65 + _pnoise(x / S * 24, y / S * 24, 24, 11) * 0.35;
+    const spk = 0.94 + 0.06 * _pnoiseLat(x, y, 29); // fine per-pixel speckle
+    let v = (0.82 + 0.18 * n) * spk;
+    v = Math.max(0.8, Math.min(1, v));
+    const g = Math.round(v * 255), i = (y * S + x) * 4;
+    img.data[i] = g; img.data[i + 1] = g; img.data[i + 2] = g; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  _detailNoiseCv = cv;
+  return cv;
+}
+function makeDetailNoiseTexture(rep) {
+  const t = new THREE.CanvasTexture(getDetailNoiseCanvas());
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep);
+  return t;
 }
 let _flareTex = null;
 function getFlareTexture() {
@@ -1989,6 +2113,7 @@ function refreshMenuJet() {
 }
 function showMenuScene() {
   if (!scene) return;
+  if (menuEnvTexture) scene.environment = menuEnvTexture; // v28: the menu keeps the startup sky-room reflections; missions swap in per-theme bakes
   buildMenuScene();
   if (!menuJet) refreshMenuJet();
   if (menuGroup) menuGroup.visible = true;
@@ -2068,6 +2193,51 @@ function applyThemeLighting(theme) {
   if (renderer) renderer.toneMappingExposure = L.exposure;
   setBloomForTheme(theme);
 }
+// ---- v28: per-theme environment reflections. Until now every material in every
+// world reflected the same generic v15 sky-room, so canyon jets shone blue and
+// nebula jets shone pink regardless of where they were. This bakes a tiny
+// throwaway scene per theme — the theme's OWN sky-dome gradient, an HDR sun disc
+// at the theme's sun direction, a ground disc in the theme's ground color, and
+// (space themes) a colored planet-glow wash — through PMREM into
+// scene.environment. Jet clearcoat/metal now reflects the world it is actually in.
+// Fail-safe: any error keeps whatever environment was already bound.
+function buildThemeEnvironment(theme) {
+  if (!renderer || !scene) return;
+  try {
+    const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
+    const L = THEME_LIGHTING[theme] || THEME_LIGHTING.city;
+    const isSpace = (theme === 'nebula' || theme === 'orbit');
+    const es = new THREE.Scene();
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot, !isSpace), side: THREE.BackSide }));
+    es.add(dome);
+    const sd = themeSunDir(theme);
+    if (sd) { // HDR sun disc where the theme's light actually comes from
+      const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(7, 24), new THREE.MeshBasicMaterial());
+      sunDisc.material.color.set(L.sun).multiplyScalar(16);
+      sunDisc.position.copy(sd).multiplyScalar(40); // themeSunDir returns a shared vector — copy, never mutate
+      sunDisc.lookAt(0, 0, 0);
+      es.add(sunDisc);
+    }
+    const gnd = new THREE.Mesh(new THREE.CircleGeometry(48, 24), new THREE.MeshBasicMaterial({ color: cfg.ground }));
+    gnd.rotation.x = -Math.PI / 2; gnd.position.y = -9; // faces up: the lower hemisphere reflects terrain/ground tones
+    es.add(gnd);
+    if (isSpace) { // planet-glow color wash: a soft emissive world-body low in the sky
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(22, 20, 14), new THREE.MeshBasicMaterial());
+      glow.material.color.set(theme === 'nebula' ? 0x7c3aed : 0x8b7cf6).multiplyScalar(1.6);
+      if (theme === 'nebula') glow.position.set(-28, 4, -20); else glow.position.set(0, -27, 10); // orbit's giant sits below, like the real one
+      es.add(glow);
+    }
+    if (!themeEnvPMREM) themeEnvPMREM = new THREE.PMREMGenerator(renderer);
+    const rt = themeEnvPMREM.fromScene(es, 0.04);
+    if (themeEnvRT) themeEnvRT.dispose();
+    themeEnvRT = rt;
+    scene.environment = rt.texture;
+    es.traverse(function(o) { // the bake is done — free the throwaway scene
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
+    });
+  } catch (e) { /* reflections are cosmetic; keep the previous environment */ }
+}
 const _boxGeo = (typeof THREE !== 'undefined') ? new THREE.BoxGeometry(1, 1, 1) : null;
 const _coneGeo = (typeof THREE !== 'undefined') ? new THREE.ConeGeometry(1, 1, 6) : null;
 const CITY_PITCH = 150; // world units per city block; ground texture tile maps 1:1 to this
@@ -2075,8 +2245,17 @@ const CITY_PLANE = CITY_PITCH * 32; // 4800 — texture repeats 32x so roads lan
 function hash2(a, b) { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); }
 function buildCityGrid(theme, radius) {
   const facades = getFacadeTextures();
+  // v28: each facade variant gets its own material character — glass-blue curtain
+  // wall (smooth, metallic), warm sandstone (rough, matte), concrete grey (mid),
+  // dark steel (dark tint, metallic). Emissive map always matches the color map.
   const mats = facades.map(function(ft, idx) {
-    return new THREE.MeshStandardMaterial({ map: ft, emissiveMap: ft, emissive: 0xffd9a0, emissiveIntensity: theme === 'neon' ? 0.95 : 0.3, color: idx === 1 ? 0xdccabd : 0xffffff, roughness: 0.6, metalness: 0.25 }); // v16: brighter lit windows in day city too
+    const look = [
+      { color: 0xe8f1ff, roughness: 0.32, metalness: 0.55 }, // 0 glass-blue
+      { color: 0xf7e3c0, roughness: 0.82, metalness: 0.05 }, // 1 warm-sand
+      { color: 0xffffff, roughness: 0.72, metalness: 0.12 }, // 2 concrete-grey
+      { color: 0xdde6f2, roughness: 0.45, metalness: 0.60 }  // 3 dark-steel
+    ][idx] || { color: 0xffffff, roughness: 0.6, metalness: 0.25 };
+    return new THREE.MeshStandardMaterial({ map: ft, emissiveMap: ft, emissive: 0xffd9a0, emissiveIntensity: theme === 'neon' ? 0.95 : 0.3, color: look.color, roughness: look.roughness, metalness: look.metalness }); // v16: brighter lit windows in day city too
   });
   const roofMat = new THREE.MeshStandardMaterial({ color: theme === 'neon' ? 0x11141c : 0x3c4654, roughness: 0.9 });
   const core = Math.min(radius * 0.95, 1450);
@@ -2121,7 +2300,7 @@ function buildCityGrid(theme, radius) {
         const w = 48 + h1 * 34, d = 48 + h2v * 34;
         const landmark = h3 > 0.93;
         const hh = landmark ? 230 + h1 * 130 : 55 + h3 * 120 + (Math.hypot(cx, cz) < 500 ? 40 : 0);
-        const mesh = new THREE.Mesh(_boxGeo, mat); mesh.scale.set(w, hh, d); mesh.position.set(cx, hh / 2, cz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
+        const mesh = new THREE.Mesh(_boxGeo, landmark ? mats[0] : mat); mesh.scale.set(w, hh, d); mesh.position.set(cx, hh / 2, cz); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh); // v28: landmark towers always wear the glass-blue hero facade
         obstacles.push({ x: cx, z: cz, r: Math.max(w, d) * 0.60, h: hh });
         if (landmark) { const spire = new THREE.Mesh(_boxGeo, roofMat); spire.scale.set(6, 26, 6); spire.position.set(cx, hh + 13, cz); worldGroup.add(spire); }
         if (!landmark) addRoofDetail(cx, cz, w, d, hh, cx * 0.91 - 51, cz * 1.13 + 33);
@@ -2689,6 +2868,7 @@ function buildEnvironment(theme, radius, densityScale) {
     lfHalo.position.copy(lfPos); lfHalo.scale.set(1250, 1250, 1); worldGroup.add(lfHalo);
   }
   applyThemeLighting(theme); // v17: sun/hemi/exposure/bloom all come from THEME_LIGHTING now (shadow tracking in animate() re-aims the sun at the player from here)
+  buildThemeEnvironment(theme); // v28: reflections are baked from THIS theme's sky/sun/ground, not the generic startup room
   // Clouds: soft radial-gradient billboards, slow drift (animated in animate())
   const cloudTex = getCloudTexture(); const clouds = [];
   const cloudCount = isSpace ? 0 : 110; // no weather in space — nebula sprites replace the clouds (clouds array stays empty, drift hook no-ops)
@@ -2738,13 +2918,13 @@ function buildEnvironment(theme, radius, densityScale) {
     // v19: mountain/canyon — the heightmap terrain built below IS the ground now. This
     // flat sheet drops to y=-3 UNDER the terrain, tinted like the valley floor, purely
     // to seal the horizon beyond the terrain's edges (it is larger than the terrain).
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, roughness: 1 }));
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, map: makeDetailNoiseTexture(140), roughness: 1 })); // v28: finer grain repeat on the flat valley sheet (it had a plain color material)
     ground.position.y = -3;
   }
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
   if (theme === 'city') {
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.14, metalness: 0.85, envMapIntensity: 1.35, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water; v20: sharper sun glint (roughness down, env up)
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), normalMap: getWaterNormalTexture(), normalScale: new THREE.Vector2(0.35, 0.35), color: 0xbfd9ea, roughness: 0.14, metalness: 0.85, envMapIntensity: 1.35, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water; v20: sharper sun glint (roughness down, env up) // v28: ripple normal map, offset-drifted in animate()
     water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water); worldGroup.userData.water = water;
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
@@ -2838,7 +3018,7 @@ function buildEnvironment(theme, radius, densityScale) {
       terrCols[vi * 3] = tmpC.r; terrCols[vi * 3 + 1] = tmpC.g; terrCols[vi * 3 + 2] = tmpC.b;
     }
     terrGeo.setAttribute('color', new THREE.BufferAttribute(terrCols, 3));
-    const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.02 }));
+    const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({ vertexColors: true, map: makeDetailNoiseTexture(90), roughness: 0.95, metalness: 0.02 })); // v28: detail grain multiplies the vertex colors (map x vColor in three.js) so low-altitude rock/snow reads as surface, not plastic
     terrain.receiveShadow = true; worldGroup.add(terrain);
     // Invisible peak guards: the terrain mesh itself isn't an obstacle (like the old
     // ground), but the big rim peaks get collision columns so bot weaving and the
@@ -2867,6 +3047,7 @@ window.addEventListener('keyup', function(e) { keys[e.code] = false; });
 function startMission() {
   closeModals(); clearSmoke();
   if (typeof mm !== 'undefined' && mm.searching && !(typeof mmPendingMatch !== 'undefined' && mmPendingMatch)) mmCancelSearch(); // v25: dropping in manually abandons a pending matchmaking search (an mm drop itself carries mmPendingMatch)
+  if (typeof duel !== 'undefined' && duel.searching && !duel.started) duelCancelSearch(); // v28: same for duel matchmaking — a duel drop itself arrives via setupPeerConn with duel.started already set, so it is not cancelled
   _missionClock = 0; _autoQDropped = false; _frameEma = 16; // v20: fresh auto-quality window per mission
   if (currentMode === 'online1v1') { startOnlineMatchmaking(); return; }
   if (!renderer) { alert('3D engine failed to load. Check connection and reload.'); return; }
@@ -3287,6 +3468,7 @@ function updateStrobe(mesh) {
 // v16: single render entry point — bloom composer on high/medium, plain renderer on
 // low quality or if the composer failed to build.
 function renderFrame() {
+  if (filmPass && filmPass.enabled && filmPass.uniforms && filmPass.uniforms.uTime) filmPass.uniforms.uTime.value = (performance.now() / 1000) % 3600; // v28: keep the film grain crawling
   if (composer && state.quality !== 'low') composer.render();
   else renderer.render(scene, camera);
 }
@@ -3581,6 +3763,7 @@ function animate(now) {
   }
   if (_botFlashT > 0) { _botFlashT -= dt; if (_botFlashT <= 0 && _botFlash) _botFlash.material.opacity = 0; }
   if (worldGroup && worldGroup.userData.water && worldGroup.userData.water.material.map) worldGroup.userData.water.material.map.offset.x += dt * 0.01; // animated harbor water
+  if (_waterNormTex) { _waterNormTex.offset.x += dt * 0.008; _waterNormTex.offset.y += dt * 0.005; } // v28: ripple normals drift on their own slower diagonal, so the surface sparkles instead of sliding uniformly
   flickerFlames(p.mesh, boosting, dt);
   SFX.engineUpdate(clampNum(curSpd / Math.max(1, p.spd * 1.45), 0, 1), boosting); // v20: engine hum tracks speed/boost
   if (p.mesh.userData.burnerLight) p.mesh.userData.burnerLight.intensity = (boosting ? 30 : 8) * (0.85 + Math.random() * 0.3);
@@ -3885,18 +4068,41 @@ function refreshPremiumSurfaces() {
   const hang = document.getElementById('hangarModal');
   if (hang && !hang.classList.contains('hidden')) switchHangarTab('jets');
 }
-function buyPremiumJet(id) {
+async function buyPremiumJet(id) {
   const j = JETS.find(function(x) { return x.id === id; });
   if (!j || !j.usd) return;
   if (state.ownedJets.includes(id)) return;
   const link = PAYMENT_LINKS[id] ? String(PAYMENT_LINKS[id]).trim() : '';
-  if (link) {
-    window.open(link, '_blank');
-    premiumNotice = 'Complete your purchase, then tap 🎟 Redeem Code and enter the code from your email.';
-  } else {
+  if (!link) {
     premiumNotice = 'This jet goes on sale soon — check back!';
+    refreshPremiumSurfaces();
+    return;
+  }
+  // v27: tell Stripe WHO is buying. The link gets client_reference_id=<Firebase uid>
+  // (plus prefilled_email for cloud accounts) appended; Stripe passes the reference id
+  // to the webhook, whose Cloud Function credits the purchase to users/{uid}.premiumJets
+  // — and syncPremiumEntitlements() then delivers the jet here automatically.
+  // The tab is pre-opened synchronously so popup blockers don't eat it while we await the uid.
+  let win = null;
+  try { win = window.open('', '_blank'); } catch (e) {}
+  let url = link;
+  try {
+    const uid = await redeemEnsureUid(); // current Firebase uid, else the anonymous-auth helper (redeem/matchmaking)
+    if (uid) {
+      url += (url.includes('?') ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(uid);
+      const email = (currentProfile && currentProfile.cloud && currentProfile.email) ? currentProfile.email : '';
+      if (email) url += '&prefilled_email=' + encodeURIComponent(email);
+    }
+  } catch (e) { /* no uid available (offline) — fall through and open the plain link; redeem codes still work */ }
+  if (win) { try { win.location.href = url; } catch (e) { try { window.open(url, '_blank'); } catch (e2) {} } }
+  else { try { window.open(url, '_blank'); } catch (e) {} }
+  if (currentProfile && currentProfile.guest) {
+    premiumNotice = 'Tip: purchases are tied to your account — sign in with a cloud account so your jet is saved forever.';
+  } else {
+    premiumNotice = 'Complete your purchase in the Stripe tab — your jet unlocks here automatically within a few seconds. (Got a code instead? Tap 🎟 Redeem Code.)';
   }
   refreshPremiumSurfaces();
+  startPurchaseWatch(id); // v27: poll entitlements until the webhook delivery lands
 }
 // ---- Redeem codes: one shared modal, target jet kept in redeemTargetId ----
 let redeemTargetId = null;
@@ -3952,12 +4158,103 @@ async function tryRedeem() {
 document.getElementById('btnRedeemUnlock').addEventListener('click', tryRedeem);
 document.getElementById('redeemCodeInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') tryRedeem(); });
 document.getElementById('btnCloseRedeem').addEventListener('click', function() { document.getElementById('redeemModal').classList.add('hidden'); });
+// ---- Instant delivery (v27): server-granted premium jets ----
+// A Stripe webhook + Cloud Function (server-side, NOT in this file) verifies each
+// payment and appends the jet id to the buyer's Firestore users/{uid} doc as the
+// array field `premiumJets`. This client collects those entitlements automatically:
+// read users/{uid} (the same getDoc the cloud sign-in uses), grant any premiumJets
+// not yet in state.ownedJets, save, re-render, and celebrate. Redeem codes above
+// remain fully functional as the backup path.
+async function syncPremiumEntitlements(reason) {
+  try {
+    const c = CLOUD;
+    if (!c || !c.db || !c.fsMod) return false; // cloud SDK not initialized yet — no-op
+    const user = c.user || cloudUser || (c.auth ? c.auth.currentUser : null);
+    if (!user) return false; // nobody authenticated — nothing to collect
+    const snap = await c.fsMod.getDoc(c.fsMod.doc(c.db, 'users', user.uid));
+    if (!snap || !snap.exists()) return false;
+    const data = snap.data() || {};
+    const grants = Array.isArray(data.premiumJets) ? data.premiumJets : [];
+    const newly = [];
+    grants.forEach(function(gid) {
+      const j = JETS.find(function(x) { return x.id === gid; });
+      if (j && j.usd && !state.ownedJets.includes(j.id)) { state.ownedJets.push(j.id); newly.push(j); }
+    });
+    if (!newly.length) return false;
+    saveState(); // cloud save-sync carries the grant into the pilot's cloud save too
+    refreshMenuJet();
+    refreshPremiumSurfaces(); // re-renders shop / hangar jets tab if either is open
+    const col = document.getElementById('collectionModal');
+    if (col && !col.classList.contains('hidden')) renderCollection();
+    if (newly.length === 1) showBanner(`🛩 ${newly[0].name} UNLOCKED — purchase delivered!`, 4600); // a mystery jet's name is revealed now that it's owned
+    else showBanner(`🛩 ${newly.length} premium jets unlocked — purchases delivered!`, 4600);
+    return true;
+  } catch (e) { return false; } // offline / rules hiccup — silent, play is unaffected
+}
+// Post-purchase watcher: after a Buy click opens a real payment link, poll the
+// entitlements every 5s for up to 90s (plus focus/visibility wake-ups, throttled
+// to one check per 8s) until the webhook delivery lands. One watcher at a time.
+let purchaseWatch = null; // { jetId, timer, deadline, lastRun, onWake }
+function stopPurchaseWatch() {
+  if (!purchaseWatch) return;
+  clearInterval(purchaseWatch.timer);
+  window.removeEventListener('focus', purchaseWatch.onWake);
+  document.removeEventListener('visibilitychange', purchaseWatch.onWake);
+  purchaseWatch = null;
+}
+function startPurchaseWatch(jetId) {
+  stopPurchaseWatch(); // only one watcher at a time
+  const w = { jetId: jetId, timer: null, deadline: Date.now() + 90000, lastRun: 0, onWake: null };
+  const attempt = async function() {
+    if (purchaseWatch !== w) return;
+    if (Date.now() > w.deadline) { stopPurchaseWatch(); return; }
+    w.lastRun = Date.now();
+    const granted = await syncPremiumEntitlements('watch');
+    if (granted && purchaseWatch === w) stopPurchaseWatch(); // stop early once a delivery lands
+  };
+  w.onWake = function() {
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    if (Date.now() - w.lastRun < 8000) return; // wake checks throttled to at most once per 8s
+    attempt();
+  };
+  w.timer = setInterval(attempt, 5000);
+  window.addEventListener('focus', w.onWake);
+  document.addEventListener('visibilitychange', w.onWake);
+  purchaseWatch = w;
+}
+document.getElementById('btnCheckPurchases').addEventListener('click', async function() {
+  const granted = await syncPremiumEntitlements('manual');
+  if (!granted) { premiumNotice = 'Checked — any delivered jets are now in your hangar.'; refreshPremiumSurfaces(); }
+  // if something was granted, syncPremiumEntitlements already showed the unlock banner
+});
 const BIND_LABELS = [ ['pitchUp', 'Pitch Nose Up'], ['pitchDown', 'Pitch Nose Down'], ['turnLeft', 'Bank / Turn Left'], ['turnRight', 'Bank / Turn Right'], ['fire', 'Fire Primary Guns'], ['rocket', 'Launch Homing Rocket'], ['autoaim', 'Activate Auto-Aim Lock'], ['boost', 'Engage Afterburner'], ['pause', 'Pause / Settings Menu'] ];
 let listeningAction = null;
 // ---- v15 settings: quality + camera appliers ----
+// v28: sun shadow resolution per quality tier. Setting mapSize alone is not
+// enough — the existing shadow map must be disposed so it reallocates at the
+// new size on the next render.
+function setSunShadow(size) {
+  if (!sunLight) return;
+  sunLight.shadow.mapSize.set(size, size);
+  if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; }
+}
 function applyQuality() {
   if (!renderer) return;
   const q = state.quality || 'high';
+  // v28: MSAA headroom — high quality rebuilds the composer at up to 8x samples
+  // (capped by the GPU), medium keeps the 4x target. Rebuild only on an actual
+  // change so per-frame callers (auto-quality, sign-in refresh) stay cheap.
+  if (composer) {
+    let maxS = 4;
+    try {
+      if (renderer.capabilities && renderer.capabilities.maxSamples) maxS = renderer.capabilities.maxSamples;
+      else { const gl = renderer.getContext(); if (gl && gl.MAX_SAMPLES !== undefined) maxS = gl.getParameter(gl.MAX_SAMPLES) || 4; }
+    } catch (e) {}
+    maxS = Math.max(4, Math.min(16, maxS || 4));
+    const wantS = (q === 'high') ? Math.min(8, maxS) : 4;
+    if (wantS !== composerSamples) { try { buildComposer(wantS); } catch (e) { /* keep the working composer */ } }
+  }
+  if (filmPass) filmPass.enabled = (q === 'high'); // v28: film finish is high-tier only
   // v16: bloom follows quality — high full strength, medium softer + cheaper composer
   // buffer, low bypasses the composer entirely (renderFrame checks quality).
   // v17: strength itself is theme-owned (baseBloomStrength); quality only scales it.
@@ -3972,15 +4269,15 @@ function applyQuality() {
   if (q === 'medium') {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
-    if (sunLight) { sunLight.castShadow = true; sunLight.shadow.mapSize.set(1024, 1024); if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+    if (sunLight) { sunLight.castShadow = true; setSunShadow(2048); } // v28: medium shadows 1024 -> 2048
   } else if (q === 'low') {
     renderer.setPixelRatio(1);
     renderer.shadowMap.enabled = false;
-    if (sunLight) sunLight.castShadow = false;
+    if (sunLight) { sunLight.castShadow = false; setSunShadow(1024); } // v28: size staged so re-enabling shadows comes back at the low tier
   } else { // high
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    if (sunLight) { sunLight.castShadow = true; sunLight.shadow.mapSize.set(2048, 2048); if (sunLight.shadow.map) { sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+    if (sunLight) { sunLight.castShadow = true; setSunShadow(4096); } // v28: high shadows 2048 -> 4096
   }
   // Toggling shadowMap.enabled only takes effect once materials recompile
   if (scene) scene.traverse(function(o) { if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m) { m.needsUpdate = true; }); } });
@@ -4406,6 +4703,171 @@ function mmCleanupMatch() { // endMatch / returnHome: tear down timers + connect
 }
 document.getElementById('btnFindMatch').addEventListener('click', function() { mmFindMatch(); });
 document.getElementById('btnCancelMatch').addEventListener('click', function() { mmCancelSearch(); });
+// ---- v28 Online 1v1: public matchmaking (FIND ONLINE MATCH) ----
+// The duel twin of the v25 royale matchmaker, on its own collections
+// (mm_duel_queue / mm_duel_matches) with its own state object, timers and peer —
+// the two systems never share a queue, a timer or a connection router branch
+// they don't explicitly hand off below.
+// ADAPTATION (the room-code flow is code-centric): in the legacy flow the host's
+// PeerJS id IS the room code (`SKYACE-<CODE>`) and the guest dials `SKYACE-<code>`
+// from a typed input. Matchmaking has no codes to type, so the match doc carries
+// the host's raw PeerJS id (hostPeerId) and the guest dials it directly. That is
+// the ONLY change: once the connection opens, both ends run the untouched legacy
+// setupPeerConn() — its open handler starts the 1v1 dogfight (campaign-mission
+// swap, remoteEnt rival, 20 Hz {pos,quat} sync), and damage / win / lose stay
+// exactly the room-duel code path. The host side needs no new start logic at
+// all: an incoming connection on the duel peer is routed straight into
+// setupPeerConn, precisely like a room-code host accepting a joiner.
+const duel = { searching: false, forming: false, pollTimer: null, hostWaitTimer: null, uid: null, peerId: null, callsign: 'GUEST', rank: 'Silver', role: null, matchId: null, matchPlayers: [], hostPeerId: null, started: false, connected: false, hostCreatedAt: 0 };
+function duelSetStatus(txt) { const e = document.getElementById('duelMmStatus'); if (e) e.textContent = txt || ''; }
+function duelUiSearching(on) {
+  document.getElementById('btnFindDuel').classList.toggle('hidden', !!on);
+  document.getElementById('btnCancelDuel').classList.toggle('hidden', !on);
+}
+function duelEnsurePeer() {
+  return new Promise(function(resolve, reject) {
+    if (typeof Peer === 'undefined') { reject(new Error('peerjs unavailable')); return; }
+    // Like royale mm, duels fly on their OWN freshly-created peer (the shared
+    // `peer` slot is destroyed first) so this router can never be confused with
+    // a stale room-code pairing.
+    if (peer) { try { peer.destroy(); } catch (e) {} peer = null; }
+    conn = null; royalePeerReady = false; remoteNet = null;
+    if (peerSyncTimer) { clearInterval(peerSyncTimer); peerSyncTimer = null; }
+    let settled = false;
+    try {
+      peer = new Peer();
+      peer.on('open', function(id) { if (!settled) { settled = true; resolve(id); } });
+      peer.on('connection', function(c) {
+        if (duel.role === 'host' && duel.matchId) duelAcceptGuestConn(c); // my duel rival knocking
+        else if (typeof mm !== 'undefined' && mm.role === 'host' && mm.matchId) mmAcceptGuestConn(c); // a royale-mm guest keeps its routing
+        else { conn = c; setupPeerConn(c); } // anything else keeps the legacy routing
+      });
+      peer.on('error', function(err) { if (!settled) { settled = true; reject(err); } });
+    } catch (e) { reject(e); }
+  });
+}
+async function duelFindMatch() {
+  if (duel.searching || currentMode !== 'online1v1') return;
+  if (typeof mm !== 'undefined' && mm.searching) mmCancelSearch(); // the two matchmakers share the peer slot — never run both
+  duelSetStatus('Connecting to matchmaking…');
+  let id;
+  try { id = await mmGetIdentity(); } // same identity as royale mm: cloud uid, else anonymous
+  catch (e) { duelSetStatus('Online matchmaking unavailable — enable Anonymous sign-in in Firebase, or use a private room code.'); return; }
+  let myPeerId;
+  try { myPeerId = await duelEnsurePeer(); }
+  catch (e) { duelSetStatus('Online matchmaking unavailable — the peer network could not be reached. You can still use a private room code.'); return; }
+  duel.uid = id.uid; duel.callsign = id.callsign; duel.peerId = myPeerId; duel.rank = getRankName(state.rp);
+  try { await CLOUD.fsMod.setDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_duel_queue', duel.uid), { peerId: duel.peerId, callsign: duel.callsign, rank: duel.rank, ts: Date.now(), status: 'waiting' }); }
+  catch (e) { duelSetStatus('Online matchmaking unavailable — could not reach the queue. You can still use a private room code.'); return; }
+  duel.searching = true; duel.forming = false; duel.role = null; duel.matchId = null; duel.matchPlayers = []; duel.hostPeerId = null; duel.started = false; duel.connected = false;
+  duelUiSearching(true);
+  duelSetStatus('Searching for a rival…');
+  if (duel.pollTimer) clearInterval(duel.pollTimer);
+  duel.pollTimer = setInterval(duelPoll, 2000);
+  duelPoll();
+}
+async function duelPoll() {
+  if (!duel.searching || duel.role || !CLOUD) return;
+  const fs = CLOUD.fsMod, db = CLOUD.db;
+  try {
+    const snap = await fs.getDocs(fs.collection(db, 'mm_duel_queue')); // tiny collection: fetch-all + client-side sort (no composite index needed)
+    const now = Date.now();
+    const docs = [];
+    snap.forEach(function(d) { docs.push(Object.assign({ id: d.id }, d.data())); });
+    docs.forEach(function(d) { if (d.status === 'waiting' && now - (d.ts || 0) > 45000 && d.id !== duel.uid) { try { fs.deleteDoc(fs.doc(db, 'mm_duel_queue', d.id)).catch(function() {}); } catch (e) {} } }); // stale entries are ignored + swept
+    const mine = docs.find(function(d) { return d.id === duel.uid; });
+    if (!mine) { duelResetSearch(); duelSetStatus('That search ended — tap Find Online Match to search again.'); return; } // my doc was swept (host cancelled after matching, or it aged out) — don't poll a ghost queue entry forever
+    if (mine && mine.status === 'matched' && mine.matchId) { duelJoinAsGuest(mine.matchId); return; }
+    const waiting = docs.filter(function(d) { return d.status === 'waiting' && now - (d.ts || 0) <= 45000; }).sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+    duelSetStatus(waiting.length > 1 ? 'Searching… a rival is in the queue' : 'Searching for a rival…');
+    if (waiting.length >= 2 && waiting[0].id === duel.uid && mine && mine.status === 'waiting') duelFormMatch(waiting.slice(0, 2)); // oldest waiter hosts the pair
+  } catch (e) { /* transient Firestore error — the next poll retries */ }
+}
+async function duelFormMatch(two) {
+  if (duel.role || duel.forming) return;
+  duel.forming = true;
+  duel.matchId = duel.uid;
+  const players = two.map(function(d) { return { uid: d.id, peerId: d.peerId, callsign: d.callsign, rank: d.rank }; });
+  const fs = CLOUD.fsMod, db = CLOUD.db;
+  try {
+    await fs.setDoc(fs.doc(db, 'mm_duel_matches', duel.matchId), { hostUid: duel.uid, hostPeerId: duel.peerId, players: players, status: 'forming', createdAt: Date.now() });
+    for (let i = 0; i < two.length; i++) { try { await fs.updateDoc(fs.doc(db, 'mm_duel_queue', two[i].id), { status: 'matched', matchId: duel.matchId }); } catch (e) {} }
+  } catch (e) { duel.forming = false; duel.matchId = null; return; } // stay queued; a later poll retries
+  duel.forming = false;
+  duel.role = 'host'; duel.matchPlayers = players; duel.hostCreatedAt = Date.now();
+  if (duel.pollTimer) { clearInterval(duel.pollTimer); duel.pollTimer = null; }
+  duelSetStatus('Match found! Waiting for your rival to connect…');
+  if (duel.hostWaitTimer) clearInterval(duel.hostWaitTimer);
+  duel.hostWaitTimer = setInterval(duelHostWatchdog, 1000);
+}
+function duelHostWatchdog() { // a formed duel whose guest never dials in must not strand the host
+  if (duel.role !== 'host') { if (duel.hostWaitTimer) { clearInterval(duel.hostWaitTimer); duel.hostWaitTimer = null; } return; }
+  if (duel.connected) { if (duel.hostWaitTimer) { clearInterval(duel.hostWaitTimer); duel.hostWaitTimer = null; } return; }
+  if (currentMode !== 'online1v1' || Date.now() - duel.hostCreatedAt >= 30000) { duelCancelSearch(); duelSetStatus('Your rival never connected — search again.'); }
+}
+function duelAcceptGuestConn(c) {
+  // Bookkeeping listener FIRST (registration order = firing order): when the
+  // connection opens we mark the duel started and sweep the Firestore docs,
+  // then setupPeerConn's own open handler runs the legacy 1v1 start.
+  conn = c;
+  duel.connected = true;
+  if (duel.hostWaitTimer) { clearInterval(duel.hostWaitTimer); duel.hostWaitTimer = null; }
+  c.on('open', function() {
+    duel.started = true; duel.searching = false;
+    duelDeleteMatchDocs(); // match is on: host deletes the match doc + both queue docs
+    duelUiSearching(false);
+    duelSetStatus('');
+  });
+  c.on('error', function() {});
+  setupPeerConn(c);
+}
+async function duelJoinAsGuest(matchId) {
+  if (duel.role) return;
+  duel.role = 'guest'; duel.matchId = matchId;
+  if (duel.pollTimer) { clearInterval(duel.pollTimer); duel.pollTimer = null; }
+  let mdoc = null;
+  try { const snap = await CLOUD.fsMod.getDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_duel_matches', matchId)); if (snap.exists()) mdoc = snap.data(); } catch (e) {}
+  if (!mdoc || !mdoc.hostPeerId || !mdoc.players) { duelResetSearch(); duelSetStatus('That match fell apart before it started — search again.'); return; }
+  duel.matchPlayers = mdoc.players; duel.hostPeerId = mdoc.hostPeerId;
+  duelSetStatus('Match found! Connecting to your rival…');
+  try {
+    const c = peer.connect(mdoc.hostPeerId, { metadata: { duel: true, peerId: duel.peerId, callsign: duel.callsign, rank: duel.rank, uid: duel.uid } }); // dial the host's raw peer id from the match doc — no room code involved
+    conn = c; duel.connected = true;
+    c.on('open', function() {
+      duel.started = true; duel.searching = false;
+      duelDeleteMyQueueDoc(); // host sweeps all the docs too; deleting mine twice is harmless
+      duelUiSearching(false);
+      duelSetStatus('');
+    });
+    c.on('error', function() {});
+    setupPeerConn(c); // legacy joiner path: on open, the 1v1 start runs exactly like a room-code duel
+  } catch (e) { duelResetSearch(); duelSetStatus('Could not connect to your rival — search again.'); }
+}
+function duelDeleteMatchDocs() {
+  if (!CLOUD || !duel.matchId) return;
+  const fs = CLOUD.fsMod, db = CLOUD.db, mid = duel.matchId;
+  try { fs.deleteDoc(fs.doc(db, 'mm_duel_matches', mid)).catch(function() {}); } catch (e) {}
+  duel.matchPlayers.forEach(function(pl) { if (pl.uid) { try { fs.deleteDoc(fs.doc(db, 'mm_duel_queue', pl.uid)).catch(function() {}); } catch (e) {} } });
+}
+function duelDeleteMyQueueDoc() {
+  if (!CLOUD || !duel.uid) return;
+  try { CLOUD.fsMod.deleteDoc(CLOUD.fsMod.doc(CLOUD.db, 'mm_duel_queue', duel.uid)).catch(function() {}); } catch (e) {}
+}
+function duelResetSearch() { // back to idle menu state (peer + identity are kept for the next search)
+  if (duel.pollTimer) { clearInterval(duel.pollTimer); duel.pollTimer = null; }
+  if (duel.hostWaitTimer) { clearInterval(duel.hostWaitTimer); duel.hostWaitTimer = null; }
+  duel.searching = false; duel.forming = false; duel.role = null; duel.matchId = null; duel.matchPlayers = []; duel.hostPeerId = null; duel.started = false; duel.connected = false;
+  duelUiSearching(false);
+}
+function duelCancelSearch() {
+  duelDeleteMyQueueDoc();
+  if (duel.role === 'host' && duel.matchId) duelDeleteMatchDocs(); // a forming host abandoning the pair releases its rival
+  duelResetSearch();
+  duelSetStatus('Search cancelled.');
+}
+document.getElementById('btnFindDuel').addEventListener('click', function() { duelFindMatch(); });
+document.getElementById('btnCancelDuel').addEventListener('click', function() { duelCancelSearch(); });
+window.addEventListener('beforeunload', function() { if (duel.searching) duelDeleteMyQueueDoc(); });
 window.addEventListener('beforeunload', function() { if (mm.searching) mmDeleteMyQueueDoc(); });
 function cancelOnline() { royalePeerReady = false; if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); showMenuScene(); }
 document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
@@ -4445,7 +4907,7 @@ function signOut() {
   const so = document.getElementById('btnSignOut'); if (so) so.textContent = '⏻ Sign Out';
   showGate();
 }
-document.getElementById('btnGuestPlay').addEventListener('click', function() { signInProfile(ensureGuestProfile()); });
+document.getElementById('btnGuestPlay').addEventListener('click', function() { signInProfile(ensureGuestProfile()); syncPremiumEntitlements('guest'); }); // v27: fire-and-forget entitlement check (usually a no-op for guests)
 document.getElementById('btnSignOut').addEventListener('click', signOut);
 window.addEventListener('beforeunload', function() { accumulatePlayTime(); });
 // Gate on boot. If localStorage is unusable the game must not brick: fall back to a
@@ -4473,6 +4935,11 @@ const firebaseConfig = { apiKey: "AIzaSyCDcwefunM1cRiO2aoNIW8gCn2_NlQl6o4", auth
 // collection — doc id = the code, fields: jetId, claimedBy).
 // Leave a link as '' (empty) and that jet is NOT on sale yet: its Buy button just
 // shows a "goes on sale soon" notice and nothing is charged or granted.
+// v27 INSTANT DELIVERY: Buy appends client_reference_id=<buyer's Firebase uid>
+// (and prefilled_email for cloud accounts) to the link automatically. Point the
+// Stripe webhook at the Cloud Function so each paid checkout appends the jet id
+// to users/{uid}.premiumJets — the game polls for it and unlocks the jet in-game
+// within seconds, no code to type. Redeem codes remain as a backup.
 const PAYMENT_LINKS = { mx1: '', mx2: '', mx3: '', mx4: '', mx5: '', mx6: '', x02: '', adf11: '' };
 let cloudInitPromise = null;
 function cloudMsg(msg, isErr) { const e = document.getElementById('cloudMsg'); if (!e) return; e.textContent = msg || ''; e.classList.toggle('hidden', !msg); e.classList.toggle('err', !!isErr); }
@@ -4583,6 +5050,7 @@ function finishCloudSignIn(user, data) {
   }
   signInProfile(p); // loads this pilot's (just-synced) save, bumps the session, hides the gate
   cloudSchedulePush(); // push the winning local save + fresh stats snapshot back up
+  syncPremiumEntitlements('signin'); // v27: collect any server-delivered premium jets (Stripe webhook grants)
 }
 async function cloudNameConfirm() {
   const user = cloudPendingUser;
