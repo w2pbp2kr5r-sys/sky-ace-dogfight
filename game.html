@@ -210,7 +210,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v29 — MUSIC & MISSILES ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v30 — THE EXPANSION ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -230,10 +230,11 @@
     <div>
       <div class="section-label">Select Mode</div>
       <div class="mode-grid">
-        <button class="mode-btn active" data-mode="campaign"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M12 2.2l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.2l-6 3.3 1.3-6.7-5-4.6 6.8-.8z" fill="currentColor" /></svg></span><strong>Campaign</strong><small>10 chapters across cities &amp; peaks</small><span class="mode-meta">10 CHAPTERS</span></button>
+        <button class="mode-btn active" data-mode="campaign"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M12 2.2l2.9 6.2 6.8.8-5 4.6 1.3 6.7L12 17.2l-6 3.3 1.3-6.7-5-4.6 6.8-.8z" fill="currentColor" /></svg></span><strong>Campaign</strong><small>15 chapters across cities &amp; peaks</small><span class="mode-meta">15 CHAPTERS</span></button>
         <button class="mode-btn" data-mode="gungame"><span class="mode-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.6" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 2.2v4M12 17.8v4M2.2 12h4M17.8 12h4" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="1.6" fill="currentColor" /></svg></span><strong>Gun Game</strong><small>10-bot FFA, 15 jets, first to 15 kills</small><span class="mode-meta">FIRST TO 15</span></button>
         <button class="mode-btn" data-mode="royale"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M3.2 18.6h17.6M4.4 17.4L3.2 8.2l5.6 4L12 5l3.2 7.2 5.6-4-1.2 9.2z" fill="currentColor" /></svg></span><strong>Ranked Royale</strong><small>50-pilot storm zone, Silver to Global</small><span class="mode-meta">50 PILOTS</span></button>
         <button class="mode-btn" data-mode="online1v1"><span class="mode-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><ellipse cx="12" cy="12" rx="4.2" ry="9" fill="none" stroke="currentColor" stroke-width="2" /><path d="M3.4 9h17.2M3.4 15h17.2" stroke="currentColor" stroke-width="2" /></svg></span><strong>Online 1v1</strong><small>Real players only — zero bots</small><span class="mode-meta">REAL PLAYERS</span></button>
+        <button class="mode-btn" data-mode="waves"><span class="mode-ico"><svg viewBox="0 0 24 24"><path d="M12 2.6l7.2 3v5.2c0 4.8-3.1 8.8-7.2 10.6C7.9 19.6 4.8 15.6 4.8 10.8V5.6z" fill="currentColor" /></svg></span><strong>Wave Defense</strong><small>Survive escalating waves of fighters. How long can you last?</small><span class="mode-meta" id="waveBestMeta">ENDLESS / ESCALATING</span></button>
       </div>
     </div>
     <div class="sub-controls">
@@ -385,10 +386,11 @@ const defaultState = {
   unlockedChapter: 1, selectedJet: 'f16',
   ownedJets: ['f16'],
   ownedSkins: ['stock'], equippedSkin: 'stock',
-  upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1 },
+  upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0 },
   sensitivity: 1.0, mobileTouch: false,
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   volume: 0.7, muted: false, musicOn: true,
+  lastDaily: '', bestWave: 0,
   binds: { pitchUp: 'KeyW', pitchDown: 'KeyS', turnLeft: 'KeyA', turnRight: 'KeyD', fire: 'Space', rocket: 'KeyR', autoaim: 'KeyE', boost: 'ShiftLeft', pause: 'Escape' }
 };
 // ---- v24 accounts: profile registry (guest entry + cloud mirrors) ----
@@ -459,6 +461,9 @@ function loadGameState() {
   if (['high', 'medium', 'low'].indexOf(state.quality) === -1) state.quality = 'high';
   if (typeof state.volume !== 'number' || isNaN(state.volume) || state.volume < 0 || state.volume > 1) state.volume = 0.7;
   if (typeof state.muted !== 'boolean') state.muted = false;
+  // v30 guards: daily reward + wave defense best (old saves default via the merges above too)
+  if (typeof state.lastDaily !== 'string') state.lastDaily = '';
+  if (typeof state.bestWave !== 'number' || isNaN(state.bestWave)) state.bestWave = 0;
 }
 loadGameState(); // boot: legacy/default state so the menu scene renders behind the gate; re-loaded per profile on sign-in
 function saveState() { try { localStorage.setItem(currentSaveKey(), JSON.stringify(state)); } catch (e) {} cloudNoteSave(); updateTopUI(); } // v23: cloudNoteSave() stamps the local meta + schedules a push when the pilot is a cloud profile (no-op otherwise)
@@ -469,6 +474,10 @@ const JETS = [
   { id: 'f35', name: 'F-35 Lightning', cost: 1200, premium: false, color: 0x475569, accent: 0xa855f7, hp: 185, spd: 1.14, turn: 1.12, dmg: 23, desc: 'Stealth airframe with upgraded sensors.' },
   { id: 'f22', name: 'F-22 Raptor', cost: 2000, premium: false, color: 0x334155, accent: 0xf59e0b, hp: 220, spd: 1.24, turn: 1.22, dmg: 28, desc: 'Air-superiority stealth twin-engine apex jet.' },
   { id: 'su57', name: 'Su-57 Felon', cost: 3000, premium: false, color: 0x1e293b, accent: 0xef4444, hp: 250, spd: 1.30, turn: 1.28, dmg: 33, desc: 'Super-maneuverable fifth-gen interceptor.' },
+  // v30 expansion jets: normal coin jets (NOT mystery, NOT premium) flying donor silhouettes
+  { id: 'rafale', name: 'Dassault Rafale', cost: 3900, premium: false, mesh: 'f16', color: 0x5b6b7d, accent: 0x60a5fa, hp: 195, spd: 1.20, turn: 1.30, dmg: 25, desc: 'Slate blue-grey omnirole fighter — balanced, with razor-sharp agility.' },
+  { id: 'f14', name: 'F-14 Tomcat', cost: 4800, premium: false, mesh: 'fa18', color: 0xd6dde3, accent: 0x38bdf8, hp: 215, spd: 1.32, turn: 1.08, dmg: 27, desc: 'Light grey/white naval interceptor — blistering top speed, mid agility, solid hull.' },
+  { id: 'typhoon', name: 'Eurofighter Typhoon', cost: 5600, premium: false, mesh: 'f35', color: 0x4f6f6a, accent: 0x2dd4bf, hp: 185, spd: 1.33, turn: 1.31, dmg: 29, desc: 'Teal-grey delta-canard — very fast and agile, trades hull for speed.' },
   { id: 'x02', name: 'X-02 Wyvern Prototype', cost: '$2.99', premium: true, usd: 2.99, color: 0x0f172a, accent: 0x38bdf8, hp: 290, spd: 1.38, turn: 1.35, dmg: 38, desc: 'Exclusive switch-blade experimental fighter.' },
   { id: 'adf11', name: 'ADF-11 Raven Darkstar', cost: '$6.99', premium: true, usd: 6.99, color: 0x111827, accent: 0xf43f5e, hp: 340, spd: 1.48, turn: 1.42, dmg: 45, desc: 'Exclusive hypersonic black-ops prototype.' },
   // Mystery jets (v10; v26: REAL-MONEY premium — coins no longer buy them. Unlocked via
@@ -546,7 +555,13 @@ const CHAPTERS = [
   { num: 7, name: 'Ch.7: Scorched Mesa', theme: 'canyon', sky: 0xd97706, fog: 0xfde68a, ground: 0x78350f, enemies: 9, reward: 250 },
   { num: 8, name: 'Ch.8: Storm Front Capital', theme: 'city', sky: 0x334155, fog: 0x64748b, ground: 0x0f172a, enemies: 10, reward: 300 },
   { num: 9, name: 'Ch.9: Planetfall Assault', theme: 'orbit', sky: 0x0a0618, fog: 0x241243, ground: 0x0a0618, enemies: 11, reward: 360 },
-  { num: 10, name: 'Ch.10: Heart of the Nebula', theme: 'nebula', sky: 0x0d0217, fog: 0x311042, ground: 0x0d0217, enemies: 12, reward: 450 }
+  { num: 10, name: 'Ch.10: Heart of the Nebula', theme: 'nebula', sky: 0x0d0217, fog: 0x311042, ground: 0x0d0217, enemies: 12, reward: 450 },
+  // v30 expansion chapters: same entry shape; bot HP keeps scaling off the (170 + 30*num) formula, engagement slots already cap at 4 for num >= 6
+  { num: 11, name: 'Ch.11: Frozen Front', theme: 'mountain', sky: 0x7dd3fc, fog: 0xe0f2fe, ground: 0xdde6ee, enemies: 7, reward: 530 },
+  { num: 12, name: 'Ch.12: Canyon Ambush', theme: 'canyon', sky: 0xf97316, fog: 0xffedd5, ground: 0x7c2d12, enemies: 7, reward: 620 },
+  { num: 13, name: 'Ch.13: Orbital Siege', theme: 'orbit', sky: 0x090418, fog: 0x2a1650, ground: 0x090418, enemies: 8, reward: 720 },
+  { num: 14, name: 'Ch.14: Nebula Maelstrom', theme: 'nebula', sky: 0x100322, fog: 0x3b0f4f, ground: 0x100322, enemies: 8, reward: 830 },
+  { num: 15, name: 'Ch.15: The Last Ace', theme: 'nebula', sky: 0x0a0114, fog: 0x2a0a2e, ground: 0x0a0114, enemies: 8, reward: 1000, ace: true }
 ];
 function getRankName(rp) { if (rp >= 1200) return 'Ranked Global'; if (rp >= 700) return 'Diamond'; if (rp >= 300) return 'Gold'; return 'Silver'; }
 // v25 ranked bots: the rank ladder, lowest -> highest. Royale fill bots are built
@@ -571,9 +586,10 @@ function updateTopUI() {
   const j = JETS.find(function(x) { return x.id === state.selectedJet; }) || JETS[0];
   document.getElementById('activeJetLabel').textContent = `Equipped: ${j.name}`;
   Array.from(chSel.options).forEach(function(opt) { opt.disabled = Number(opt.value) > state.unlockedChapter; });
+  const wb = document.getElementById('waveBestMeta'); if (wb) wb.textContent = state.bestWave > 0 ? `BEST: WAVE ${state.bestWave}` : 'ENDLESS / ESCALATING'; // v30: wave card shows your record
 }
 updateTopUI();
-const START_LABELS = { campaign: '▶ Start Mission', gungame: '▶ Start Gun Game', royale: '▶ Enter the Royale', online1v1: '▶ Start Online 1v1' };
+const START_LABELS = { campaign: '▶ Start Mission', gungame: '▶ Start Gun Game', royale: '▶ Enter the Royale', online1v1: '▶ Start Online 1v1', waves: '▶ Start Wave Defense' };
 function updateStartLabel() { const b = document.getElementById('btnStartPlay'); if (b) b.textContent = START_LABELS[currentMode] || '▶ Start'; }
 document.querySelectorAll('.mode-btn').forEach(function(btn) {
   btn.onclick = function() {
@@ -1332,6 +1348,8 @@ const JET_SPECS = {
 // Mystery jets (v10) fly existing silhouettes — alias their specs to the donor airframes
 JET_SPECS.mx1 = JET_SPECS.f22; JET_SPECS.mx2 = JET_SPECS.su57; JET_SPECS.mx3 = JET_SPECS.fa18;
 JET_SPECS.mx4 = JET_SPECS.f35; JET_SPECS.mx5 = JET_SPECS.adf11; JET_SPECS.mx6 = JET_SPECS.x02;
+// v30 expansion jets fly donor silhouettes too (F-14 on the Hornet frame, Rafale on the Falcon, Typhoon on the Lightning)
+JET_SPECS.f14 = JET_SPECS.fa18; JET_SPECS.rafale = JET_SPECS.f16; JET_SPECS.typhoon = JET_SPECS.f35;
 // ---- Realistic per-jet paint schemes (v7): subtle military finishes, 1024px procedural textures ----
 const JET_SCHEMES = {
   f16:   { base: '#9aa7b4', dark: '#7e8b99', light: '#b3bfcb' },
@@ -1346,7 +1364,10 @@ const JET_SCHEMES = {
   mx3:   { base: '#98a2ad', dark: '#79828d', light: '#b4bcc5' },
   mx4:   { base: '#414c58', dark: '#2e363f', light: '#59636f', pixel: true },
   mx5:   { base: '#14171d', dark: '#0a0c10', light: '#232830' },
-  mx6:   { base: '#241a4d', dark: '#150e30', light: '#372a6e', pixel: true }
+  mx6:   { base: '#241a4d', dark: '#150e30', light: '#372a6e', pixel: true },
+  rafale: { base: '#5b6b7d', dark: '#42505f', light: '#78879a' },
+  f14:   { base: '#d6dde3', dark: '#aeb8c2', light: '#eef2f5' },
+  typhoon: { base: '#4f6f6a', dark: '#38524d', light: '#6d8f89' }
 };
 const _jetGeoCache = {};
 function _shadeCss(hex, f) {
@@ -3248,7 +3269,7 @@ function startMission() {
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
   const mapRadius = currentMode === 'royale' ? 2400 : 1300;
-  const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : ch.theme);
+  const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : (currentMode === 'waves' ? 'city' : ch.theme)); // v30: Wave Defense always flies Sunlit Harbor
   buildEnvironment(theme, mapRadius, currentMode === 'gungame' ? 0.22 : 1); // v15: Gun Game thins the asteroid field // v18: 0.38 -> 0.22 (~15 rocks — galaxy props fill the space instead)
   // v18 Online Royale: a peer that connected while Royale was selected turns this
   // drop into a 2-human match (48 bots + rival puppet). Solo Royale is untouched.
@@ -3262,7 +3283,7 @@ function startMission() {
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
   activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
-  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49))); // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
+  const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (currentMode === 'waves' ? 0 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49)))); // v30: waves spawn through the wave system below, not this loop // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
   for (let i = 0; i < botCount; i++) {
     const ang = (i / botCount) * Math.PI * 2; const dist = currentMode === 'royale' ? (350 + Math.random() * 1650) : (320 + Math.random() * 550);
     const randJet = JETS[i % JETS.length];
@@ -3274,6 +3295,27 @@ function startMission() {
     const botBaseHp = currentMode === 'campaign' ? (170 + 30 * ch.num) : (currentMode === 'gungame' ? 230 : 380);
     const botHp = botHpMul ? Math.round(380 * botHpMul) : Math.round(botBaseHp * (0.9 + 0.2 * skill));
     activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireMul: botFireMul, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+  }
+  if (currentMode === 'campaign' && ch.ace) {
+    // v30 ACE boss (Ch.15): one extra bot flagged ace — hull x3.2, skill at the top
+    // of the bot range (the 'ace' difficulty value), deep-red/black paint on a
+    // scaled-up Su-57 frame, nameplate '★ ACE'. It spawns through the same entity
+    // shape as every campaign bot, so it obeys the campaign rule (pickBotTarget
+    // sends it at the player only) and the win check (entities empty) unchanged.
+    const aceSkill = 1.15;
+    const aceMesh = buildJetMesh(0x1a0505, 0xef4444, { hull: 1, damage: 1, agility: 1, speed: 1 }, 'su57');
+    aceMesh.scale.setScalar(1.15);
+    aceMesh.position.set(0, 260, -700); scene.add(aceMesh);
+    const aceHp = Math.round((170 + 30 * ch.num) * (0.9 + 0.2 * aceSkill) * 3.2);
+    activeGame.entities.push({ id: botCount, name: '★ ACE', ace: true, mesh: aceMesh, hp: aceHp, maxHp: aceHp, spd: 68 * aceSkill, skill: aceSkill, fireMul: 1, fireCd: 1, rocketCd: 6, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-aceMesh.position.x, -aceMesh.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+    showBanner('⚠ ENEMY ACE DETECTED', 4200);
+  }
+  if (currentMode === 'waves') {
+    // v30 Wave Defense: wave state rides on activeGame; spawnWaveBatch/updateWaves
+    // (below) run the escalation. Wave 1 = 4 hostiles over the city map.
+    activeGame.wave = 1; activeGame.wavesCleared = 0; activeGame.waveQuota = 4; activeGame.waveSpawned = 0; activeGame.waveState = 'combat'; activeGame.waveTimer = 0; activeGame.nextBotId = 0;
+    spawnWaveBatch();
+    showBanner('WAVE 1 INBOUND — SURVIVE!', 3200);
   }
   if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
   if (onlineRoyale && !mmCfg) {
@@ -3416,6 +3458,10 @@ function spawnRocket(pos, dir, ownerId, targetObj, dmg) {
 // in Gun Game Tiers 1-4 the button said "ROCKET (RDY)" while the fire gate
 // silently refused every press.
 function rocketLockedOut() { return !!(activeGame && activeGame.mode === 'gungame' && !GUN_GAME_TIERS[activeGame.player.ggTier].rockets); }
+// v30 Armor Plating: the single multiplier applied at every player HP intake
+// from enemy fire (bullets + rockets funnel through exactly two lines below).
+// 4% less damage per level, Lv.6 = x0.76. Bots never benefit — player only.
+function playerDamageMul() { const a = (state && state.upgrades && state.upgrades.armor) || 0; return 1 - 0.04 * a; }
 function firePlayerRocket() {
   if (!activeGame || activeGame.player.rocketCd > 0) return;
   if (rocketLockedOut()) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
@@ -3467,6 +3513,11 @@ function endMatch(victory, title, summary) {
     if (victory && modeAtEnd === 'campaign') pst.missionsWon += 1;
     accumulatePlayTime();
   }
+  // v30 daily reward: the first completed match of each real day pays +250 coins.
+  // It lives in the endMatch funnel so it fires at most once per day across ALL
+  // modes, and never on the boot/menu path (quitting home bypasses endMatch).
+  { const _dd = new Date(); const _today = _dd.getFullYear() + '-' + String(_dd.getMonth() + 1).padStart(2, '0') + '-' + String(_dd.getDate()).padStart(2, '0');
+    if (state.lastDaily !== _today) { state.lastDaily = _today; state.coins += 250; saveState(); setTimeout(function() { showBanner('🎁 DAILY REWARD +250 COINS', 4200); }, 700); } }
   mmCleanupMatch(); // v25: tear down matchmaking timers/connections (no-op when no mm match ran)
   royaleRemoteRef = null; // v18: the online-royale puppet never outlives its match (the peer link + royalePeerReady stay up for a rematch)
   activeGame = null; paused = false; clearSmoke(); SFX.engineStop();
@@ -3474,12 +3525,12 @@ function endMatch(victory, title, summary) {
   applyFov(); // v17: snap FOV back to the player's setting (a boost kick may have left it wide)
   document.getElementById('statusTitle').textContent = title;
   let nextBtn = '';
-  if (victory && modeAtEnd === 'campaign' && chapterAtEnd < 10) nextBtn = '<button class="btn btn-play" onclick="nextChapter()">Next Chapter</button>';
+  if (victory && modeAtEnd === 'campaign' && chapterAtEnd < CHAPTERS.length) nextBtn = '<button class="btn btn-play" onclick="nextChapter()">Next Chapter</button>';
   document.getElementById('statusBody').innerHTML = `<p style="color:#cbd5e1;line-height:1.5;">${summary}</p><div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">${nextBtn}<button class="btn btn-sec" onclick="returnHome()">Home Menu</button></div>`;
   document.getElementById('statusModal').classList.remove('hidden');
   if (typeof MUS !== 'undefined') MUS.update(); // v29: the results screen is lobby again — music fades back in
 }
-function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
+function nextChapter() { chSel.value = Math.min(CHAPTERS.length, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
 function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
@@ -3512,7 +3563,7 @@ function pickBotTarget(bot) {
   // and revenge retargeting are gone for this mode. A bot clipped by another bot's
   // stray fire ignores it completely (the bullet-hit resolution also skips bot-on-bot
   // damage in campaign, so campaign kills are always earned by the player).
-  if (activeGame.mode === 'campaign') return (p.respawnT > 0) ? null : 'player';
+  if (activeGame.mode === 'campaign' || activeGame.mode === 'waves') return (p.respawnT > 0) ? null : 'player'; // v30: Wave Defense bots hunt the player only, exactly like campaign
   // Revenge (FFA modes): whoever shot me in the last 6s gets targeted 50% of retargets
   if (bot.lastAttacker != null && (gameTime - bot.lastHitAt) < 6 && Math.random() < 0.5) {
     if (bot.lastAttacker === 'player' && !(activeGame.player.respawnT > 0)) return 'player';
@@ -3786,6 +3837,9 @@ function animate(now) {
   // holding R doesn't spam the unlock banner.
   if (!rocketLockedOut() && p.rocketCd <= 0 && p.respawnT <= 0 && (keys[state.binds.rocket] || p._touchRocket)) firePlayerRocket();
   for (let i = activeGame.rings.length - 1; i >= 0; i--) { const rg = activeGame.rings[i]; rg.mesh.rotation.y += dt * 1.5; if (p.respawnT <= 0 && rg.mesh.position.distanceTo(p.mesh.position) < 22) { if (rg.info.type === 'heal') p.hp = Math.min(p.maxHp, p.hp + 50); else if (rg.info.type === 'lock') { p.autoAimLeft = 7; p.lockTarget = pickFrontTarget(1200); } else { p.buff = rg.info.type; p.buffTimer = 8; } showBanner(`${rg.info.name}: ${rg.info.desc}`, 3800); scene.remove(rg.mesh); activeGame.rings.splice(i, 1); spawnPowerRing(); } }
+  // v30 Nano Repair: hull regenerates while the player is alive in a mission —
+  // never past maxHp, and not while dead/respawning (Gun Game respawn window).
+  { const rgLvl = (state.upgrades && state.upgrades.regen) || 0; if (rgLvl > 0 && p.respawnT <= 0 && p.hp > 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 0.4 * rgLvl * dt); }
   if (activeGame.mode === 'royale') {
     activeGame.zoneTimer -= dt;
     if (activeGame.zoneTimer <= 0 && activeGame.zoneRadius > 220) { activeGame.zoneRadius = Math.max(220, activeGame.zoneRadius - 320); activeGame.zoneTimer = 35; showBanner('STORM ZONE CLOSING IN!', 2500); }
@@ -3924,8 +3978,8 @@ function animate(now) {
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
-    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { if (activeGame.mode === 'campaign' && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg * playerDamageMul(); p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -3964,12 +4018,13 @@ function animate(now) {
     // Visible white smoke trail so pilots can see missiles coming
     rk._smokeAcc = (rk._smokeAcc || 0) + 20 * dt;
     while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.1, grow: 2.4, life: 0.5, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
-    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg * playerDamageMul(); p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     let rHit = false;
     for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); if (rk.ownerId === 'player') showHitmarker(ent.hp <= 0); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
     if (!activeGame) return;
   }
+  if (activeGame.mode === 'waves') updateWaves(dt); // v30: wave clear / breather / next-wave flow ticks once per frame
   if (activeGame.mode !== 'royale') { document.getElementById('hudWarning').textContent = incomingMissile ? 'MISSILE LOCK! TURN & SHOOT ROCKET TO DETONATE!' : (p.spawnProtT > 0 ? 'SPAWN PROTECTION' : (p.autoAimLeft > 0 ? `AUTO-AIM ACTIVE (${p.autoAimLeft.toFixed(1)}s)` : 'RADAR CLEAR')); }
   if (incomingMissile && p.respawnT <= 0 && gameTime - SFX._beepT > 0.4) { SFX._beepT = gameTime; SFX.lockBeep(); } // v20: lock-on warning beep
   if (p.hp <= 0 && p.respawnT <= 0) {
@@ -3979,6 +4034,7 @@ function animate(now) {
       if (!activeGame) return; // the credited kill was a bot's 15th — match over
     }
     else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame.mmMatch) mmNotifyMyDeath(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; } // v18: place = alive bots + living rival (both sit in entities) + you — and the rival is told you fell
+    else if (activeGame.mode === 'waves') { const sv = activeGame.wavesCleared || 0; if (sv > (state.bestWave || 0)) state.bestWave = sv; saveState(); updateTopUI(); endMatch(false, 'WAVE DEFENSE OVER', `You survived ${sv} wave${sv === 1 ? '' : 's'} over Sunlit Harbor. Kills: ${p.kills} | Best: Wave ${state.bestWave}`); return; } // v30: no respawn in Wave Defense — death ends the run
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); return; }
   }
   // Afterburner flicker + cloud drift (visual life, no allocations)
@@ -4086,6 +4142,43 @@ function royaleVictory() {
   if (activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rivalwin' }); } catch (e) {} }
   state.rp += 35; state.coins += 54; awardXP(120); const kills = p.kills; endMatch(true, '#1 VICTORY ROYALE!', `50-Pilot Champion! Kills: ${kills} | Rank: ${getRankName(state.rp)} (+35 RP)`); // v15: royale coins 90 -> 54 (x0.6), RP unchanged
 }
+// ---- Wave Defense system (v30) ----
+// Bots spawn with the exact entity shape of the campaign loop, but their skill
+// and hull escalate per wave: skill = 0.75 + 0.04/wave (cap 1.6), hull +6%/wave.
+// A wave's quota is 3 + wave; at most 8 are alive at once — the rest arrive as
+// reinforcements the moment a slot frees (updateWaves tops up every frame).
+function spawnWaveBot() {
+  const g = activeGame; if (!g || g.mode !== 'waves') return;
+  const wave = g.wave;
+  const skill = Math.min(1.6, 0.75 + 0.04 * (wave - 1));
+  const randJet = JETS[Math.floor(Math.random() * JETS.length)];
+  const m = buildJetMesh(randJet.color, randJet.accent, { hull: 1, damage: 1, agility: 1, speed: 1 }, randJet.id);
+  const ang = Math.random() * Math.PI * 2, dist = 380 + Math.random() * 500;
+  m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
+  const botHp = Math.round(200 * Math.pow(1.06, wave - 1) * (0.9 + 0.2 * skill));
+  g.entities.push({ id: g.nextBotId++, name: 'Hostile-' + (100 + g.waveSpawned), mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireMul: 1, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
+  g.waveSpawned++;
+}
+function spawnWaveBatch() { const g = activeGame; if (!g || g.mode !== 'waves') return; while (g.entities.length < 8 && g.waveSpawned < g.waveQuota) spawnWaveBot(); }
+function updateWaves(dt) {
+  const g = activeGame; if (!g || g.mode !== 'waves') return;
+  const p = g.player;
+  if (g.waveState === 'breather') {
+    g.waveTimer -= dt;
+    if (g.waveTimer <= 0) { g.wave++; g.waveQuota = 3 + g.wave; g.waveSpawned = 0; g.waveState = 'combat'; spawnWaveBatch(); showBanner(`WAVE ${g.wave} INBOUND!`, 2600); }
+    return;
+  }
+  spawnWaveBatch(); // reinforcements: refill freed slots until the wave quota is out
+  if (g.waveSpawned >= g.waveQuota && g.entities.length === 0 && p.hp > 0) {
+    g.wavesCleared = g.wave;
+    if (g.wave > (state.bestWave || 0)) state.bestWave = g.wave;
+    const bonus = 40 * g.wave; state.coins += bonus;
+    p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.25)); // breather repair: +25% hull
+    saveState(); updateTopUI();
+    showBanner(`WAVE ${g.wave} CLEARED! +${bonus} COINS — HULL REPAIRED`, 3400);
+    g.waveState = 'breather'; g.waveTimer = 5;
+  }
+}
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (victim.mesh && p && p.mesh && victim.mesh.position.distanceTo(p.mesh.position) < 900) SFX.explosion(); // v20: deaths are audible when they happen near you
@@ -4103,7 +4196,7 @@ function handleEntityEliminated(eIdx, killerId) {
   else {
     scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
     if (activeGame.entities.length === 0) {
-      if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; const chReward = Math.round(ch.reward * 0.6); state.coins += chReward; state.unlockedChapter = Math.min(10, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${chReward} Coins & +45 XP!`); }
+      if (activeGame.mode === 'campaign') { const ch = CHAPTERS.find(function(c) { return c.num === activeGame.chapter; }) || CHAPTERS[0]; const chReward = Math.round(ch.reward * 0.6); state.coins += chReward; state.unlockedChapter = Math.min(CHAPTERS.length, Math.max(state.unlockedChapter, activeGame.chapter + 1)); awardXP(90); endMatch(true, `CHAPTER ${activeGame.chapter} COMPLETE!`, `Reward: +${chReward} Coins & +45 XP!`); }
       else if (activeGame.mode === 'royale') { royaleVictory(); }
       else if (activeGame.mode === 'online1v1' || currentMode === 'online1v1') { endMatch(true, '1V1 VICTORY!', 'You shot down your online rival!'); }
     }
@@ -4118,9 +4211,10 @@ function updateHUD(curSpd) {
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
   else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = activeGame.mmMatch ? 'Ranked Royale — ONLINE' : (activeGame.onlineRoyale ? 'Ranked Royale — ONLINE (BETA)' : 'Ranked Royale'); document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; } // v18: alive = bots + rival puppet (both in entities) + you
+  else if (activeGame.mode === 'waves') { document.getElementById('hudModeTitle').textContent = 'Wave Defense'; const wLeft = activeGame.entities.length + Math.max(0, (activeGame.waveQuota || 0) - (activeGame.waveSpawned || 0)); document.getElementById('hudCenterInfo').textContent = activeGame.waveState === 'breather' ? `WAVE ${activeGame.wave} CLEARED — NEXT WAVE IN ${Math.max(0, Math.ceil(activeGame.waveTimer))}s` : `WAVE ${activeGame.wave} — HOSTILES LEFT: ${wLeft}`; } // v30
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
-  activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444'); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
+  activeGame.entities.forEach(function(e) { const dist = e.mesh.position.distanceTo(p.mesh.position); if (activeGame.mode === 'royale' && dist > 480) return; const v = e.mesh.position.clone().project(camera); if (v.z > 1) return; const x = (v.x * 0.5 + 0.5) * window.innerWidth; const y = (-v.y * 0.5 + 0.5) * window.innerHeight; if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return; const div = document.createElement('div'); div.className = 't-box' + ((p.autoAimLeft > 0 && p.lockTarget === e) ? ' locked' : ''); div.style.left = x + 'px'; div.style.top = y + 'px'; if (activeGame.mode === 'campaign' || activeGame.mode === 'waves') { const pct = Math.max(0, Math.min(100, Math.round((e.hp / e.maxHp) * 100))); const barCol = e.ace ? '#ef4444' : (pct > 50 ? '#22c55e' : (pct >= 25 ? '#f59e0b' : '#ef4444')); div.innerHTML = '<div style="position:absolute;left:50%;top:-17px;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:0.4px;color:#fecaca;text-shadow:0 1px 3px #000;white-space:nowrap;">' + e.name + '</div>' + '<div style="position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);width:44px;height:5px;background:rgba(0,0,0,0.65);border:1px solid rgba(255,255,255,0.55);border-radius:2px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + barCol + ';"></div></div>'; } boxWrap.appendChild(div); });
 }
 function drawMinimap() {
   const c = document.getElementById('minimap'); if (!c || !activeGame) return; const ctx = c.getContext('2d'); ctx.clearRect(0, 0, 110, 110); const scale = 50 / 2400;
@@ -4175,10 +4269,12 @@ function switchHangarTab(tab, btnEl) {
       { key: 'agility', name: 'Vector Control Flaps', desc: 'Increases turn rate & widens wing span.' },
       { key: 'speed', name: 'Afterburner Nozzles', desc: 'Boosts top airspeed & thruster size.' },
       { key: 'autoaim', name: 'Target Lock Computer', desc: 'Boosts Auto-Aim accuracy cone & lock time.' },
-      { key: 'rocket', name: 'Homing Missile Rack', desc: 'Boosts rocket damage & cuts reload time.' }
+      { key: 'rocket', name: 'Homing Missile Rack', desc: 'Boosts rocket damage & cuts reload time.' },
+      { key: 'armor', name: 'Armor Plating', desc: 'Reduces ALL incoming damage by 4% per level.', base0: true },
+      { key: 'regen', name: 'Nano Repair', desc: 'Hull slowly self-repairs: +0.4 HP/s per level in flight.', base0: true }
     ];
     body.innerHTML = '<div class="card-grid">' + upgs.map(function(u) {
-      const lvl = state.upgrades[u.key]; const cost = lvl * 210; // v15: upgrade prices x1.5
+      const lvl = state.upgrades[u.key] || 0; const cost = (u.base0 ? lvl + 1 : lvl) * 210; // v15: upgrade prices x1.5 // v30: 0-based tracks price their next level on the same 210 ladder
       const btn = lvl >= 6 ? '<button class="btn btn-sec btn-sm" disabled>MAXED</button>' : `<button class="btn btn-gold btn-sm" onclick="buyUpgrade('${u.key}', ${cost})">Upgrade (${cost} Coins)</button>`;
       return `<div class="item-card"><h3>${u.name} (Lv.${lvl}/6)</h3><p>${u.desc}</p><div class="stat-bar"><div class="stat-fill" style="width:${lvl / 6 * 100}%"></div></div>${btn}</div>`;
     }).join('') + '</div>';
