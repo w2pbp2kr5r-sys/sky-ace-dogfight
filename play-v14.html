@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0" />
 <title>NEBULA DOGFIGHT — 3D Fighter Jet Game</title>
 <meta name="description" content="Play NEBULA DOGFIGHT in your browser. Campaign, Gun Game, Ranked Royale and Online 1v1." />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
@@ -90,7 +90,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v15 — ULTRA GRAPHICS ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v16 — NEXT-GEN GRAPHICS ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -218,7 +218,12 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const SAVE_KEY = 'skyace_save_v1';
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
@@ -370,6 +375,7 @@ function awardXP(amount) {
 
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
 let renderer = null, scene = null, camera = null, sunLight = null;
+let composer = null, bloomPass = null; // v16: post-processing pipeline (UnrealBloom) — null-safe, plain rendering is the fallback
 const canvas = document.getElementById('gameCanvas');
 if (typeof THREE !== 'undefined') {
   renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
@@ -407,7 +413,18 @@ if (typeof THREE !== 'undefined') {
   } catch (envErr) { /* reflections are cosmetic; game runs fine without them */ }
   camera = new THREE.PerspectiveCamera(state.fov || 65, window.innerWidth / window.innerHeight, 0.5, 4500);
   camera.up.set(0, 1, 0);
-  window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+  window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (composer) composer.setSize(window.innerWidth, window.innerHeight); });
+  // Post-processing (v16): RenderPass -> UnrealBloom -> OutputPass. OutputPass applies
+  // the renderer's ACES tone mapping + sRGB conversion to the HDR composer buffer
+  // (the standard r160 recipe — no double tonemapping). Any failure here just leaves
+  // composer null and the game renders exactly as before.
+  try {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.55, 0.82);
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+  } catch (compErr) { composer = null; bloomPass = null; }
   scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85));
   scene.add(new THREE.AmbientLight(0xffffff, 0.18));
   sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6); sunLight.position.set(300, 600, 250);
@@ -468,8 +485,8 @@ function makeFacadeTexture(style) {
         ctx.fillStyle = '#c8ccd2'; ctx.fillRect(x - 4, y - 4, 44, 34);
         ctx.fillStyle = Math.random() < 0.4 ? '#ffdf9e' : '#33424f'; ctx.fillRect(x, y, 36, 26);
       }
-    } else if (style === 2) { // pale concrete offices
-      ctx.fillStyle = '#79828c'; ctx.fillRect(0, 0, w, h);
+    } else if (style === 2) { // concrete offices (v16: darker base so lit windows pop)
+      ctx.fillStyle = '#59636d'; ctx.fillRect(0, 0, w, h);
       ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 3;
       for (let x = 0; x <= w; x += 128) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
       for (let y = 14; y < h - 10; y += 34) for (let x = 14; x < w - 10; x += 58) {
@@ -982,7 +999,7 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const paintColor = skinActive ? baseColor : (upg.hull >= 3 ? 0x232b38 : baseColor);
   const hullTex = getHullTexture(paintColor, jetId, skinActive ? skin : null);
   const hullMaps = getHullMaps(paintColor, jetId, skinActive ? skin : null);
-  const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide };
+  const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide }; // v16: stronger panel normal detail
   // v15: clearcoat physical hull for ALL jets (the PMREM env makes it cheap to look
   // good) — modest 0.25 clearcoat on bots, the hero jets (withBurnerLight: player +
   // home-screen showcase) keep the richer 0.3 coat and full env intensity.
@@ -991,16 +1008,22 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
     : new THREE.MeshStandardMaterial(hullProps);
   const armorMat = new THREE.MeshStandardMaterial({ color: 0x1c222c, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.6 });
   // Control surfaces (v8): same paint, darkened ~15% so the hinge gaps read as separate panels
-  const surfMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(0.55, 0.55), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.8, side: THREE.DoubleSide });
+  const surfMat = new THREE.MeshStandardMaterial({ color: 0xd8d8d8, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.8, side: THREE.DoubleSide });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x141a24, metalness: 0.8, roughness: 0.45, envMapIntensity: 0.7 });
   const radomeMat = new THREE.MeshStandardMaterial({ color: 0x454c54, metalness: 0.05, roughness: 0.62, envMapIntensity: 0.4 });
   const glareMat = new THREE.MeshStandardMaterial({ color: 0x0c0e11, metalness: 0.1, roughness: 0.85 });
   const intakeDarkMat = new THREE.MeshBasicMaterial({ color: 0x04060a });
   const petalMat = new THREE.MeshStandardMaterial({ color: 0x3a3f47, metalness: 0.9, roughness: 0.32, envMapIntensity: 1.0, side: THREE.DoubleSide });
-  const glassMat = (THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial({ color: 0x27363f, metalness: 0.1, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.5 }) : new THREE.MeshStandardMaterial({ color: 0x27363f, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.4 }));
+  const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x2a2c30, metalness: 1, roughness: 0.45, envMapIntensity: 0.9 }); // v16: burnt exhaust metal
+  // v16: gold-tinted fighter canopy — physical glass with iridescence (the rainbow
+  // gold sheen real F-22/F-35 canopies have), near-mirror polish, seat/pilot inside
+  // still visible through the 0.88 opacity.
+  const glassMat = (THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial({ color: 0x1a1206, metalness: 0, roughness: 0.06, transparent: true, opacity: 0.88, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 2.2, iridescence: 0.55, iridescenceIOR: 1.3 }) : new THREE.MeshStandardMaterial({ color: 0x27363f, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.4 }));
   const formMat = new THREE.MeshStandardMaterial({ color: 0x0d2016, emissive: 0x86efac, emissiveIntensity: 1.1, metalness: 0.2, roughness: 0.5 });
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xff8c3a, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+  glowMat.color.setRGB(2.5, 1.2, 0.45); // v16: HDR burner disc — blooms like a real afterburner
   const diamondMat = new THREE.MeshBasicMaterial({ color: 0xd9f2ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  diamondMat.color.setRGB(1.6, 2.1, 2.6); // v16: HDR shock diamonds
   g.userData.glowMat = glowMat;
   const wingSpan = spec.span + (upg.agility - 1) * 0.35;
   const halfSpan = wingSpan / 2;
@@ -1076,6 +1099,18 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
     const strip = new THREE.Mesh(geos.formStrip, formMat);
     strip.position.set(side * (spec.rad * spec.width + 0.30), 0.18, -0.5); g.add(strip);
   });
+  // Nav lights (v16): port/left wingtip RED, starboard/right GREEN (aviation standard;
+  // with the nose on +Z and up +Y, the pilot's left is +X), plus a white tail strobe
+  // that blinks via updateStrobe(). HDR emissive so they bloom at dusk/in space.
+  const navGeo = new THREE.SphereGeometry(0.14, 8, 6);
+  const navRedMat = new THREE.MeshStandardMaterial({ color: 0x1a0202, emissive: 0xff2222, emissiveIntensity: 2.2 });
+  const navGrnMat = new THREE.MeshStandardMaterial({ color: 0x021a04, emissive: 0x22ff66, emissiveIntensity: 2.2 });
+  const strobeMat = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xffffff, emissiveIntensity: 0 }); // unique per jet — blinked per-frame
+  const navTipZ = _trailZ(spec.wing, halfSpan, 1.0);
+  const navL = new THREE.Mesh(navGeo, navRedMat); navL.position.set(halfSpan, -0.10, navTipZ); g.add(navL); noShadow.push(navL);
+  const navR = new THREE.Mesh(navGeo, navGrnMat); navR.position.set(-halfSpan, -0.10, navTipZ); g.add(navR); noShadow.push(navR);
+  const strobe = new THREE.Mesh(navGeo, strobeMat); strobe.position.set(0, 0.12, -spec.len * 0.52); g.add(strobe); noShadow.push(strobe);
+  g.userData.navLights = [navL, navR, strobe]; g.userData.strobeMat = strobeMat;
   // Canards (X-02 / ADF-11) and LERX root extensions (F/A-18)
   if (spec.canard) {
     const cR = new THREE.Mesh(geos.canardR, hullMat); cR.rotation.x = Math.PI / 2; cR.position.set(0, 0.05, spec.len * 0.27); g.add(cR);
@@ -1144,7 +1179,7 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const nozzleScale = 1 + (upg.speed - 1) * 0.15;
   const engXs = spec.engines === 1 ? [0] : [-spec.engGap, spec.engGap];
   engXs.forEach(function(ex) {
-    const noz = new THREE.Mesh(geos.nozzle, darkMat); noz.rotation.x = Math.PI / 2; noz.position.set(ex, 0, -spec.len * 0.50); g.add(noz);
+    const noz = new THREE.Mesh(geos.nozzle, nozzleMat); noz.rotation.x = Math.PI / 2; noz.position.set(ex, 0, -spec.len * 0.50); g.add(noz);
     const petal = new THREE.Mesh(geos.petal, petalMat); petal.rotation.x = Math.PI / 2; petal.position.set(ex, 0, -spec.len * 0.50 - 0.42); g.add(petal);
     // Turkey feathers (v9): six thin metallic plates fanned radially at the nozzle exit
     for (let fk = 0; fk < 6; fk++) {
@@ -1156,7 +1191,9 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
       g.add(feather);
     }
     const glow = new THREE.Mesh(geos.glowDisc, glowMat); glow.position.set(ex, 0, -spec.len * 0.50 - 0.18); glow.rotation.y = Math.PI; g.add(glow);
-    const flame = new THREE.Mesh(geos.flame, new THREE.MeshBasicMaterial({ color: 0x66c7ff, transparent: true, opacity: 0.85 }));
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0x66c7ff, transparent: true, opacity: 0.85 });
+    flameMat.color.setRGB(1.1, 1.7, 2.5); // v16: HDR blue burner flame
+    const flame = new THREE.Mesh(geos.flame, flameMat);
     flame.rotation.x = -Math.PI / 2; flame.scale.set(nozzleScale, nozzleScale, nozzleScale);
     flame.position.set(ex, 0, -spec.len * 0.50 - 1.55); flame.userData.baseLen = (upg.speed || 1) >= 3 ? 1.2 : 1; g.add(flame); flames.push(flame);
     // Afterburner shock diamonds (v8): bright mach discs standing in the exhaust plume
@@ -1377,7 +1414,7 @@ function buildMenuScene() {
     const sg = new THREE.BufferGeometry();
     sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     sg.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 9, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
+    const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 10.5, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false })); // v16: slightly larger/brighter menu stars
     menuGroup.add(stars); menuGroup.userData.stars = stars;
   })();
   // Nebula clouds (v11): 16 big soft additive sprites, palette biased to purple & pink
@@ -1397,6 +1434,7 @@ function buildMenuScene() {
   // Gas-giant planet, upper area of the frame, with an additive atmosphere halo
   const planet = new THREE.Mesh(new THREE.SphereGeometry(260, 40, 28), new THREE.MeshStandardMaterial({ map: getPlanetTexture(), roughness: 0.85, metalness: 0.0, emissive: 0x1a0f38, emissiveIntensity: 0.35 }));
   planet.position.set(1150, 830, 1500); menuGroup.add(planet); menuGroup.userData.planet = planet;
+  const pAtmo = makeAtmosphere(260 * 1.06, 0x8a6fe0); pAtmo.position.copy(planet.position); menuGroup.add(pAtmo); // v16: fresnel atmosphere rim
   const pGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: 0x8a6fe0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   pGlow.position.copy(planet.position); pGlow.scale.setScalar(980); menuGroup.add(pGlow);
   // Ringed planet (v11): pink/lavender bands + a tilted flat ring, opposite side from the gas giant
@@ -1405,6 +1443,7 @@ function buildMenuScene() {
   ringGrp.add(ringPlanet);
   const ringMesh = new THREE.Mesh(new THREE.RingGeometry(150 * 1.4, 150 * 2.2, 64), new THREE.MeshBasicMaterial({ color: 0xf0a6c8, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false, fog: false }));
   ringMesh.rotation.x = -Math.PI / 2; ringGrp.add(ringMesh);
+  ringGrp.add(makeAtmosphere(150 * 1.06, 0xf472b6)); // v16: pink fresnel atmosphere, tilts with the group
   menuGroup.add(ringGrp); menuGroup.userData.ringPlanet = ringGrp;
   const rpGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: 0xe879a8, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   rpGlow.position.copy(ringGrp.position); rpGlow.scale.setScalar(620); menuGroup.add(rpGlow);
@@ -1418,20 +1457,23 @@ function buildMenuScene() {
   (function() {
     const ax = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, jetY = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
     const plat = new THREE.Group(); plat.position.set(ax, jetY - 8.5, 0); // pad top sits 7 under the jet
-    const padMat = new THREE.MeshStandardMaterial({ map: getPadTexture(), color: 0xffffff, metalness: 0.85, roughness: 0.38, envMapIntensity: 1.0 }); // v15: painted metal pad
+    const padMat = new THREE.MeshStandardMaterial({ map: getPadTexture(), color: 0xffffff, metalness: 0.85, roughness: 0.28, envMapIntensity: 1.3 }); // v16: polished-metal pad — mirror-like env reflections under bloom
     const padDark = new THREE.MeshStandardMaterial({ color: 0x171c28, metalness: 0.7, roughness: 0.55 });
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(26, 27.5, 3, 40), padMat); plat.add(pad);
     const padSkirt = new THREE.Mesh(new THREE.CylinderGeometry(27.5, 22, 2.2, 40), padDark); padSkirt.position.y = -2.6; plat.add(padSkirt);
     // Glowing cyan ring inlaid in the pad top + a torus lip on the rim
-    const ringIn = new THREE.Mesh(new THREE.RingGeometry(21.5, 24.5, 48), new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide }));
+    const ringInMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide }); ringInMat.color.multiplyScalar(1.6); // v16: HDR color so the pad ring blooms
+    const ringIn = new THREE.Mesh(new THREE.RingGeometry(21.5, 24.5, 48), ringInMat);
     ringIn.rotation.x = -Math.PI / 2; ringIn.position.y = 1.53; plat.add(ringIn);
-    const ringC = new THREE.Mesh(new THREE.RingGeometry(10.5, 12, 40), new THREE.MeshBasicMaterial({ color: 0x67e8f9, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }));
+    const ringCMat = new THREE.MeshBasicMaterial({ color: 0x67e8f9, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }); ringCMat.color.multiplyScalar(1.4);
+    const ringC = new THREE.Mesh(new THREE.RingGeometry(10.5, 12, 40), ringCMat);
     ringC.rotation.x = -Math.PI / 2; ringC.position.y = 1.53; plat.add(ringC);
-    const lip = new THREE.Mesh(new THREE.TorusGeometry(26, 0.35, 8, 48), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+    const lipMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee }); lipMat.color.multiplyScalar(1.6);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(26, 0.35, 8, 48), lipMat);
     lip.rotation.x = Math.PI / 2; lip.position.y = 1.2; plat.add(lip);
     // 8 emissive pad lights around the rim
     const plGeo = new THREE.SphereGeometry(0.55, 8, 6);
-    const plMat = new THREE.MeshBasicMaterial({ color: 0x9be9ff });
+    const plMat = new THREE.MeshBasicMaterial({ color: 0x9be9ff }); plMat.color.multiplyScalar(1.5); // v16: HDR pad lights for bloom
     for (let pi = 0; pi < 8; pi++) {
       const pa = (pi / 8) * Math.PI * 2;
       const pl = new THREE.Mesh(plGeo, plMat);
@@ -1473,13 +1515,19 @@ function buildMenuScene() {
     function makeHoloPanel(px, py, pz, ry) {
       const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
       const tex = new THREE.CanvasTexture(cv);
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(17, 8.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.88, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(17, 8.5), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.88, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide })); // v16: FrontSide only — DoubleSide showed mirrored text from behind (the backwards-signs bug)
       m.position.set(px, py, pz); m.rotation.y = ry;
       m.userData.canvas = cv; m.userData.tex = tex; m.userData.baseY = py; m.userData.baseRotY = ry;
       return m;
     }
-    const hp1 = makeHoloPanel(ax - 23, jetY + 10, 6, 0.5);
-    const hp2 = makeHoloPanel(ax - 25, jetY + 5, 11, 0.62);
+    // v16 BACKWARDS-SIGN FIX: a PlaneGeometry's textured front face points +Z, but the
+    // menu camera sits at jet + (-14, +6, -64) — it views the panels from the -Z side,
+    // so with the old yaw (+0.5) it saw the mirrored BACK of the planes. Rotating each
+    // panel by PI - yaw turns the front face toward -Z (and slightly +X, where the
+    // camera sits relative to the panels), keeping the same aesthetic tilt while the
+    // text reads correctly.
+    const hp1 = makeHoloPanel(ax - 23, jetY + 10, 6, Math.PI - 0.5);
+    const hp2 = makeHoloPanel(ax - 25, jetY + 5, 11, Math.PI - 0.62);
     menuGroup.add(hp1); menuGroup.add(hp2);
     menuGroup.userData.holoPanels = [hp1, hp2];
   })();
@@ -1498,6 +1546,14 @@ function buildMenuScene() {
   const nebLight = new THREE.PointLight(0xa855f7, 900, 420, 1.8);
   nebLight.position.set(46, 195, -30);
   menuGroup.add(nebLight);
+  // Pink rim spot (v16): from behind-left of the jet (screen-left is +X here, behind
+  // is +Z, away from the camera) so the hero jet gets a magenta edge against the dark.
+  // decay 0 keeps the spec'd 0.9 intensity meaningful — r160's physical decay (2)
+  // would make a 0.9 spot invisible at ~200 units.
+  const pinkSpot = new THREE.SpotLight(0xf472b6, 0.9, 400, 0.5, 1, 0);
+  pinkSpot.position.set(176, 250, 190);
+  pinkSpot.target.position.set(46, 160, 0);
+  menuGroup.add(pinkSpot); menuGroup.add(pinkSpot.target);
   scene.add(menuGroup);
 }
 function refreshMenuJet() {
@@ -1544,6 +1600,7 @@ function animateMenuScene(dt) {
     mj.rotation.x = Math.sin(t * 0.6) * 0.04;
     mj.rotation.z = Math.sin(t * 0.5) * 0.04;
     flickerFlames(mj, false, dt); // burners at a low hover flicker
+    updateStrobe(mj); // v16: home-screen jet strobes too
     if (mj.userData.burnerLight) mj.userData.burnerLight.intensity = 7 + Math.sin(t * 7) * 1.6;
     // Framing (v11): camera pulled back to z -64 and the look target is offset +X of
     // the jet on wider windows. With this camera (placed at -Z/-X of the jet looking
@@ -1574,7 +1631,7 @@ function hash2(a, b) { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; r
 function buildCityGrid(theme, radius) {
   const facades = getFacadeTextures();
   const mats = facades.map(function(ft, idx) {
-    return new THREE.MeshStandardMaterial({ map: ft, emissiveMap: ft, emissive: 0xffd9a0, emissiveIntensity: theme === 'neon' ? 0.95 : 0.18, color: idx === 1 ? 0xdccabd : 0xffffff, roughness: 0.6, metalness: 0.25 });
+    return new THREE.MeshStandardMaterial({ map: ft, emissiveMap: ft, emissive: 0xffd9a0, emissiveIntensity: theme === 'neon' ? 0.95 : 0.3, color: idx === 1 ? 0xdccabd : 0xffffff, roughness: 0.6, metalness: 0.25 }); // v16: brighter lit windows in day city too
   });
   const roofMat = new THREE.MeshStandardMaterial({ color: theme === 'neon' ? 0x11141c : 0x3c4654, roughness: 0.9 });
   const core = Math.min(radius * 0.95, 1450);
@@ -1781,6 +1838,18 @@ function addThemeProps(theme, radius) {
   }
 }
 // ---- Space environments (v13): 'nebula' + 'orbit' themes — starfields, asteroid fields, crystal spires, a gas giant and a station ----
+// Fresnel atmosphere shell (v16): a BackSide additive sphere slightly larger than the
+// planet; the fragment intensity peaks at the limb (view direction perpendicular to
+// the normal), giving the soft glowing atmosphere rim real space photography has.
+function makeAtmosphere(radius, colorHex) {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { atmColor: { value: new THREE.Color(colorHex) } },
+    vertexShader: 'varying vec3 vN; void main() { vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'uniform vec3 atmColor; varying vec3 vN; void main() { float i = pow(0.65 - dot(vN, vec3(0.0, 0.0, 1.0)), 3.0); gl_FragColor = vec4(atmColor, 1.0) * i; }',
+    blending: THREE.AdditiveBlending, side: THREE.BackSide, transparent: true, depthWrite: false
+  });
+  return new THREE.Mesh(new THREE.SphereGeometry(radius, 40, 28), mat);
+}
 let _orbitPlanetTex = null;
 function getOrbitPlanetTexture() {
   if (_orbitPlanetTex) return _orbitPlanetTex;
@@ -1849,7 +1918,7 @@ function buildAsteroids(count, radius, yMin, yMax, avoid) {
 function buildCrystalSpires(radius, count) {
   const geos = getAsteroidGeos();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x554e60, roughness: 0.95, metalness: 0.05, flatShading: true });
-  const crysMats = [0xa855f7, 0xec4899].map(function(c) { return new THREE.MeshStandardMaterial({ color: 0x1a0b2e, emissive: c, emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.1 }); });
+  const crysMats = [0xa855f7, 0xec4899].map(function(c) { return new THREE.MeshStandardMaterial({ color: 0x1a0b2e, emissive: c, emissiveIntensity: 1.3, roughness: 0.25, metalness: 0.1 }); });
   const crysGeo = new THREE.OctahedronGeometry(1, 0);
   for (let ci = 0; ci < (count || 12); ci++) {
     const a = Math.random() * Math.PI * 2, d = 210 + Math.random() * Math.max(80, radius * 0.9 - 210);
@@ -1880,7 +1949,7 @@ function buildSpaceStation() {
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 7, 16), darkMetal); collar.position.y = -18; grp.add(collar);
   const ringGrp = new THREE.Group(); grp.add(ringGrp); // ring + emissive strip + docking arms rotate slowly (env spin hook)
   const ring = new THREE.Mesh(new THREE.TorusGeometry(34, 3.5, 12, 42), metal); ring.rotation.x = Math.PI / 2; ring.castShadow = true; ringGrp.add(ring);
-  const strip = new THREE.Mesh(new THREE.TorusGeometry(34, 0.8, 8, 42), new THREE.MeshStandardMaterial({ color: 0x062a33, emissive: 0x22d3ee, emissiveIntensity: 1.6, roughness: 0.4 }));
+  const strip = new THREE.Mesh(new THREE.TorusGeometry(34, 0.8, 8, 42), new THREE.MeshStandardMaterial({ color: 0x062a33, emissive: 0x22d3ee, emissiveIntensity: 1.8, roughness: 0.4 }));
   strip.rotation.x = Math.PI / 2; ringGrp.add(strip);
   for (let k = 0; k < 4; k++) {
     const aa = k * Math.PI / 2;
@@ -1951,7 +2020,7 @@ function buildSpaceEnvironment(theme, radius, density) {
   } else { // orbit: a gas giant fills the sky below + a station to fight around
     const planet = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 32), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
     planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
-    const atmo = new THREE.Mesh(new THREE.SphereGeometry(4120, 48, 32), new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, fog: false }));
+    const atmo = makeAtmosphere(4000 * 1.03, 0x8b7cf6); // v16: fresnel shader shell replaces the flat glow sphere
     atmo.position.copy(planet.position); worldGroup.add(atmo);
     buildSpaceStation();
     buildAsteroids(35, radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // keep the station's airspace clear
@@ -2001,12 +2070,12 @@ function buildEnvironment(theme, radius, densityScale) {
     ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY_PLANE, CITY_PLANE), new THREE.MeshStandardMaterial({ map: getCityGroundTexture(theme === 'neon'), color: 0xffffff, roughness: 0.96, metalness: 0.02 }));
   } else {
     const gTex = getGroundTexture('noise', cfg.gBase, cfg.gLine);
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ map: gTex, color: 0xffffff, roughness: 0.94, metalness: 0.02 }));
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ map: gTex, bumpMap: gTex, bumpScale: 0.6, color: 0xffffff, roughness: 0.94, metalness: 0.02 })); // v16: noise bump so canyon/mountain ground catches raking light
   }
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
   if (theme === 'city') {
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.18, metalness: 0.75, transparent: true, opacity: 0.88 }));
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.18, metalness: 0.85, envMapIntensity: 1.2, transparent: true, opacity: 0.88 })); // v16: mirror-like harbor water
     water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water); worldGroup.userData.water = water;
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
@@ -2119,9 +2188,13 @@ function spawnBullet(pos, dir, ownerId, dmg, color) {
   const col = color || 0xfef08a;
   const isTracer = ownerId === 'player' && ((++_playerShotCount) % 4 === 0); // every 4th player round is a bigger, brighter tracer
   const grp = new THREE.Group();
-  const core = new THREE.Mesh(_bulletCoreGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isTracer ? 1.0 : 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const coreMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: isTracer ? 1.0 : 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  coreMat.color.multiplyScalar(1.9); // v16: HDR tracer core — pushes past the bloom threshold
+  const core = new THREE.Mesh(_bulletCoreGeo, coreMat);
   core.rotation.x = Math.PI / 2; grp.add(core);
-  const inner = new THREE.Mesh(_bulletInnerGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const innerMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  innerMat.color.setRGB(2, 2, 2); // v16: white-hot HDR centre
+  const inner = new THREE.Mesh(_bulletInnerGeo, innerMat);
   inner.rotation.x = Math.PI / 2; grp.add(inner);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSmokeTexture(), color: col, transparent: true, opacity: isTracer ? 0.95 : 0.65, blending: THREE.AdditiveBlending, depthWrite: false }));
   glow.scale.setScalar(isTracer ? 3.2 : 2.2); grp.add(glow);
@@ -2160,6 +2233,8 @@ function spawnRocket(pos, dir, ownerId, targetObj, dmg) {
   if (!_rkGeos) {
     _rkGeos = { body: new THREE.CylinderGeometry(0.42, 0.42, 4.6, 10), nose: new THREE.ConeGeometry(0.42, 1.3, 10), band: new THREE.CylinderGeometry(0.44, 0.44, 0.35, 10), finA: new THREE.BoxGeometry(1.7, 0.06, 0.7), finB: new THREE.BoxGeometry(0.06, 1.7, 0.7), flame: new THREE.ConeGeometry(0.34, 1.9, 8), disc: new THREE.CircleGeometry(0.20, 10) };
     _rkMats = { body: new THREE.MeshStandardMaterial({ color: 0xffffff, map: getRocketTexture(), metalness: 0.6, roughness: 0.35, envMapIntensity: 0.8 }), dark: new THREE.MeshStandardMaterial({ color: 0x22262e, metalness: 0.7, roughness: 0.4 }), red: new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.4, roughness: 0.45 }), flame: new THREE.MeshBasicMaterial({ color: 0xffa53a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), disc: new THREE.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), glass: (THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial({ color: 0x141a20, metalness: 0.2, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 1.3 }) : new THREE.MeshStandardMaterial({ color: 0x141a20, metalness: 0.7, roughness: 0.15, envMapIntensity: 1.2 })) };
+    _rkMats.flame.color.setRGB(2.2, 1.2, 0.45); // v16: HDR rocket exhaust — blooms
+    _rkMats.disc.color.setRGB(1.6, 2.0, 2.4); // v16: HDR exhaust disc
   }
   const wrap = new THREE.Group();
   const body = new THREE.Mesh(_rkGeos.body, _rkMats.body); body.rotation.x = Math.PI / 2; wrap.add(body);
@@ -2371,13 +2446,25 @@ function spawnImpactFx(pos) {
   for (let s = 0; s < 5; s++) spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xffa63d, size: 0.8, grow: 1.5, life: 0.25, opacity: 0.9, vx: (Math.random() - 0.5) * 22, vy: (Math.random() - 0.5) * 22, vz: (Math.random() - 0.5) * 22 });
   spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.2, grow: 3, life: 0.12, opacity: 0.95, vx: 0, vy: 0, vz: 0 });
 }
+// v16: tail-strobe blink — brief white flash every 1.2s, driven off a shared clock so
+// it works in the menu scene and in missions alike. Material is unique per jet.
+function updateStrobe(mesh) {
+  const sm = mesh && mesh.userData && mesh.userData.strobeMat;
+  if (sm) sm.emissiveIntensity = ((performance.now() / 1000) % 1.2) < 0.08 ? 3 : 0;
+}
+// v16: single render entry point — bloom composer on high/medium, plain renderer on
+// low quality or if the composer failed to build.
+function renderFrame() {
+  if (composer && state.quality !== 'low') composer.render();
+  else renderer.render(scene, camera);
+}
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
   if (!renderer) return;
-  if (!activeGame) { animateMenuScene(dt); renderer.render(scene, camera); return; }
-  if (paused) { renderer.render(scene, camera); return; }
-  if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 4.5, -13).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderer.render(scene, camera); return; }
+  if (!activeGame) { animateMenuScene(dt); renderFrame(); return; }
+  if (paused) { renderFrame(); return; }
+  if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 4.5, -13).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderFrame(); return; }
   const p = activeGame.player;
   gameTime += dt;
   if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
@@ -2660,7 +2747,8 @@ function animate(now) {
     shakeT = Math.max(0, shakeT - dt * 1.7);
   }
   camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(20)));
-  updateHUD(curSpd); renderer.render(scene, camera);
+  updateStrobe(p.mesh); activeGame.entities.forEach(function(e) { updateStrobe(e.mesh); }); // v16: strobe blink
+  updateHUD(curSpd); renderFrame();
 }
 // Gun Game bot promotion (v14): driven by the same GUN_GAME_TIERS table as the player —
 // new plane on the field, thicker hull (and heal the gain), tier speed. Bot bullet/rocket
@@ -2887,6 +2975,13 @@ let listeningAction = null;
 function applyQuality() {
   if (!renderer) return;
   const q = state.quality || 'high';
+  // v16: bloom follows quality — high full strength, medium softer + cheaper composer
+  // buffer, low bypasses the composer entirely (renderFrame checks quality).
+  if (composer && bloomPass) {
+    if (q === 'medium') { bloomPass.strength = 0.4; composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }
+    else { bloomPass.strength = 0.55; composer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); }
+    composer.setSize(window.innerWidth, window.innerHeight);
+  }
   if (q === 'medium') {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
@@ -2970,6 +3065,24 @@ function setupPeerConn(c) {
 function cancelOnline() { if (peerSyncTimer) clearInterval(peerSyncTimer); if (peer) { try { peer.destroy(); } catch (e) {} peer = null; } closeModals(); document.getElementById('menuScreen').classList.remove('hidden'); showMenuScene(); }
 document.getElementById('btnHostRoom').onclick = function() { startOnlineMatchmaking(null, true); };
 document.getElementById('btnJoinRoom').onclick = function() { const c = document.getElementById('joinCodeInput').value.trim(); if (c) startOnlineMatchmaking(c, false); else startOnlineMatchmaking(); };
+// v16: this script is now an ES module, so its top-level functions are NOT globals.
+// The HTML (static markup + template strings in the renderers above) calls these 15
+// functions from inline onclick handlers — re-expose exactly those on window.
+window.closeModals = closeModals;
+window.switchHangarTab = switchHangarTab;
+window.nextChapter = nextChapter;
+window.returnHome = returnHome;
+window.equipJet = equipJet;
+window.openModalsShop = openModalsShop;
+window.buyJet = buyJet;
+window.buyUpgrade = buyUpgrade;
+window.simulateIAP = simulateIAP;
+window.buyJetShop = buyJetShop;
+window.openCrate = openCrate;
+window.equipSkin = equipSkin;
+window.equipSkinFromCollection = equipSkinFromCollection;
+window.startRebind = startRebind;
+window.cancelOnline = cancelOnline;
 // Idle background on menu: the v10 galaxy home scene (hero jet hovering over its platform)
 if (renderer) { showMenuScene(); camera.position.set(24, 168, -56); camera.lookAt(38 + (camera.aspect >= 1.35 ? -5 : 0), 158, 0); }
 requestAnimationFrame(animate);
