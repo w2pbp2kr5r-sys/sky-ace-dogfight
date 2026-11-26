@@ -89,7 +89,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v12 ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v13 — GALAXY MAPS ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -302,13 +302,13 @@ const CHAPTERS = [
   { num: 1, name: 'Ch.1: Sunlit Harbor City', theme: 'city', sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x1e293b, enemies: 3, reward: 60 },
   { num: 2, name: 'Ch.2: Alpine Snow Peaks', theme: 'mountain', sky: 0x93c5fd, fog: 0xdbeafe, ground: 0xe2e8f0, enemies: 4, reward: 85 },
   { num: 3, name: 'Ch.3: Red Rock Canyon', theme: 'canyon', sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, enemies: 5, reward: 110 },
-  { num: 4, name: 'Ch.4: Sunset Bay Metropolis', theme: 'city', sky: 0xf43f5e, fog: 0xfda4af, ground: 0x1e1b4b, enemies: 6, reward: 140 },
+  { num: 4, name: 'Ch.4: Orbital Shipyard', theme: 'orbit', sky: 0x0b0620, fog: 0x1e1b4b, ground: 0x0b0620, enemies: 6, reward: 140 },
   { num: 5, name: 'Ch.5: Glacier Ridge', theme: 'mountain', sky: 0x0284c7, fog: 0xbae6fd, ground: 0xcbd5e1, enemies: 7, reward: 170 },
-  { num: 6, name: 'Ch.6: Neon Night Skyline', theme: 'neon', sky: 0x090d16, fog: 0x1e1b4b, ground: 0x0f172a, enemies: 8, reward: 210 },
+  { num: 6, name: 'Ch.6: Nebula Drift', theme: 'nebula', sky: 0x12041f, fog: 0x2a0a3a, ground: 0x12041f, enemies: 8, reward: 210 },
   { num: 7, name: 'Ch.7: Scorched Mesa', theme: 'canyon', sky: 0xd97706, fog: 0xfde68a, ground: 0x78350f, enemies: 9, reward: 250 },
   { num: 8, name: 'Ch.8: Storm Front Capital', theme: 'city', sky: 0x334155, fog: 0x64748b, ground: 0x0f172a, enemies: 10, reward: 300 },
-  { num: 9, name: 'Ch.9: Everest Summit Assault', theme: 'mountain', sky: 0x1e3a8a, fog: 0x93c5fd, ground: 0xf8fafc, enemies: 11, reward: 360 },
-  { num: 10, name: 'Ch.10: Cyber Core Citadel', theme: 'neon', sky: 0x050811, fog: 0x311042, ground: 0x090d16, enemies: 12, reward: 450 }
+  { num: 9, name: 'Ch.9: Planetfall Assault', theme: 'orbit', sky: 0x0a0618, fog: 0x241243, ground: 0x0a0618, enemies: 11, reward: 360 },
+  { num: 10, name: 'Ch.10: Heart of the Nebula', theme: 'nebula', sky: 0x0d0217, fog: 0x311042, ground: 0x0d0217, enemies: 12, reward: 450 }
 ];
 function getRankName(rp) { if (rp >= 1200) return 'Ranked Global'; if (rp >= 700) return 'Diamond'; if (rp >= 300) return 'Gold'; return 'Silver'; }
 let currentMode = 'campaign';
@@ -1425,7 +1425,9 @@ const ENV_THEMES = {
   city:     { sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x2a3342, bColor: 0x334155, skyTop: '#1c5f9e', skyBot: '#a8d8f8', gBase: '#232a36', gLine: '#10141c', sun: 0xfff2d8, cloud: 0xffffff },
   mountain: { sky: 0x7dd3fc, fog: 0xe0f2fe, ground: 0xdbeafe, bColor: 0x94a3b8, skyTop: '#2f6fb4', skyBot: '#dcefff', gBase: '#c8d6e4', gLine: '#9db4c8', sun: 0xfff6e0, cloud: 0xffffff },
   canyon:   { sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, bColor: 0x7c2d12, skyTop: '#7a3b12', skyBot: '#f7b733', gBase: '#8a3d18', gLine: '#5f2708', sun: 0xffd9a0, cloud: 0xffe8cc },
-  neon:     { sky: 0x050811, fog: 0x1e1b4b, ground: 0x090d16, bColor: 0x1e1b4b, skyTop: '#02020a', skyBot: '#2a1052', gBase: '#0a0d18', gLine: '#1c2450', sun: 0xbfd4ff, cloud: 0x8f7fd8 }
+  neon:     { sky: 0x050811, fog: 0x1e1b4b, ground: 0x090d16, bColor: 0x1e1b4b, skyTop: '#02020a', skyBot: '#2a1052', gBase: '#0a0d18', gLine: '#1c2450', sun: 0xbfd4ff, cloud: 0x8f7fd8 },
+  nebula:   { sky: 0x0d0217, fog: 0x1a0b2e, ground: 0x12041f, bColor: 0x2a1052, skyTop: '#030110', skyBot: '#2a0a4a', gBase: '#12041f', gLine: '#2a0a3a', sun: 0xd8ccff, cloud: 0xa78bfa },
+  orbit:    { sky: 0x0a0618, fog: 0x1a0b2e, ground: 0x0b0620, bColor: 0x241243, skyTop: '#02010a', skyBot: '#1e0b40', gBase: '#0b0620', gLine: '#241243', sun: 0xd8ccff, cloud: 0xa78bfa }
 };
 const _boxGeo = (typeof THREE !== 'undefined') ? new THREE.BoxGeometry(1, 1, 1) : null;
 const _coneGeo = (typeof THREE !== 'undefined') ? new THREE.ConeGeometry(1, 1, 6) : null;
@@ -1641,25 +1643,203 @@ function addThemeProps(theme, radius) {
     }
   }
 }
+// ---- Space environments (v13): 'nebula' + 'orbit' themes — starfields, asteroid fields, crystal spires, a gas giant and a station ----
+let _orbitPlanetTex = null;
+function getOrbitPlanetTexture() {
+  if (_orbitPlanetTex) return _orbitPlanetTex;
+  _orbitPlanetTex = makeCanvas(1024, 512, function(ctx, w, h) {
+    // Gas bands in the game's purple / blue / pink palette, wavy edges like the menu planet
+    const bands = ['#160a30', '#24124a', '#3b2a7a', '#4a6fd4', '#5b3fa8', '#7a5fd0', '#9333a8', '#b83a8c', '#4a6fd4', '#2a1650', '#6a4fc0', '#d9579e', '#33205e', '#1b0b38'];
+    const bh = h / bands.length;
+    bands.forEach(function(col, i) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, i * bh);
+      for (let x = 0; x <= w; x += 24) ctx.lineTo(x, i * bh + Math.sin(x * 0.012 + i * 1.9) * 5);
+      ctx.lineTo(w, (i + 1) * bh + 6); ctx.lineTo(0, (i + 1) * bh + 6); ctx.closePath(); ctx.fill();
+    });
+    for (let i = 0; i < 500; i++) { ctx.fillStyle = 'rgba(255,255,255,' + (Math.random() * 0.05) + ')'; ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    const sg = ctx.createRadialGradient(w * 0.36, h * 0.42, 4, w * 0.36, h * 0.42, 64);
+    sg.addColorStop(0, 'rgba(236,72,153,0.65)'); sg.addColorStop(1, 'rgba(236,72,153,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(w * 0.36, h * 0.42, 72, 32, 0, 0, 6.3); ctx.fill();
+    const tg = ctx.createLinearGradient(0, 0, w * 0.35, h);
+    tg.addColorStop(0, 'rgba(0,0,12,0.40)'); tg.addColorStop(0.45, 'rgba(0,0,12,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, w, h);
+  });
+  if (THREE.SRGBColorSpace) _orbitPlanetTex.colorSpace = THREE.SRGBColorSpace;
+  return _orbitPlanetTex;
+}
+let _asteroidGeos = null;
+function getAsteroidGeos() {
+  if (_asteroidGeos) return _asteroidGeos;
+  _asteroidGeos = [];
+  for (let gi = 0; gi < 8; gi++) { // 8 pre-jittered rock variants, reused by every asteroid / spire base
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    const pa = g.attributes.position; const v = new THREE.Vector3(); const cache = {};
+    for (let vi = 0; vi < pa.count; vi++) { // jitter keyed by vertex position so shared corners move together (no cracks)
+      v.fromBufferAttribute(pa, vi);
+      const key = v.x.toFixed(3) + ',' + v.y.toFixed(3) + ',' + v.z.toFixed(3);
+      if (!(key in cache)) cache[key] = 0.75 + Math.random() * 0.55; // displacement factor 0.75-1.30
+      v.multiplyScalar(cache[key]); pa.setXYZ(vi, v.x, v.y, v.z);
+    }
+    g.computeVertexNormals();
+    _asteroidGeos.push(g);
+  }
+  return _asteroidGeos;
+}
+function buildAsteroids(count, radius, yMin, yMax, avoid) {
+  const geos = getAsteroidGeos();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6b6472, roughness: 0.95, metalness: 0.05, flatShading: true });
+  const spin = worldGroup.userData.spin || (worldGroup.userData.spin = []);
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < count * 40) {
+    const a = Math.random() * Math.PI * 2, d = 140 + Math.random() * Math.max(60, radius * 0.92 - 140);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (Math.hypot(x, z) < 130) continue; // spawn keep-out: player spawns at (0,180,0), spec min distance > 120
+    let bad = false;
+    if (avoid) for (let ai = 0; ai < avoid.length; ai++) { if (Math.hypot(x - avoid[ai].x, z - avoid[ai].z) < avoid[ai].d) { bad = true; break; } }
+    if (bad) continue;
+    const s = 6 + Math.random() * 24, y = yMin + Math.random() * (yMax - yMin);
+    const m = new THREE.Mesh(geos[placed % geos.length], mat);
+    m.scale.setScalar(s); m.position.set(x, y, z);
+    m.rotation.set(Math.random() * 3.1, Math.random() * 3.1, Math.random() * 3.1);
+    m.castShadow = true; m.receiveShadow = true;
+    m.userData.svx = (Math.random() - 0.5) * 0.14; m.userData.svy = (Math.random() - 0.5) * 0.18; // slow tumble, driven by the env hook in animate()
+    worldGroup.add(m); spin.push(m);
+    obstacles.push({ x: x, z: z, r: s * 1.1, h: y + s * 1.25 }); // same {x,z,r,h} column format as the buildings; h = asteroid top
+    placed++;
+  }
+}
+function buildCrystalSpires(radius) {
+  const geos = getAsteroidGeos();
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x554e60, roughness: 0.95, metalness: 0.05, flatShading: true });
+  const crysMats = [0xa855f7, 0xec4899].map(function(c) { return new THREE.MeshStandardMaterial({ color: 0x1a0b2e, emissive: c, emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.1 }); });
+  const crysGeo = new THREE.OctahedronGeometry(1, 0);
+  for (let ci = 0; ci < 12; ci++) {
+    const a = Math.random() * Math.PI * 2, d = 210 + Math.random() * Math.max(80, radius * 0.9 - 210);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d, y = 60 + Math.random() * 260;
+    const grp = new THREE.Group(); grp.position.set(x, y, z); grp.rotation.y = Math.random() * 3.1;
+    const bs = 8 + Math.random() * 6;
+    const base = new THREE.Mesh(geos[ci % geos.length], baseMat); base.scale.setScalar(bs); base.castShadow = true; grp.add(base);
+    const nC = 2 + Math.floor(Math.random() * 3); let topY = bs; // 2-4 crystals per cluster
+    for (let k = 0; k < nC; k++) {
+      const cl = 14 + Math.random() * 20, cr = 1.6 + Math.random() * 1.8;
+      const crys = new THREE.Mesh(crysGeo, crysMats[(ci + k) % 2]);
+      crys.scale.set(cr, cl, cr);
+      crys.position.set((Math.random() - 0.5) * bs * 0.9, bs * 0.4 + cl * 0.55, (Math.random() - 0.5) * bs * 0.9);
+      crys.rotation.set((Math.random() - 0.5) * 0.7, Math.random() * 3.1, (Math.random() - 0.5) * 0.7);
+      grp.add(crys);
+      topY = Math.max(topY, bs * 0.4 + cl * 1.1);
+    }
+    worldGroup.add(grp);
+    obstacles.push({ x: x, z: z, r: bs * 1.1 + 8, h: y + topY }); // base registered; r padded for tilted crystal tips
+  }
+}
+function buildSpaceStation() {
+  const SX = 260, SY = 240, SZ = -260; // offset from spawn (0,180,0) — 368 units out, well clear
+  const grp = new THREE.Group(); grp.position.set(SX, SY, SZ);
+  const metal = new THREE.MeshStandardMaterial({ color: 0x9aa7bd, metalness: 0.85, roughness: 0.35 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: 0x3c4658, metalness: 0.8, roughness: 0.45 });
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 60, 16), metal); hub.castShadow = true; grp.add(hub);
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 7, 16), darkMetal); collar.position.y = -18; grp.add(collar);
+  const ringGrp = new THREE.Group(); grp.add(ringGrp); // ring + emissive strip + docking arms rotate slowly (env spin hook)
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(34, 3.5, 12, 42), metal); ring.rotation.x = Math.PI / 2; ring.castShadow = true; ringGrp.add(ring);
+  const strip = new THREE.Mesh(new THREE.TorusGeometry(34, 0.8, 8, 42), new THREE.MeshStandardMaterial({ color: 0x062a33, emissive: 0x22d3ee, emissiveIntensity: 1.6, roughness: 0.4 }));
+  strip.rotation.x = Math.PI / 2; ringGrp.add(strip);
+  for (let k = 0; k < 4; k++) {
+    const aa = k * Math.PI / 2;
+    const arm = new THREE.Mesh(_boxGeo, darkMetal); arm.scale.set(26, 3, 3);
+    arm.position.set(Math.cos(aa) * 24, 0, Math.sin(aa) * 24); arm.rotation.y = -aa; ringGrp.add(arm);
+    const dock = new THREE.Mesh(_boxGeo, metal); dock.scale.set(6, 6, 6);
+    dock.position.set(Math.cos(aa) * 38, 0, Math.sin(aa) * 38); ringGrp.add(dock);
+  }
+  ringGrp.userData.svx = 0; ringGrp.userData.svy = 0.12;
+  (worldGroup.userData.spin || (worldGroup.userData.spin = [])).push(ringGrp);
+  const panelMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.6, roughness: 0.25 });
+  [-1, 1].forEach(function(sd) { // solar wings: tips reach 54 from centre, inside the r=55 obstacle
+    const strut = new THREE.Mesh(_boxGeo, darkMetal); strut.scale.set(16, 1.6, 1.6); strut.position.set(sd * 16, 16, 0); grp.add(strut);
+    const wing = new THREE.Mesh(_boxGeo, panelMat); wing.scale.set(40, 0.5, 13); wing.position.set(sd * 34, 16, 0); wing.castShadow = true; grp.add(wing);
+  });
+  [[0, 33, 0, 0xff4444], [0, -33, 0, 0xff4444], [0, 0, 38, 0x22d3ee], [0, 0, -38, 0xffffff]].forEach(function(bp3) { // beacon lights (static bright spheres read as blinking lights)
+    const bl = new THREE.Mesh(new THREE.SphereGeometry(1.7, 10, 8), new THREE.MeshBasicMaterial({ color: bp3[3] }));
+    bl.position.set(bp3[0], bp3[1], bp3[2]); grp.add(bl);
+  });
+  worldGroup.add(grp);
+  obstacles.push({ x: SX, z: SZ, r: 55, h: SY + 42 }); // one obstacle routes bots around the whole station
+}
+function buildSpaceEnvironment(theme, radius) {
+  worldGroup.userData.spin = [];
+  // Env-scoped violet lighting (dies with worldGroup on rebuild; the global directional keeps its cfg.sun tint)
+  worldGroup.add(new THREE.AmbientLight(0x7c5cff, 0.55));
+  worldGroup.add(new THREE.HemisphereLight(0x8a6fe0, 0x14042a, 0.45));
+  // Starfield: Points on a far shell (fog:false so the deep-space fog never washes them out)
+  (function() {
+    const N = theme === 'orbit' ? 1000 : 1200, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    const tints = [[1, 1, 1], [0.98, 0.66, 0.83], [0.77, 0.71, 0.99], [0.72, 0.84, 1], [1, 1, 1], [0.98, 0.66, 0.83]];
+    const shellR = Math.min(radius * 1.8, 3900); // inside the sky dome (<=4200) and the camera far plane (4500)
+    for (let si = 0; si < N; si++) {
+      const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
+      const rad = shellR * (0.9 + Math.random() * 0.1);
+      pos[si * 3] = rr * Math.cos(th) * rad; pos[si * 3 + 1] = u * rad; pos[si * 3 + 2] = rr * Math.sin(th) * rad;
+      const tc = tints[Math.floor(Math.random() * tints.length)], br = 0.45 + Math.random() * 0.55;
+      col[si * 3] = tc[0] * br; col[si * 3 + 1] = tc[1] * br; col[si * 3 + 2] = tc[2] * br;
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    sg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    worldGroup.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 9, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false })));
+  })();
+  // Nebula clouds: big soft additive sprites ringing the play area
+  (function() {
+    const nebTex = getCloudTexture();
+    const nebCols = [0xa855f7, 0xec4899, 0xd946ef, 0xf472b6, 0x8b5cf6, 0xc026d3, 0x7c3aed, 0xe879f9, 0xa855f7, 0xec4899];
+    const nCount = theme === 'orbit' ? 6 : 9;
+    for (let ni = 0; ni < nCount; ni++) {
+      const nm = new THREE.SpriteMaterial({ map: nebTex, color: nebCols[ni % nebCols.length], transparent: true, opacity: 0.10 + Math.random() * 0.10, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+      const sp = new THREE.Sprite(nm);
+      const na = (ni / nCount) * Math.PI * 2 + Math.random() * 0.7, nd = radius * 1.2;
+      sp.position.set(Math.cos(na) * nd, (Math.random() - 0.3) * radius * 0.55, Math.sin(na) * nd);
+      const ns = radius * (0.6 + Math.random() * 0.6);
+      sp.scale.set(ns, ns * (0.55 + Math.random() * 0.3), 1);
+      worldGroup.add(sp);
+    }
+  })();
+  if (theme === 'nebula') {
+    // No ground in deep space: a faint additive nebula glow far below stands in for a floor
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.4, 40), new THREE.MeshBasicMaterial({ map: getCloudTexture(), color: 0x7c3aed, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+    disc.rotation.x = -Math.PI / 2; disc.position.y = -140; worldGroup.add(disc);
+    buildAsteroids(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))), radius, 40, 380, null);
+    buildCrystalSpires(radius);
+  } else { // orbit: a gas giant fills the sky below + a station to fight around
+    const planet = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 32), new THREE.MeshStandardMaterial({ map: getOrbitPlanetTexture(), roughness: 1, metalness: 0 }));
+    planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
+    const atmo = new THREE.Mesh(new THREE.SphereGeometry(4120, 48, 32), new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, fog: false }));
+    atmo.position.copy(planet.position); worldGroup.add(atmo);
+    buildSpaceStation();
+    buildAsteroids(35, radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // keep the station's airspace clear
+  }
+}
 function buildEnvironment(theme, radius) {
   if (!scene) return; radius = radius || 1400;
   if (menuGroup) menuGroup.visible = false;
   scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
   const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
+  const isSpace = (theme === 'nebula' || theme === 'orbit');
   scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, 0.00038);
+  if (isSpace) { scene.background = new THREE.Color(0x0a0418); scene.fog = new THREE.FogExp2(0x1a0b2e, 0.00013); } // v13 deep-space override: dark purple, low density so asteroids stay visible out to ~radius*1.2
   // Gradient sky dome (BackSide sphere with canvas gradient)
   const skyR = Math.min(radius * 2.9, 4200);
   const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot), side: THREE.BackSide, fog: false, depthWrite: false }));
   worldGroup.add(skyDome);
   // Sun disc sprite aligned with the directional light
-  const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSunTexture(), color: cfg.sun, fog: false, depthWrite: false, transparent: true }));
-  sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun);
-  const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: cfg.sun, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
-  flare.position.copy(sun.position); flare.scale.setScalar(Math.min(radius * 1.3, 1150)); worldGroup.add(flare);
+  if (!isSpace) { // space themes have no sun disc — the starfield + nebulae carry the sky
+    const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSunTexture(), color: cfg.sun, fog: false, depthWrite: false, transparent: true }));
+    sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun);
+    const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: cfg.sun, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
+    flare.position.copy(sun.position); flare.scale.setScalar(Math.min(radius * 1.3, 1150)); worldGroup.add(flare);
+  }
   if (sunLight) { sunLight.position.set(radius * 0.35, radius * 0.7, radius * 0.3); sunLight.target.position.set(0, 0, 0); sunLight.color.set(cfg.sun); }
   // Clouds: soft radial-gradient billboards, slow drift (animated in animate())
   const cloudTex = getCloudTexture(); const clouds = [];
-  const cloudCount = 110;
+  const cloudCount = isSpace ? 0 : 110; // no weather in space — nebula sprites replace the clouds (clouds array stays empty, drift hook no-ops)
   for (let ci = 0; ci < cloudCount; ci++) {
     const cm = new THREE.SpriteMaterial({ map: cloudTex, color: cfg.cloud, transparent: true, opacity: 0.30 + Math.random() * 0.34, depthWrite: false });
     const sp = new THREE.Sprite(cm);
@@ -1671,20 +1851,25 @@ function buildEnvironment(theme, radius) {
   worldGroup.userData.clouds = clouds; worldGroup.userData.cloudBound = Math.min(radius * 2.1, 3600);
   // Ground: city themes use a road-grid texture exactly aligned with the building blocks; other themes use natural noise
   const isCityTheme = (theme === 'city' || theme === 'neon');
-  let ground;
-  if (isCityTheme) {
+  let ground = null;
+  if (isSpace) {
+    // v13: NO ground plane for space themes. Nothing downstream reads this mesh — the flight floor is the
+    // numeric clamp y >= 12 in the player/bot updates, bot AI + collisions run off the obstacles array only.
+    // 'nebula' gets a visual glow disc and 'orbit' a planet below instead (see buildSpaceEnvironment).
+  } else if (isCityTheme) {
     ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY_PLANE, CITY_PLANE), new THREE.MeshStandardMaterial({ map: getCityGroundTexture(theme === 'neon'), color: 0xffffff, roughness: 0.96, metalness: 0.02 }));
   } else {
     const gTex = getGroundTexture('noise', cfg.gBase, cfg.gLine);
     ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ map: gTex, color: 0xffffff, roughness: 0.94, metalness: 0.02 }));
   }
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground);
+  if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
   if (theme === 'city') {
     const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ map: getWaterTexture(), color: 0xbfd9ea, roughness: 0.18, metalness: 0.75, transparent: true, opacity: 0.88 }));
     water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water); worldGroup.userData.water = water;
   }
-  // Distant mountain ring silhouette around the play area (all themes, fog-blended)
+  // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
+  if (!isSpace) {
   const ringR = Math.min(radius * 1.85, 3700);
   const ringCol = new THREE.Color(cfg.fog); ringCol.lerp(new THREE.Color(cfg.ground), 0.38);
   const ringMat = new THREE.MeshBasicMaterial({ color: ringCol });
@@ -1695,6 +1880,7 @@ function buildEnvironment(theme, radius) {
     ridge.scale.set(520 + ((ri * 89) % 380), rh, 520 + ((ri * 89) % 380));
     ridge.position.set(Math.cos(ra) * ringR, rh / 2 - 30, Math.sin(ra) * ringR);
     worldGroup.add(ridge);
+  }
   }
   // Obstacles / scenery (collision data pushed in lock-step with meshes)
   if (theme === 'mountain' || theme === 'canyon') {
@@ -1717,10 +1903,12 @@ function buildEnvironment(theme, radius) {
         obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.62, h: h * 1.05 });
       }
     }
+  } else if (isSpace) {
+    buildSpaceEnvironment(theme, radius);
   } else {
     buildCityGrid(theme, radius);
   }
-  addAirstrip();
+  if (!isSpace) addAirstrip(); // a runway makes no sense floating in deep space (and its fixed obstacles would be invisible traps)
   addThemeProps(theme, radius);
   scene.add(worldGroup);
 }
@@ -1739,7 +1927,7 @@ function startMission() {
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
   const ch = CHAPTERS.find(function(c) { return c.num === Number(chSel.value); }) || CHAPTERS[0];
   const mapRadius = currentMode === 'royale' ? 2400 : 1300;
-  const theme = currentMode === 'gungame' ? 'canyon' : (currentMode === 'royale' ? 'city' : ch.theme);
+  const theme = currentMode === 'gungame' ? 'nebula' : (currentMode === 'royale' ? 'orbit' : ch.theme);
   buildEnvironment(theme, mapRadius);
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
@@ -2319,6 +2507,10 @@ function animate(now) {
   if (worldGroup && worldGroup.userData.clouds) {
     const cb = worldGroup.userData.cloudBound || 2600;
     worldGroup.userData.clouds.forEach(function(sp) { sp.position.x += dt * 3.2; if (sp.position.x > cb) sp.position.x = -cb; });
+  }
+  if (worldGroup && worldGroup.userData.spin) { // space dressing (v13): slow asteroid tumble + station ring rotation, same env-hook pattern as clouds/water
+    const spinArr = worldGroup.userData.spin;
+    for (let spi = 0; spi < spinArr.length; spi++) { const sm = spinArr[spi]; sm.rotation.x += (sm.userData.svx || 0) * dt; sm.rotation.y += (sm.userData.svy || 0) * dt; }
   }
   // Stable chase camera: offset built from heading/pitch only (roll excluded), world-up preserved so the view never barrel-rolls
   camera.up.set(0, 1, 0);
