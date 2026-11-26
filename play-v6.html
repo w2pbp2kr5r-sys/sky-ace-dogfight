@@ -89,7 +89,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ GALAXY v10 — CRATES, SKINS & MYSTERY JETS ★</div></div>
+    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ GALAXY v11 — COLLECTION & MORE SKINS ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -99,6 +99,7 @@
       <button class="btn btn-sec btn-sm" id="btnTopHangar">🛠 Hangar</button>
       <button class="btn btn-gold btn-sm" id="btnTopShop">🛒 Shop</button>
       <button class="btn btn-sec btn-sm" id="btnTopCustom">🎨 Customization</button>
+      <button class="btn btn-sec btn-sm" id="btnTopCollection">🏆 Collection</button>
       <button class="btn btn-sec btn-sm" id="btnTopSettings">⚙ Settings</button>
     </div>
   </div>
@@ -172,6 +173,13 @@
   <div class="modal-card">
     <div class="modal-header"><h2>Customization — Crates &amp; Skins</h2><button class="btn btn-sec btn-sm" id="btnCloseCustom">Close</button></div>
     <div class="modal-body" id="customBody"></div>
+  </div>
+</div>
+
+<div id="collectionModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>Collection — Jets &amp; Skins</h2><button class="btn btn-sec btn-sm" id="btnCloseCollection">Close</button></div>
+    <div class="modal-body" id="collectionBody"></div>
   </div>
 </div>
 
@@ -251,7 +259,20 @@ const SKINS = [
   { id: 'toxic', name: 'Toxic', rarity: 'Epic', c1: 0x2f4530, c2: 0x1a2b1c, pattern: 'pixel', accent: 0xa3e635 },
   { id: 'solar', name: 'Solar Gold', rarity: 'Legendary', c1: 0xc9962e, c2: 0x6e5212, pattern: 'stripes', accent: 0xfff2b0 },
   { id: 'chrome', name: 'Chrome Phantom', rarity: 'Legendary', c1: 0xd9dee6, c2: 0x9aa3b0, pattern: 'solid', accent: 0xe0f2fe },
-  { id: 'galaxy', name: 'Galaxy Storm', rarity: 'Mythic', c1: 0x2a1650, c2: 0x173a6e, pattern: 'pixel', accent: 0x22d3ee }
+  { id: 'galaxy', name: 'Galaxy Storm', rarity: 'Mythic', c1: 0x2a1650, c2: 0x173a6e, pattern: 'pixel', accent: 0x22d3ee },
+  // ---- v11 expansion: 12 more skins (crates roll from SKINS by rarity, so these join the pools automatically) ----
+  { id: 'sunset', name: 'Sunset', rarity: 'Common', c1: 0xea7a1e, c2: 0xf5b942, pattern: 'stripes', accent: 0xffd9a0 },
+  { id: 'olive', name: 'Olive Drab', rarity: 'Common', c1: 0x5a6142, c2: 0x3f452e, pattern: 'solid', accent: 0xd6cfa8 },
+  { id: 'skypatrol', name: 'Sky Patrol', rarity: 'Common', c1: 0x9fc8e8, c2: 0xe8f1f8, pattern: 'solid', accent: 0x2563eb },
+  { id: 'charcoal', name: 'Charcoal', rarity: 'Common', c1: 0x3a3f46, c2: 0x1e2126, pattern: 'solid', accent: 0x9ca3af },
+  { id: 'rose', name: 'Rose Ace', rarity: 'Rare', c1: 0xd96a9b, c2: 0xf3e6ee, pattern: 'stripes', accent: 0xf43f5e },
+  { id: 'emerald', name: 'Emerald', rarity: 'Rare', c1: 0x0f7a52, c2: 0x083d2a, pattern: 'camo', accent: 0x34d399 },
+  { id: 'carbon', name: 'Carbon', rarity: 'Rare', c1: 0x14161a, c2: 0x2c3038, pattern: 'solid', accent: 0x64748b },
+  { id: 'magma', name: 'Magma', rarity: 'Epic', c1: 0x17110f, c2: 0xb3271a, pattern: 'stripes', accent: 0xff6a3d },
+  { id: 'aurora', name: 'Aurora', rarity: 'Epic', c1: 0x1f8a80, c2: 0x4b2a7a, pattern: 'camo', accent: 0x7ef0d4 },
+  { id: 'sakura', name: 'Sakura', rarity: 'Epic', c1: 0xf2b8cd, c2: 0xfdf3f6, pattern: 'camo', accent: 0xe75480 },
+  { id: 'voidwalker', name: 'Void Walker', rarity: 'Legendary', c1: 0x0a0812, c2: 0x3b1a63, pattern: 'pixel', accent: 0xa855f7 },
+  { id: 'supernova', name: 'Supernova', rarity: 'Mythic', c1: 0xe83e8c, c2: 0xf97316, pattern: 'stripes', accent: 0xffe08a }
 ];
 function getSkinById(id) { return SKINS.find(function(s) { return s.id === id; }) || SKINS[0]; }
 function getEquippedSkin() { return getSkinById(state.equippedSkin); }
@@ -528,6 +549,50 @@ function getPlanetTexture() {
   });
   if (THREE.SRGBColorSpace) _planetTex.colorSpace = THREE.SRGBColorSpace;
   return _planetTex;
+}
+let _ringPlanetTex = null;
+function getRingPlanetTexture() {
+  if (_ringPlanetTex) return _ringPlanetTex;
+  _ringPlanetTex = makeCanvas(512, 256, function(ctx, w, h) {
+    // Ringed planet (v11): horizontal pink / lavender bands with wavy edges
+    const bands = ['#4a1030', '#6d1a4a', '#93336b', '#c05c8f', '#e8a0bf', '#8a2a5e', '#5c1440', '#b04a7d', '#d77fae', '#3d0c2a'];
+    const bh = h / bands.length;
+    bands.forEach(function(col, i) {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, i * bh);
+      for (let x = 0; x <= w; x += 16) ctx.lineTo(x, i * bh + Math.sin(x * 0.018 + i * 2.1) * 3.5);
+      ctx.lineTo(w, (i + 1) * bh + 4); ctx.lineTo(0, (i + 1) * bh + 4); ctx.closePath(); ctx.fill();
+    });
+    for (let i = 0; i < 200; i++) { ctx.fillStyle = 'rgba(255,230,245,' + (Math.random() * 0.06) + ')'; ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+    const tg = ctx.createLinearGradient(0, 0, w * 0.4, h);
+    tg.addColorStop(0, 'rgba(10,0,16,0.42)'); tg.addColorStop(0.45, 'rgba(10,0,16,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, w, h);
+  });
+  if (THREE.SRGBColorSpace) _ringPlanetTex.colorSpace = THREE.SRGBColorSpace;
+  return _ringPlanetTex;
+}
+let _moonTex = null;
+function getMoonTexture() {
+  if (_moonTex) return _moonTex;
+  _moonTex = makeCanvas(256, 128, function(ctx, w, h) {
+    // Small pink moon (v11): mauve base with darker blotches and crater rims
+    ctx.fillStyle = '#c98aa6'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) {
+      const bx = Math.random() * w, by = Math.random() * h, br = 6 + Math.random() * 20;
+      const bg = ctx.createRadialGradient(bx, by, 1, bx, by, br);
+      bg.addColorStop(0, 'rgba(140,80,110,0.5)'); bg.addColorStop(1, 'rgba(140,80,110,0)');
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(bx, by, br, 0, 6.3); ctx.fill();
+    }
+    for (let i = 0; i < 16; i++) {
+      const cx = Math.random() * w, cy = Math.random() * h, cr = 2.5 + Math.random() * 5;
+      ctx.fillStyle = 'rgba(120,64,92,0.65)'; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 6.3); ctx.fill();
+      ctx.strokeStyle = 'rgba(240,200,220,0.55)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, cr, Math.PI * 1.05, Math.PI * 1.7); ctx.stroke();
+    }
+    const tg = ctx.createLinearGradient(0, 0, w * 0.35, h);
+    tg.addColorStop(0, 'rgba(10,0,14,0.38)'); tg.addColorStop(0.5, 'rgba(10,0,14,0)');
+    ctx.fillStyle = tg; ctx.fillRect(0, 0, w, h);
+  });
+  if (THREE.SRGBColorSpace) _moonTex.colorSpace = THREE.SRGBColorSpace;
+  return _moonTex;
 }
 let _bbTex = null;
 function getBillboardTexture() {
@@ -1173,17 +1238,17 @@ let menuGroup = null, menuJet = null, menuTime = 0;
 // v10: hero-jet anchor — the jet hovers over its platform a little more to the
 // right, clear of the left-docked menu panel; the camera looks essentially AT
 // the jet (offset <= 5), so jet + platform always stay in frame.
-const MENU_JET_OFFSET = (typeof THREE !== 'undefined') ? new THREE.Vector3(38, 12, 0) : null;
+const MENU_JET_OFFSET = (typeof THREE !== 'undefined') ? new THREE.Vector3(46, 12, 0) : null;
 function buildMenuScene() {
   if (!scene || menuGroup) return;
   menuGroup = new THREE.Group();
   // Deep-space dome (v10 galaxy home): near-black blue with a subtle purple depth
   const sky = new THREE.Mesh(new THREE.SphereGeometry(3900, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture([[0, '#01020a'], [0.35, '#05020f'], [0.55, '#0a0624'], [0.75, '#150a38'], [1, '#030210']]), side: THREE.BackSide, fog: false, depthWrite: false }));
   menuGroup.add(sky);
-  // Starfield: ~1600 points on a far shell, white / blue / warm via vertex colours
+  // Starfield: ~2200 points on a far shell, white / blue / warm / pink / lavender via vertex colours
   (function() {
-    const N = 1600, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
-    const tints = [[1, 1, 1], [0.72, 0.84, 1], [1, 0.88, 0.70], [0.82, 0.72, 1]];
+    const N = 2200, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    const tints = [[1, 1, 1], [0.72, 0.84, 1], [1, 0.88, 0.70], [0.82, 0.72, 1], [0.98, 0.66, 0.83], [0.77, 0.71, 0.99]];
     for (let si = 0; si < N; si++) {
       const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rr = Math.sqrt(1 - u * u);
       const rad = 1500 + Math.random() * 2100;
@@ -1197,12 +1262,12 @@ function buildMenuScene() {
     const stars = new THREE.Points(sg, new THREE.PointsMaterial({ size: 9, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
     menuGroup.add(stars); menuGroup.userData.stars = stars;
   })();
-  // Nebula clouds: big soft additive sprites tinted purple / magenta / blue / teal
+  // Nebula clouds (v11): 16 big soft additive sprites, palette biased to purple & pink
   (function() {
     const nebTex = getCloudTexture();
-    const nebCols = [0xa855f7, 0xec4899, 0x3b82f6, 0x14b8a6, 0xa855f7, 0xec4899, 0x6366f1, 0x0ea5e9, 0xd946ef];
+    const nebCols = [0xa855f7, 0xec4899, 0xd946ef, 0xf472b6, 0xa855f7, 0xec4899, 0x8b5cf6, 0xd946ef, 0xf472b6, 0xc026d3, 0x3b82f6, 0x14b8a6, 0xa855f7, 0xec4899, 0x7c3aed, 0xe879f9];
     for (let ni = 0; ni < nebCols.length; ni++) {
-      const nm = new THREE.SpriteMaterial({ map: nebTex, color: nebCols[ni], transparent: true, opacity: 0.10 + Math.random() * 0.12, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+      const nm = new THREE.SpriteMaterial({ map: nebTex, color: nebCols[ni], transparent: true, opacity: 0.10 + Math.random() * 0.14, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
       const sp = new THREE.Sprite(nm);
       const na = (ni / nebCols.length) * Math.PI * 2 + Math.random() * 0.7, nd = 2500 + Math.random() * 800;
       sp.position.set(Math.cos(na) * nd, (Math.random() - 0.35) * 1500, Math.sin(na) * nd);
@@ -1216,9 +1281,24 @@ function buildMenuScene() {
   planet.position.set(1150, 830, 1500); menuGroup.add(planet); menuGroup.userData.planet = planet;
   const pGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: 0x8a6fe0, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
   pGlow.position.copy(planet.position); pGlow.scale.setScalar(980); menuGroup.add(pGlow);
+  // Ringed planet (v11): pink/lavender bands + a tilted flat ring, opposite side from the gas giant
+  const ringGrp = new THREE.Group(); ringGrp.position.set(-1900, 250, 1600); ringGrp.rotation.set(0.32, 0, 0.44); // ~25° tilt, ring tilts with the group
+  const ringPlanet = new THREE.Mesh(new THREE.SphereGeometry(150, 36, 24), new THREE.MeshStandardMaterial({ map: getRingPlanetTexture(), roughness: 0.85, metalness: 0.0, emissive: 0x2a0a1e, emissiveIntensity: 0.35 }));
+  ringGrp.add(ringPlanet);
+  const ringMesh = new THREE.Mesh(new THREE.RingGeometry(150 * 1.4, 150 * 2.2, 64), new THREE.MeshBasicMaterial({ color: 0xf0a6c8, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+  ringMesh.rotation.x = -Math.PI / 2; ringGrp.add(ringMesh);
+  menuGroup.add(ringGrp); menuGroup.userData.ringPlanet = ringGrp;
+  const rpGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: 0xe879a8, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  rpGlow.position.copy(ringGrp.position); rpGlow.scale.setScalar(620); menuGroup.add(rpGlow);
+  // Small pink moon (v11), upper area
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(70, 28, 20), new THREE.MeshStandardMaterial({ map: getMoonTexture(), roughness: 0.95, metalness: 0.0, emissive: 0x2a1220, emissiveIntensity: 0.3 }));
+  moon.position.set(1700, 1050, 1900); menuGroup.add(moon); menuGroup.userData.moon = moon;
+  // Magenta-purple halo (v11): a big soft glow directly behind the platform/jet showcase
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: getCloudTexture(), color: 0xd946ef, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  halo.position.set(MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, 172, 520); halo.scale.set(900, 620, 1); menuGroup.add(halo);
   // ---- Hover platform (v10): the hero jet floats above a glowing landing pad ----
   (function() {
-    const ax = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 38, jetY = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
+    const ax = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, jetY = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
     const plat = new THREE.Group(); plat.position.set(ax, jetY - 8.5, 0); // pad top sits 7 under the jet
     const padMat = new THREE.MeshStandardMaterial({ color: 0x2b3242, metalness: 0.8, roughness: 0.4, envMapIntensity: 0.9 });
     const padDark = new THREE.MeshStandardMaterial({ color: 0x171c28, metalness: 0.7, roughness: 0.55 });
@@ -1274,14 +1354,14 @@ function buildMenuScene() {
   menuGroup.add(new THREE.AmbientLight(0x33245e, 0.55));
   const keyLight = new THREE.DirectionalLight(0xd8ccff, 1.1);
   keyLight.position.set(-120, 260, -180);
-  keyLight.target.position.set(38, 160, 0);
+  keyLight.target.position.set(46, 160, 0);
   menuGroup.add(keyLight); menuGroup.add(keyLight.target);
   const rimLight = new THREE.DirectionalLight(0x22d3ee, 0.8);
   rimLight.position.set(180, 120, 240);
-  rimLight.target.position.set(38, 160, 0);
+  rimLight.target.position.set(46, 160, 0);
   menuGroup.add(rimLight); menuGroup.add(rimLight.target);
   const nebLight = new THREE.PointLight(0xa855f7, 900, 420, 1.8);
-  nebLight.position.set(38, 195, -30);
+  nebLight.position.set(46, 195, -30);
   menuGroup.add(nebLight);
   scene.add(menuGroup);
 }
@@ -1293,7 +1373,7 @@ function refreshMenuJet() {
   const jc = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
   menuJet = buildJetMesh(jc.color, jc.accent, state.upgrades, jc.id, true, getEquippedSkin());
   menuJet.scale.setScalar(1.25); // hero jet reads big and detailed on the home screen
-  menuJet.position.set(MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 38, 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12), 0);
+  menuJet.position.set(MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12), 0);
   menuGroup.add(menuJet);
 }
 function showMenuScene() {
@@ -1311,6 +1391,8 @@ function animateMenuScene(dt) {
   const ud = menuGroup.userData;
   if (ud.stars) ud.stars.rotation.y += dt * 0.004; // the whole sky wheel turns, very slowly
   if (ud.planet) ud.planet.rotation.y += dt * 0.01;
+  if (ud.ringPlanet) ud.ringPlanet.rotation.y += dt * 0.008; // ring group turns as one, tilt preserved
+  if (ud.moon) ud.moon.rotation.y += dt * 0.006;
   if (ud.holoGrp) ud.holoGrp.rotation.y -= dt * 0.25; // holo ring counter-rotates vs the jet
   if (ud.motes) { ud.motes.rotation.y += dt * 0.02; ud.motes.position.y = (150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12)) - 2 + Math.sin(t * 0.4) * 0.8; }
   if (ud.beacons) ud.beacons.forEach(function(bc, bi) { bc.material.opacity = (Math.sin(t * 2.4 + bi * Math.PI) > 0) ? 0.95 : 0.07; });
@@ -1319,18 +1401,21 @@ function animateMenuScene(dt) {
   if (mj) {
     // HOVER (v10): the jet floats above its platform — gentle bob, a slow turntable
     // yaw so players see every side, and a whisper of pitch/roll sway. No more orbit.
-    const ox = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 38, oy = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
+    const ox = MENU_JET_OFFSET ? MENU_JET_OFFSET.x : 46, oy = 150 + (MENU_JET_OFFSET ? MENU_JET_OFFSET.y : 12);
     mj.position.set(ox, oy + Math.sin(t * 0.9) * 1.2, 0);
     mj.rotation.y += dt * 0.22;
     mj.rotation.x = Math.sin(t * 0.6) * 0.04;
     mj.rotation.z = Math.sin(t * 0.5) * 0.04;
     flickerFlames(mj, false, dt); // burners at a low hover flicker
     if (mj.userData.burnerLight) mj.userData.burnerLight.intensity = 7 + Math.sin(t * 7) * 1.6;
-    // Framing (v9 rule kept): camera is placed FROM the jet and looks essentially AT
-    // it (x-offset <= 5, zero on narrow windows). Pulled back to z -56 so the whole
-    // 26-radius platform fits under the jet — see the v10 report for the angle math.
-    camera.position.set(mj.position.x - 14 + Math.sin(t * 0.13) * 2.5, mj.position.y + 6 + Math.sin(t * 0.21) * 1.2, mj.position.z - 56);
-    const lookOffX = (camera.aspect >= 1.35) ? -5 : 0;
+    // Framing (v11): camera pulled back to z -64 and the look target is offset +X of
+    // the jet on wider windows. With this camera (placed at -Z/-X of the jet looking
+    // back toward +Z), screen-right is world -X, so a +X look offset pushes the jet
+    // RIGHT on screen — clear of the left-hand game-selection panel. Distance to jet
+    // ~66.3; pad angular radius ~23.1 deg; worst-case right extent at aspect 1.35 is
+    // shift atan(16/66.3)=13.6 deg + 23.1 deg = 36.7 deg < 40.7 deg horiz half-FOV.
+    camera.position.set(mj.position.x - 14 + Math.sin(t * 0.13) * 2.5, mj.position.y + 6 + Math.sin(t * 0.21) * 1.2, mj.position.z - 64);
+    const lookOffX = (camera.aspect >= 1.35) ? 16 : ((camera.aspect >= 1.05) ? 8 : 0);
     camera.lookAt(mj.position.x + lookOffX, mj.position.y - 4, mj.position.z);
   }
 }
@@ -2289,6 +2374,8 @@ document.getElementById('btnStartPlay').onclick = startMission;
 document.getElementById('btnTopHangar').onclick = function() { switchHangarTab('jets'); document.getElementById('hangarModal').classList.remove('hidden'); };
 document.getElementById('btnTopShop').onclick = function() { renderShop(); document.getElementById('shopModal').classList.remove('hidden'); };
 document.getElementById('btnTopCustom').onclick = function() { renderCustomization(); document.getElementById('customModal').classList.remove('hidden'); };
+document.getElementById('btnTopCollection').onclick = function() { renderCollection(); document.getElementById('collectionModal').classList.remove('hidden'); };
+document.getElementById('btnCloseCollection').onclick = function() { closeModals(); };
 document.getElementById('btnTopSettings').onclick = function() { renderKeybinds(); document.getElementById('pauseActions').classList.add('hidden'); document.getElementById('settingsModal').classList.remove('hidden'); };
 document.getElementById('btnCloseCustom').onclick = function() { closeModals(); };
 document.getElementById('btnCloseSettings').onclick = function() { if (activeGame) togglePause(false); else closeModals(); };
@@ -2388,6 +2475,34 @@ function openCrate(crateId) {
   saveState(); renderCustomization();
 }
 function equipSkin(id) { state.equippedSkin = id; saveState(); refreshMenuJet(); renderCustomization(); }
+// ---- Collection (v11): every jet + skin in the game, owned or locked ----
+function renderCollection() {
+  const body = document.getElementById('collectionBody'); if (!body) return;
+  const jetsOwned = JETS.filter(function(j) { return state.ownedJets.includes(j.id); }).length;
+  const skinsOwned = SKINS.filter(function(s) { return state.ownedSkins.includes(s.id); }).length;
+  let html = `<p style="color:#e2e8f0;font-size:0.95rem;margin-bottom:12px;">Jets owned: <strong>${jetsOwned} / ${JETS.length}</strong> · Skins owned: <strong>${skinsOwned} / ${SKINS.length}</strong></p>`;
+  html += '<div class="section-label">Fighter Jets</div><div class="card-grid">';
+  html += JETS.map(function(j) {
+    const owned = state.ownedJets.includes(j.id);
+    const badge = j.rarity ? ' ' + rarityBadge(j.rarity) : '';
+    if (!owned) {
+      const nm = j.mystery ? '???' : j.name;
+      return `<div class="item-card" style="opacity:0.55;"><h3>🔒 ${nm}${badge}</h3><p>${j.mystery ? 'Unknown aircraft — buy to reveal' : j.desc}</p><p>Locked</p></div>`;
+    }
+    const eqMark = (state.selectedJet === j.id) ? '<p style="color:#4ade80;font-weight:700;">★ Equipped</p>' : '';
+    return `<div class="item-card"><h3>${j.name}${badge}</h3><p>${j.desc}</p><p>Hull: ${j.hp} | SPD: ${Math.round(j.spd * 100)}%</p>${eqMark}</div>`;
+  }).join('') + '</div>';
+  html += '<div class="section-label" style="margin-top:10px;">Jet Skins</div><div class="card-grid">';
+  html += SKINS.map(function(s) {
+    const owned = state.ownedSkins.includes(s.id);
+    if (!owned) return `<div class="item-card" style="opacity:0.55;"><h3>${skinSwatches(s)} ${s.name}</h3><p>${rarityBadge(s.rarity)} <span style="color:#94a3b8;">Pattern: ${s.pattern}</span></p><p>Locked — open crates in Customization</p></div>`;
+    const eq = state.equippedSkin === s.id;
+    const btn = eq ? '<button class="btn btn-sec btn-sm" disabled>Equipped</button>' : `<button class="btn btn-play btn-sm" onclick="equipSkinFromCollection('${s.id}')">Equip</button>`;
+    return `<div class="item-card"><h3>${skinSwatches(s)} ${s.name}</h3><p>${rarityBadge(s.rarity)} <span style="color:#94a3b8;">Pattern: ${s.pattern}</span></p>${btn}</div>`;
+  }).join('') + '</div>';
+  body.innerHTML = html;
+}
+function equipSkinFromCollection(id) { state.equippedSkin = id; saveState(); refreshMenuJet(); renderCollection(); }
 function simulateIAP(title, coins, jetId) { if (!confirm(`Confirm test purchase of ${title}?`)) return; if (coins) state.coins += coins; if (jetId && !state.ownedJets.includes(jetId)) { state.ownedJets.push(jetId); state.selectedJet = jetId; } saveState(); refreshMenuJet(); renderShop(); }
 const BIND_LABELS = [ ['pitchUp', 'Pitch Nose Up'], ['pitchDown', 'Pitch Nose Down'], ['turnLeft', 'Bank / Turn Left'], ['turnRight', 'Bank / Turn Right'], ['fire', 'Fire Primary Guns'], ['rocket', 'Launch Homing Rocket'], ['autoaim', 'Activate Auto-Aim Lock'], ['boost', 'Engage Afterburner'], ['pause', 'Pause / Settings Menu'] ];
 let listeningAction = null;
