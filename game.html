@@ -89,7 +89,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v13 — GALAXY MAPS ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v14 — GUN GAME FIXED ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -282,21 +282,21 @@ const CRATES = [
   { id: 'elite', name: 'Elite Crate', cost: 1200, refund: 450, odds: { Common: 25, Rare: 35, Epic: 25, Legendary: 11, Mythic: 4 } }
 ];
 const GUN_GAME_TIERS = [
-  { name: 'T-1 Trainer', ability: 'Standard Twin Guns', color: 0x94a3b8, dmg: 16, fireRate: 0.16, spd: 1.0, rockets: false },
-  { name: 'T-2 Hawk', ability: 'Rapid Autocannon', color: 0x38bdf8, dmg: 14, fireRate: 0.10, spd: 1.05, rockets: false },
-  { name: 'T-3 Viper', ability: 'High Velocity Rounds', color: 0x22c55e, dmg: 20, fireRate: 0.14, spd: 1.10, rockets: false },
-  { name: 'T-4 Mirage', ability: 'Turbo Afterburner', color: 0xeab308, dmg: 18, fireRate: 0.13, spd: 1.25, rockets: false },
-  { name: 'T-5 Hornet', ability: 'Homing Rocket Pod', color: 0xf97316, dmg: 18, fireRate: 0.14, spd: 1.12, rockets: true },
-  { name: 'T-6 Fulcrum', ability: 'Heavy Armor Plating', color: 0xef4444, dmg: 22, fireRate: 0.14, spd: 1.10, rockets: true },
-  { name: 'T-7 Typhoon', ability: 'Tight Turn Thrusters', color: 0xa855f7, dmg: 21, fireRate: 0.12, spd: 1.18, rockets: true },
-  { name: 'T-8 Rafale', ability: 'Gatling Burst', color: 0xec4899, dmg: 17, fireRate: 0.08, spd: 1.16, rockets: true },
-  { name: 'T-9 Eagle', ability: 'Long-Range Cannon', color: 0x14b8a6, dmg: 26, fireRate: 0.15, spd: 1.22, rockets: true },
-  { name: 'T-10 Flanker', ability: 'Twin Rocket Salvo', color: 0x6366f1, dmg: 24, fireRate: 0.13, spd: 1.20, rockets: true },
-  { name: 'T-11 Lightning', ability: 'Stealth Overdrive', color: 0x64748b, dmg: 26, fireRate: 0.11, spd: 1.26, rockets: true },
-  { name: 'T-12 Raptor', ability: 'Precision Lock', color: 0x3b82f6, dmg: 28, fireRate: 0.11, spd: 1.28, rockets: true },
-  { name: 'T-13 Felon', ability: 'Plasma Tracers', color: 0xd946ef, dmg: 32, fireRate: 0.10, spd: 1.30, rockets: true },
-  { name: 'T-14 Wyvern', ability: 'Hyper Agility', color: 0xf59e0b, dmg: 35, fireRate: 0.09, spd: 1.35, rockets: true },
-  { name: 'T-15 Darkstar Final', ability: 'Golden Ace Railgun (1 Kill to Win!)', color: 0xfacc15, dmg: 45, fireRate: 0.12, spd: 1.40, rockets: true }
+  { name: 'T-1 Trainer', ability: 'Standard Twin Guns', color: 0x94a3b8, dmg: 16, fireRate: 0.16, spd: 1.0, rockets: false, turn: 1.00, hpBonus: 0, rocketCd: 1.00, rocketDmg: 1.00 },
+  { name: 'T-2 Hawk', ability: 'Rapid Autocannon', color: 0x38bdf8, dmg: 14, fireRate: 0.10, spd: 1.05, rockets: false, turn: 1.03, hpBonus: 10, rocketCd: 0.97, rocketDmg: 1.04 },
+  { name: 'T-3 Viper', ability: 'High Velocity Rounds', color: 0x22c55e, dmg: 20, fireRate: 0.14, spd: 1.10, rockets: false, turn: 1.05, hpBonus: 20, rocketCd: 0.94, rocketDmg: 1.08 },
+  { name: 'T-4 Mirage', ability: 'Turbo Afterburner', color: 0xeab308, dmg: 18, fireRate: 0.13, spd: 1.25, rockets: false, turn: 1.08, hpBonus: 30, rocketCd: 0.91, rocketDmg: 1.12 },
+  { name: 'T-5 Hornet', ability: 'Homing Rocket Pod', color: 0xf97316, dmg: 18, fireRate: 0.14, spd: 1.12, rockets: true, turn: 1.10, hpBonus: 40, rocketCd: 0.88, rocketDmg: 1.16 },
+  { name: 'T-6 Fulcrum', ability: 'Heavy Armor Plating', color: 0xef4444, dmg: 22, fireRate: 0.14, spd: 1.10, rockets: true, turn: 1.13, hpBonus: 50, rocketCd: 0.85, rocketDmg: 1.20 },
+  { name: 'T-7 Typhoon', ability: 'Tight Turn Thrusters', color: 0xa855f7, dmg: 21, fireRate: 0.12, spd: 1.18, rockets: true, turn: 1.16, hpBonus: 60, rocketCd: 0.82, rocketDmg: 1.24 },
+  { name: 'T-8 Rafale', ability: 'Gatling Burst', color: 0xec4899, dmg: 17, fireRate: 0.08, spd: 1.16, rockets: true, turn: 1.18, hpBonus: 70, rocketCd: 0.79, rocketDmg: 1.28 },
+  { name: 'T-9 Eagle', ability: 'Long-Range Cannon', color: 0x14b8a6, dmg: 26, fireRate: 0.15, spd: 1.22, rockets: true, turn: 1.21, hpBonus: 80, rocketCd: 0.76, rocketDmg: 1.32 },
+  { name: 'T-10 Flanker', ability: 'Twin Rocket Salvo', color: 0x6366f1, dmg: 24, fireRate: 0.13, spd: 1.20, rockets: true, turn: 1.23, hpBonus: 90, rocketCd: 0.73, rocketDmg: 1.36 },
+  { name: 'T-11 Lightning', ability: 'Stealth Overdrive', color: 0x64748b, dmg: 26, fireRate: 0.11, spd: 1.26, rockets: true, turn: 1.26, hpBonus: 100, rocketCd: 0.70, rocketDmg: 1.40 },
+  { name: 'T-12 Raptor', ability: 'Precision Lock', color: 0x3b82f6, dmg: 28, fireRate: 0.11, spd: 1.28, rockets: true, turn: 1.28, hpBonus: 110, rocketCd: 0.66, rocketDmg: 1.45 },
+  { name: 'T-13 Felon', ability: 'Plasma Tracers', color: 0xd946ef, dmg: 32, fireRate: 0.10, spd: 1.30, rockets: true, turn: 1.30, hpBonus: 120, rocketCd: 0.62, rocketDmg: 1.50 },
+  { name: 'T-14 Wyvern', ability: 'Hyper Agility', color: 0xf59e0b, dmg: 35, fireRate: 0.09, spd: 1.35, rockets: true, turn: 1.33, hpBonus: 130, rocketCd: 0.58, rocketDmg: 1.55 },
+  { name: 'T-15 Darkstar Final', ability: 'Golden Ace Railgun (1 Kill to Win!)', color: 0xfacc15, dmg: 45, fireRate: 0.12, spd: 1.40, rockets: true, turn: 1.35, hpBonus: 140, rocketCd: 0.55, rocketDmg: 1.60 }
 ];
 const CHAPTERS = [
   { num: 1, name: 'Ch.1: Sunlit Harbor City', theme: 'city', sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x1e293b, enemies: 3, reward: 60 },
@@ -1933,7 +1933,7 @@ function startMission() {
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : 49);
   for (let i = 0; i < botCount; i++) {
@@ -2049,9 +2049,10 @@ function firePlayerRocket() {
   const p = activeGame.player; const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
   if (p.respawnT > 0) return;
   const best = pickFrontTarget(1000); // true lock-on: most-in-front opponent within 1000; no lock = dumbfire straight
-  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, 55 + state.upgrades.rocket * 12);
+  const ggTierDef = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier] : null;
+  spawnRocket(p.mesh.position.clone().add(fwd.clone().multiplyScalar(6)), fwd, 'player', best, (55 + state.upgrades.rocket * 12) * (ggTierDef ? ggTierDef.rocketDmg : 1));
   if (best) showBanner('MISSILE AWAY — LOCKED ON', 1500);
-  p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7);
+  p.rocketCd = Math.max(4, 9 - state.upgrades.rocket * 0.7) * (ggTierDef ? ggTierDef.rocketCd : 1);
 }
 // Pick the entity most in front of the player (smallest angle off the nose) within range — used for auto-aim and missile locks
 function pickFrontTarget(range) {
@@ -2238,7 +2239,7 @@ function animate(now) {
   const p = activeGame.player;
   gameTime += dt;
   if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
-  if (p.respawnT === undefined) { p.lastHitBy = null; p.deaths = 0; p.respawnT = 0; p.spawnProtT = 0; }
+  if (p.respawnT === undefined) { p.lastHitBy = null; p.lastHitAt = -99; p.deaths = 0; p.respawnT = 0; p.spawnProtT = 0; }
   if (p.spawnProtT > 0) p.spawnProtT -= dt;
   // Gun Game respawn cycle (v6): death is a 2s timeout, not the end of the match
   if (activeGame.mode === 'gungame' && p.respawnT > 0) {
@@ -2247,7 +2248,7 @@ function animate(now) {
       const ra = Math.random() * Math.PI * 2;
       p.mesh.position.set(Math.cos(ra) * 650, 200, Math.sin(ra) * 650);
       p.heading = Math.atan2(-p.mesh.position.x, -p.mesh.position.z); p.pitch = 0; p.roll = 0; p.yawIn = 0; p.pitchIn = 0;
-      p.hp = p.maxHp; p.lastHitBy = null; p.mesh.visible = true; p.spawnProtT = 2.0;
+      p.hp = p.maxHp; p.lastHitBy = null; p.lastHitAt = -99; p.mesh.visible = true; p.spawnProtT = 2.0;
       orientFlight(p);
       const _respOff = new THREE.Vector3(0, 3.6, -12).applyQuaternion(p.mesh.quaternion);
       camera.position.copy(p.mesh.position).add(_respOff); // snap the chase cam behind the jet
@@ -2282,8 +2283,9 @@ function animate(now) {
       p.pitchIn = clampNum((desPitch - p.pitch) * 3.2, -1, 1);
     }
   }
-  const yawRate = 0.95 * (p.turn / 1.45) * sens;
-  const pitchRate = 0.88 * (p.turn / 1.45) * sens;
+  const tierTurn = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].turn : 1;
+  const yawRate = 0.95 * (p.turn / 1.45) * sens * tierTurn;
+  const pitchRate = 0.88 * (p.turn / 1.45) * sens * tierTurn;
   p.heading = angleWrap(p.heading + p.yawIn * yawRate * dt);
   p.pitch = clampNum(p.pitch + p.pitchIn * pitchRate * dt, -1.05, 1.05);
   if (rawPitch === 0 && p.autoAimLeft <= 0) p.pitch += (0 - p.pitch) * Math.min(1, 0.8 * dt); // gentle auto-level when hands off the pitch controls
@@ -2296,7 +2298,7 @@ function animate(now) {
   const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(p.mesh.quaternion);
   p.fwdVec = fwd;
   if (p.respawnT <= 0) { p.mesh.position.addScaledVector(fwd, curSpd * dt); p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y)); }
-  if (p.respawnT <= 0) for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { endMatch(false, 'AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); return; } }
+  if (p.respawnT <= 0) for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { if (activeGame.mode === 'gungame') { gungamePlayerDown('crash'); } else { endMatch(false, 'AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); } return; } }
   if (p.respawnT <= 0) emitDamageSmoke(p, dt); // player always trails damage smoke when hurt
   const firing = keys[state.binds.fire] || p._touchFire;
   const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1);
@@ -2438,8 +2440,8 @@ function animate(now) {
     if (bot.aiState === 'engage' && ti) {
       const toT = ti.pos.clone().sub(bp).normalize();
       const aimAng = Math.acos(clampNum(bFwd.dot(toT), -1, 1));
-      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill, 0xf87171); bot.fireCd = 0.45 / bot.skill; }
-      if (dist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35); bot.rocketCd = 11 / bot.skill; }
+      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill * (activeGame.mode === 'gungame' ? (GUN_GAME_TIERS[bot.ggTier].dmg / GUN_GAME_TIERS[0].dmg) : 1), 0xf87171); bot.fireCd = 0.45 / bot.skill; }
+      if (dist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35 * (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[bot.ggTier].rocketDmg : 1)); bot.rocketCd = 11 / bot.skill; }
     }
   }
   for (let i = activeGame.bullets.length - 1; i >= 0; i--) {
@@ -2448,7 +2450,7 @@ function animate(now) {
     let hit = false;
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
-    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; hit = true; spawnImpactFx(b.mesh.position); }
+    if (b.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; hit = true; spawnImpactFx(b.mesh.position); }
     else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
@@ -2467,7 +2469,7 @@ function animate(now) {
     // Visible white smoke trail so pilots can see missiles coming
     rk._smokeAcc = (rk._smokeAcc || 0) + 20 * dt;
     while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.1, grow: 2.4, life: 0.5, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
-    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     let rHit = false;
     for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
@@ -2476,17 +2478,9 @@ function animate(now) {
   if (activeGame.mode !== 'royale') { document.getElementById('hudWarning').textContent = incomingMissile ? 'MISSILE LOCK! TURN & SHOOT ROCKET TO DETONATE!' : (p.spawnProtT > 0 ? 'SPAWN PROTECTION' : (p.autoAimLeft > 0 ? `AUTO-AIM ACTIVE (${p.autoAimLeft.toFixed(1)}s)` : 'RADAR CLEAR')); }
   if (p.hp <= 0 && p.respawnT <= 0) {
     if (activeGame.mode === 'gungame') {
-      // Gun Game (v6): first to 15 — dying costs a death and 2 seconds, never the match.
-      // Credit the killer bot first; if that was its 15th kill, it wins on the spot.
-      const killer = (p.lastHitBy != null) ? activeGame.entities.find(function(e) { return e.id === p.lastHitBy; }) : null;
-      if (killer) {
-        killer.kills++; killer.ggTier = Math.min(14, killer.kills);
-        if (killer.kills >= 15) { endMatch(false, 'DEFEAT', `${killer.name} reached 15 kills first!`); return; }
-      }
-      for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
-      for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8 });
-      p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
-      showBanner('SHOT DOWN — RESPAWNING IN 2s', 2000);
+      // Gun Game (v6/v14): first to 15 — dying costs a death and 2 seconds, never the match.
+      gungamePlayerDown('shot');
+      if (!activeGame) return; // the credited kill was a bot's 15th — match over
     }
     else if (activeGame.mode === 'royale') { const place = activeGame.entities.length + 1; const rpDelta = place <= 10 ? 18 : (place <= 25 ? 4 : -10); state.rp = Math.max(0, state.rp + rpDelta); saveState(); endMatch(false, `PLACED #${place} / 50`, `Kills: ${p.kills} | Rank: ${getRankName(state.rp)} (${rpDelta >= 0 ? '+' : ''}${rpDelta} RP)`); return; }
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); return; }
@@ -2520,14 +2514,56 @@ function animate(now) {
   camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(20)));
   updateHUD(curSpd); renderer.render(scene, camera);
 }
+// Gun Game bot promotion (v14): driven by the same GUN_GAME_TIERS table as the player —
+// new plane on the field, thicker hull (and heal the gain), tier speed. Bot bullet/rocket
+// damage scales at fire time from the tier table, so it needs no state here.
+function applyBotTier(bot) {
+  if (!bot) return;
+  const oldTier = bot.ggTier || 0;
+  const newTier = Math.min(14, bot.kills);
+  bot.ggTier = newTier;
+  if (newTier === oldTier) return;
+  const nt = GUN_GAME_TIERS[newTier], ot = GUN_GAME_TIERS[oldTier];
+  const hpGain = nt.hpBonus - ot.hpBonus; bot.maxHp += hpGain; bot.hp += hpGain;
+  bot.spd *= (nt.spd / ot.spd); // ratios telescope: base spd x (tier spd / tier-1 spd)
+  const tierJetCfg = JETS.find(function(j) { return j.id === tierJetId(newTier); });
+  const swapMesh = buildJetMesh(nt.color, tierJetCfg ? tierJetCfg.accent : 0xf87171, { hull: 1, damage: 1, agility: 1, speed: 1 }, tierJetId(newTier));
+  swapMesh.position.copy(bot.mesh.position); swapMesh.quaternion.copy(bot.mesh.quaternion);
+  scene.remove(bot.mesh); scene.add(swapMesh); bot.mesh = swapMesh;
+}
+// Gun Game player death (v14): ONE routine for every death cause — shot down or crashed.
+// A death always means: killer credit (only if a bot really earned it), explosion FX, a death
+// on the counter, mesh hidden, respawnT = 2s. It never ends the match by itself — the single
+// exception is when the credited kill was that bot's 15th, which ends the match as a defeat.
+function gungamePlayerDown(cause) {
+  if (!activeGame || activeGame.mode !== 'gungame') return;
+  const p = activeGame.player;
+  if (p.respawnT > 0) return;
+  // Killer credit: a 'shot' death credits the last bot that hit the player (the only way hp
+  // reaches 0 in Gun Game); a 'crash' credits that bot ONLY if it hit the player within the
+  // last 5 seconds — flying into a rock on your own credits nobody.
+  let killer = null;
+  if (p.lastHitBy != null && p.lastHitBy !== 'player') {
+    const cand = activeGame.entities.find(function(e) { return e.id === p.lastHitBy; });
+    if (cand && (cause !== 'crash' || (gameTime - (p.lastHitAt || -99)) <= 5)) killer = cand;
+  }
+  if (killer) {
+    killer.kills++; applyBotTier(killer);
+    if (killer.kills >= 15) { endMatch(false, 'DEFEAT', `${killer.name} reached 15 kills first!`); return; }
+  }
+  for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
+  for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8 });
+  p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
+  showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
+}
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (killerId === 'player') {
     p.kills++; const coinGain = activeGame.mode === 'campaign' ? 20 : 6; const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain);
-    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability}`, 3000); }
+    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; p.maxHp = 85 + tier.hpBonus; p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.4)); const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier), true); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability} | DMG x${(tier.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${tier.spd.toFixed(2)} · TURN x${tier.turn.toFixed(2)} · HULL ${p.maxHp}`, 3000); }
   } else {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
-    if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; killerBot.ggTier = Math.min(14, killerBot.kills); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
+    if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; applyBotTier(killerBot); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
   }
   if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); victim.heading = Math.atan2(-victim.mesh.position.x, -victim.mesh.position.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
   else {
@@ -2546,7 +2582,7 @@ function updateHUD(curSpd) {
   document.getElementById('btnFireRocket').textContent = p.rocketCd > 0 ? `ROCKET (${Math.ceil(p.rocketCd)}s)` : 'ROCKET (RDY)';
   document.getElementById('btnAutoAim').textContent = p.autoAimCd > 0 ? `LOCK (${Math.ceil(p.autoAimCd)}s)` : 'AUTO-AIM (RDY)';
   if (activeGame.mode === 'campaign') { document.getElementById('hudModeTitle').textContent = `Chapter ${activeGame.chapter}`; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
-  else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15`; }
+  else if (activeGame.mode === 'gungame') { const topBot = activeGame.entities.reduce(function(m, b) { return Math.max(m, b.kills); }, 0); document.getElementById('hudModeTitle').textContent = GUN_GAME_TIERS[p.ggTier].name; const gt = GUN_GAME_TIERS[p.ggTier]; document.getElementById('hudCenterInfo').textContent = `Your Kills: ${p.kills}/15 | Deaths: ${p.deaths} | Top Bot: ${topBot}/15 — Tier ${p.ggTier + 1} · DMG x${(gt.dmg / GUN_GAME_TIERS[0].dmg).toFixed(2)} · SPD x${gt.spd.toFixed(2)} · Hull ${p.maxHp}`; }
   else if (activeGame.mode === 'royale') { document.getElementById('hudModeTitle').textContent = 'Ranked Royale'; document.getElementById('hudCenterInfo').textContent = `Alive: ${activeGame.entities.length + 1} / 50 | Kills: ${p.kills}`; }
   else { document.getElementById('hudModeTitle').textContent = 'Online 1v1'; document.getElementById('hudCenterInfo').textContent = `Enemies Left: ${activeGame.entities.length}`; }
   const boxWrap = document.getElementById('targetBoxes'); boxWrap.innerHTML = '';
