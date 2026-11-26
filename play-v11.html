@@ -6,8 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
-<title>SKY ACE: 3D Fighter Jet Dogfight</title>
-<meta name="description" content="Play SKY ACE 3D in your browser. Campaign, Gun Game, Ranked Royale and Online 1v1." />
+<title>NEBULA DOGFIGHT — 3D Fighter Jet Game</title>
+<meta name="description" content="Play NEBULA DOGFIGHT in your browser. Campaign, Gun Game, Ranked Royale and Online 1v1." />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
@@ -89,7 +89,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ GALAXY v11 — COLLECTION & MORE SKINS ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v12 ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -601,7 +601,7 @@ function getBillboardTexture() {
     ctx.fillStyle = '#070714'; ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 5; ctx.strokeRect(5, 5, w - 10, h - 10);
     ctx.fillStyle = '#f0abfc'; ctx.font = '900 62px Arial'; ctx.textAlign = 'center'; ctx.fillText('ACE', w / 2, 72);
-    ctx.fillStyle = '#22d3ee'; ctx.font = '700 17px Arial'; ctx.fillText('SKY ACE AIRSHOW', w / 2, 102);
+    ctx.fillStyle = '#22d3ee'; ctx.font = '700 17px Arial'; ctx.fillText('NEBULA AIRSHOW', w / 2, 102);
     ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.moveTo(26, 96); ctx.lineTo(44, 62); ctx.lineTo(62, 96); ctx.closePath(); ctx.fill();
     ctx.fillRect(w - 58, 66, 30, 28);
   });
@@ -818,7 +818,7 @@ function getDecalTexture() {
     _drawStar(ctx, 52, 64, 30, '#ffffff');
     ctx.fillStyle = '#d43a2f'; ctx.beginPath(); ctx.arc(52, 64, 8, 0, 6.3); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.94)'; ctx.font = '900 40px Arial'; ctx.fillText('ACE-01', 102, 78);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '700 13px Arial'; ctx.fillText('SKY ACE SQN', 104, 100);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '700 13px Arial'; ctx.fillText('NEBULA SQN', 104, 100);
   });
   if (THREE.SRGBColorSpace) _decalTex.colorSpace = THREE.SRGBColorSpace;
   return _decalTex;
