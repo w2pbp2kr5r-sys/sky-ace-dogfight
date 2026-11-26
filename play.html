@@ -268,7 +268,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v33 — MOBILE & AIM ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v34 — HOMING & UPDATES ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -335,6 +335,7 @@
     <div class="hud-box"><button class="hud-btn" id="btnHudPause">Settings</button><div id="hudWarning" style="margin-top:6px">RADAR CLEAR</div><canvas id="minimap" width="110" height="110" class="hidden"></canvas></div>
   </div>
   <div id="bannerAlert" class="hidden"></div>
+  <div id="updPill" class="hidden">⬆ Update ready — applies after this match</div>
   <div id="reticle"></div>
   <div class="hud-bottom">
     <div></div>
@@ -347,6 +348,13 @@
   </div>
 </div>
 <div id="countdownOverlay" class="hidden">3</div>
+
+<!-- v34: auto-updater surfaces — a toast (menu/gate state) and a quiet in-match pill -->
+<style>
+  #updToast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 300; background: rgba(8,20,38,0.94); border: 1px solid #38bdf8; color: #e0f2fe; padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 8px 28px rgba(0,0,0,0.55); pointer-events: none; white-space: nowrap; }
+  #updPill { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 12; background: rgba(8,20,38,0.88); border: 1px solid #38bdf8; color: #bae6fd; padding: 5px 14px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; pointer-events: none; white-space: nowrap; }
+</style>
+<div id="updToast" class="hidden">⬆ New version available — updating…</div>
 
 <!-- v31: Wave Defense upgrade draft — opened (paused) after every cleared wave -->
 <style>
@@ -482,6 +490,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
+const BUILD_VERSION = 34; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -3593,30 +3602,35 @@ function spawnRocket(pos, dir, ownerId, targetObj, dmg) {
   // Detailed missile (v6): metallic body, dark seeker nose, orange warning band, tail + mid fins,
   // flickering exhaust flame and a blinking red tracker light — same group/dir conventions as before
   if (!_rkGeos) {
-    _rkGeos = { body: new THREE.CylinderGeometry(0.42, 0.42, 4.6, 10), nose: new THREE.ConeGeometry(0.42, 1.3, 10), band: new THREE.CylinderGeometry(0.44, 0.44, 0.35, 10), finA: new THREE.BoxGeometry(1.7, 0.06, 0.7), finB: new THREE.BoxGeometry(0.06, 1.7, 0.7), flame: new THREE.ConeGeometry(0.34, 1.9, 8), disc: new THREE.CircleGeometry(0.20, 10) };
+    _rkGeos = { body: new THREE.CylinderGeometry(0.38, 0.38, 5.75, 10), nose: new THREE.ConeGeometry(0.38, 1.3, 10), band: new THREE.CylinderGeometry(0.40, 0.40, 0.35, 10), finA: new THREE.BoxGeometry(1.7, 0.06, 0.7), finB: new THREE.BoxGeometry(0.06, 1.7, 0.7), flame: new THREE.ConeGeometry(0.34, 1.9, 8), disc: new THREE.CircleGeometry(0.20, 10) }; // v34: slimmer, longer airframe (radius x0.9, length x1.25) — reads as a real AAM, not a stubby tube
     _rkMats = { body: new THREE.MeshStandardMaterial({ color: 0xffffff, map: getRocketTexture(), metalness: 0.6, roughness: 0.35, envMapIntensity: 0.8 }), dark: new THREE.MeshStandardMaterial({ color: 0x22262e, metalness: 0.7, roughness: 0.4 }), red: new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.4, roughness: 0.45 }), flame: new THREE.MeshBasicMaterial({ color: 0xffa53a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), disc: new THREE.MeshBasicMaterial({ color: 0xd8f4ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), glass: (THREE.MeshPhysicalMaterial ? new THREE.MeshPhysicalMaterial({ color: 0x141a20, metalness: 0.2, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 1.3 }) : new THREE.MeshStandardMaterial({ color: 0x141a20, metalness: 0.7, roughness: 0.15, envMapIntensity: 1.2 })) };
     _rkMats.flame.color.setRGB(2.2, 1.2, 0.45); // v16: HDR rocket exhaust — blooms
     _rkMats.disc.color.setRGB(1.6, 2.0, 2.4); // v16: HDR exhaust disc
   }
   const wrap = new THREE.Group();
   const body = new THREE.Mesh(_rkGeos.body, _rkMats.body); body.rotation.x = Math.PI / 2; wrap.add(body);
-  const nose = new THREE.Mesh(_rkGeos.nose, _rkMats.glass); // dark glass seeker head (v8) nose.rotation.x = Math.PI / 2; nose.position.z = 2.9; wrap.add(nose);
+  const nose = new THREE.Mesh(_rkGeos.nose, _rkMats.glass); // dark glass seeker head (v8) nose.rotation.x = Math.PI / 2; nose.position.z = 3.52; wrap.add(nose); // v34: sits on the longer body's tip (half-length 2.875 + cone half 0.65)
   const band = new THREE.Mesh(_rkGeos.band, _rkMats.red); band.rotation.x = Math.PI / 2; band.position.z = 1.1; wrap.add(band);
-  [[-1.95, 1], [0.35, 0.78]].forEach(function(fp) {
+  [[-2.55, 1], [0.35, 0.78]].forEach(function(fp) { // v34: tail fins moved back to the longer airframe's tail
     const fa = new THREE.Mesh(_rkGeos.finA, _rkMats.red); fa.position.z = fp[0]; fa.scale.setScalar(fp[1]); wrap.add(fa);
     const fb = new THREE.Mesh(_rkGeos.finB, _rkMats.red); fb.position.z = fp[0]; fb.scale.setScalar(fp[1]); wrap.add(fb);
   });
-  const flame = new THREE.Mesh(_rkGeos.flame, _rkMats.flame); flame.rotation.x = -Math.PI / 2; flame.position.z = -3.2; wrap.add(flame); wrap.userData.flame = flame;
+  const flame = new THREE.Mesh(_rkGeos.flame, _rkMats.flame); flame.rotation.x = -Math.PI / 2; flame.position.z = -3.75; wrap.add(flame); wrap.userData.flame = flame; // v34: behind the longer tail (-2.875)
   const blink = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSmokeTexture(), color: 0xff3333, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
-  blink.scale.setScalar(1.7); blink.position.z = 2.6; wrap.add(blink); wrap.userData.blink = blink;
+  blink.scale.setScalar(1.7); blink.position.z = 3.0; wrap.add(blink); wrap.userData.blink = blink;
+  // v34: additive exhaust glow sprite at the tail — a soft HDR bloom halo around the
+  // flame so the plume reads as hot gas, not just a cone. Flickered in the update loop.
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSmokeTexture(), color: 0xffb066, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.material.color.multiplyScalar(2.0); // HDR push past the bloom threshold, same trick as the tracer cores
+  glow.scale.set(2.6, 2.6, 1); glow.position.z = -3.45; wrap.add(glow); wrap.userData.glow = glow;
   // Exhaust shock diamonds (v8): two bright mach discs standing in the rocket plume
   const discs = [];
-  [[-2.62, 1.0], [-2.98, 0.65]].forEach(function(dp) {
+  [[-3.2, 1.0], [-3.56, 0.65]].forEach(function(dp) { // v34: shifted back with the longer tail
     const d = new THREE.Mesh(_rkGeos.disc, _rkMats.disc); d.rotation.y = Math.PI; d.position.z = dp[0]; d.scale.setScalar(dp[1]); d.userData.baseS = dp[1]; wrap.add(d); discs.push(d);
   });
   wrap.userData.discs = discs;
   wrap.position.copy(pos); scene.add(wrap);
-  activeGame.rockets.push({ mesh: wrap, dir: dir.clone().normalize(), ownerId: ownerId, target: targetObj, dmg: dmg, hp: 10, life: 9.5, _smokeAcc: 0 });
+  activeGame.rockets.push({ mesh: wrap, dir: dir.clone().normalize(), ownerId: ownerId, target: targetObj, dmg: dmg, hp: 10, life: 9.5, _smokeAcc: 0, _lastDist: Infinity, _riseT: 0, _wasClose: false, _reattack: false, _reattackT: 0, _turnAcc: 0, _roll: 0 }); // v34: guidance state — overshoot/re-attack bookkeeping, cumulative turn (anti-orbit), visual roll
   // Launch effect (v8): a burst of smoke and a flash as the missile leaves the rail
   for (let lp = 0; lp < 6; lp++) spawnSmokePuff(pos.x + (Math.random() - 0.5) * 2, pos.y + (Math.random() - 0.5) * 2, pos.z + (Math.random() - 0.5) * 2, { color: lp < 3 ? 0xffffff : 0xb9bfc9, size: 1.6, grow: 4, life: 0.55, opacity: 0.5, vx: -dir.x * 10 + (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, vz: -dir.z * 10 + (Math.random() - 0.5) * 6 });
   spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.6, grow: 3, life: 0.14, opacity: 0.95, vx: 0, vy: 0, vz: 0 });
@@ -3703,7 +3717,7 @@ function endMatch(victory, title, summary) {
   if (typeof MUS !== 'undefined') MUS.update(); // v29: the results screen is lobby again — music fades back in
 }
 function nextChapter() { chSel.value = Math.min(CHAPTERS.length, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); } // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
+function returnHome() { if (activeGame && activeGame.onlineRoyale && conn && conn.open) { try { conn.send({ type: 'rdead' }); } catch (e) {} } if (activeGame && activeGame.mmMatch) mmNotifyMyDeath(); mmCleanupMatch(); royaleRemoteRef = null; activeGame = null; paused = false; clearSmoke(); SFX.engineStop(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); applyPendingUpdate(); } // v34: back at the menu — a waiting update applies now // v18: quitting an Online Royale mid-match counts as falling — the rival is told ('rdead')
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -3721,6 +3735,11 @@ function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
 // ---- Bot AI helpers (v4): damage tracking, targeting, target info ----
 const _botTmpFwd = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+// v34 rocket guidance scratch vectors (shared, never retained across frames)
+const _rkVel = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _rkAim = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _rkWant = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+const _rkAxis = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 function isRemoteId(id) { return typeof id === 'string' && id.indexOf('remote') === 0; } // v25: 'remote' (v18 room rival) and 'remote_<peerId>' (v25 matchmade puppets) are both network-driven, never AI
 function noteBotHit(ent, ownerId) {
   ent.lastHitAt = gameTime; ent.lastAttacker = ownerId;
@@ -4234,21 +4253,60 @@ function animate(now) {
   for (let rd = activeGame.rockets.length - 1; rd >= 0; rd--) { const rkD = activeGame.rockets[rd]; if (rkD._dead) { scene.remove(rkD.mesh); activeGame.rockets.splice(rd, 1); } }
   for (let i = activeGame.rockets.length - 1; i >= 0; i--) {
     const rk = activeGame.rockets[i]; rk.life -= dt;
-    // True lock-on homing (v5): strong capped steering — sharp turns bleed it, fuel runs out at 9.5s, or shoot it down
-    let rkTgtPos = null;
-    if (rk.target === 'player') { if (p.respawnT > 0) { rkTgtPos = null; } else { incomingMissile = true; rkTgtPos = p.mesh.position; } }
-    else if (rk.target && rk.target.mesh && activeGame.entities.includes(rk.target)) rkTgtPos = rk.target.mesh.position;
-    if (rkTgtPos) { const steer = rk.ownerId === 'player' ? 4.6 : 3.8; const toT = rkTgtPos.clone().sub(rk.mesh.position).normalize(); rk.dir.lerp(toT, Math.min(1, steer * dt)).normalize(); }
+    // v34 homing — proportional guidance to the PREDICTED intercept point with a
+    // turn-rate cap (rad/s) that stiffens as the rocket closes. This replaces the
+    // v5 position-lerp (dir.lerp toward the target's CURRENT position): pure
+    // pursuit with exponential lag settles into a stable orbit around a crossing
+    // or maneuvering target — the "rockets go in circles around you" bug. Now the
+    // missile leads its target, rotates at a capped rate like a real airframe,
+    // and the terminal-phase cap (x1.6 at point blank) lets it correct the last
+    // crossing error instead of sailing past and circling back forever.
+    let rkTgtPos = null, rkTgtVel = null;
+    if (rk.target === 'player') { if (p.respawnT > 0) { rkTgtPos = null; } else { incomingMissile = true; rkTgtPos = p.mesh.position; rkTgtVel = _rkVel.copy(fwd).multiplyScalar(curSpd); } }
+    else if (rk.target && rk.target.mesh && activeGame.entities.includes(rk.target)) { rkTgtPos = rk.target.mesh.position; rkTgtVel = rk.target.fwdVec ? _rkVel.copy(rk.target.fwdVec).multiplyScalar(rk.target.spd || 0) : _rkVel.set(0, 0, 0); }
+    if (rkTgtPos) {
+      const rp = rk.mesh.position;
+      const dist = rp.distanceTo(rkTgtPos);
+      _rkAim.copy(rkTgtPos).addScaledVector(rkTgtVel, dist / 205); // one-iteration intercept prediction (timeToGo = distance / rocket speed)
+      _rkWant.copy(_rkAim).sub(rp).normalize();
+      let cap = (rk.ownerId === 'player' ? 4.2 : 3.4) * (1 + 0.6 * (1 - clampNum(dist / 600, 0, 1))); // closing factor: full base rate far away, up to x1.6 in the terminal phase
+      if (rk._reattackT > 0) { cap *= 1.6; rk._reattackT -= dt; } // v34: overshoot re-attack window (below) stacks on top
+      const ang = rk.dir.angleTo(_rkWant);
+      if (ang > 0.0001) {
+        const turn = Math.min(ang, cap * dt);
+        _rkAxis.copy(rk.dir).cross(_rkWant);
+        if (_rkAxis.lengthSq() < 1e-8) _rkAxis.set(0, 1, 0).cross(rk.dir); // near-opposite vectors: any perpendicular axis will do
+        if (_rkAxis.lengthSq() < 1e-8) _rkAxis.set(1, 0, 0);
+        _rkAxis.normalize();
+        rk.dir.applyAxisAngle(_rkAxis, turn).normalize();
+        rk._turnAcc = (rk._turnAcc || 0) + turn;
+      }
+      // v34 overshoot recovery: the rocket got close (<45) and the range is now
+      // OPENING — after 0.25s of opening it earns ONE re-attack at boosted turn
+      // authority for up to 1.2s to swing back onto the target. A second miss is
+      // final: it flies ballistic and dies at fuel end (no infinite circling).
+      if (dist < 45) rk._wasClose = true;
+      if (rk._wasClose && !rk._reattack) {
+        if (dist > (rk._lastDist || dist)) rk._riseT = (rk._riseT || 0) + dt; else rk._riseT = 0;
+        if (rk._riseT >= 0.25) { rk._reattack = true; rk._reattackT = 1.2; rk._wasClose = false; rk._riseT = 0; }
+      }
+      rk._lastDist = dist;
+      // v34 anti-orbit hard rule: ~630 degrees of cumulative turning with no hit
+      // means this missile is boring circles — it burns out and pops harmlessly.
+      if ((rk._turnAcc || 0) > 11.0) { spawnImpactFx(rp); for (let sp3 = 0; sp3 < 3; sp3++) spawnSmokePuff(rp.x, rp.y, rp.z, { color: 0xcfd6de, size: 2.0, grow: 5, life: 0.6, opacity: 0.5, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, vz: (Math.random() - 0.5) * 6 }); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    } else { rk._lastDist = Infinity; rk._wasClose = false; rk._riseT = 0; }
     rk.mesh.position.addScaledVector(rk.dir, 205 * dt); rk.mesh.lookAt(rk.mesh.position.clone().add(rk.dir));
+    rk._roll = (rk._roll || 0) + 3 * dt; rk.mesh.rotateZ(rk._roll); // v34: slow corkscrew roll around the flight axis (visual only — real AAMs roll in flight)
     if (rk.mesh.userData.flame) { const fs = 0.8 + Math.random() * 0.5; rk.mesh.userData.flame.scale.set(fs, 0.9 + Math.random() * 0.5, fs); }
+    if (rk.mesh.userData.glow) { const gs = 2.3 + Math.random() * 1.0; rk.mesh.userData.glow.scale.set(gs, gs, 1); } // v34: exhaust glow breathes with the flame
     if (rk.mesh.userData.discs) rk.mesh.userData.discs.forEach(function(d) { d.scale.setScalar(d.userData.baseS * (0.8 + Math.random() * 0.45)); });
     if (rk.mesh.userData.blink) rk.mesh.userData.blink.material.opacity = Math.sin(gameTime * 18 + i * 1.7) > 0 ? 0.9 : 0.12;
     // Visible white smoke trail so pilots can see missiles coming
-    rk._smokeAcc = (rk._smokeAcc || 0) + 20 * dt;
-    while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.1, grow: 2.4, life: 0.5, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
-    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg * playerDamageMul(); p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
+    rk._smokeAcc = (rk._smokeAcc || 0) + 30 * dt; // v34: denser trail (20 -> 30 puffs/s), slightly larger puffs, longer fade — a real missile smoke column
+    while (rk._smokeAcc >= 1) { rk._smokeAcc -= 1; spawnSmokePuff(rk.mesh.position.x, rk.mesh.position.y, rk.mesh.position.z, { color: 0xf1f5f9, size: 1.5, grow: 2.4, life: 0.75, opacity: 0.38, vx: 0, vy: 0.5, vz: 0 }); }
+    if (rk.ownerId !== 'player' && p.respawnT <= 0 && p.spawnProtT <= 0 && rk.mesh.position.distanceTo(p.mesh.position) < (rk.target === 'player' ? 13 : 8)) { p.hp -= rk.dmg * playerDamageMul(); p.lastHitBy = rk.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.6); SFX.hit(); flashDamage(); scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; } // v34 proximity fuze: a rocket locked on the player detonates within 13 units (a near-pass is lethal, like a real missile's fuze) — dumbfire rockets keep the 8-unit direct-hit radius
     let rHit = false;
-    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); if (rk.ownerId === 'player') showHitmarker(ent.hp <= 0); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
+    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < (rk.target === ent ? 13 : 8.5)) { if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && rk.ownerId !== 'player') { rHit = true; spawnImpactFx(rk.mesh.position); break; } /* v34: campaign/waves bot-on-bot ROCKET skip — mirrors the v21 bullet rule above. This path previously had NO skip: a bot rocket in Wave Defense homing on the player would damage (and could kill, with kill credit) any bot within 8.5 units of its flight path, and noteBotHit would record that bot as the victim's attacker. Now the rocket detonates harmlessly on the bot — no damage, no noteBotHit, no kill credit — so in campaign/waves a bot's health can only ever be moved by the player. (Campaign bots never fire rockets at all — the mode gate in the weapons block — so in practice this hole was waves-only; the skip covers both modes symmetrically.) */ ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); if (rk.ownerId === 'player') showHitmarker(ent.hp <= 0); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } } // v34 proximity fuze: 13 units vs the rocket's locked target, 8.5 direct-hit radius vs everything else
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -5763,6 +5821,72 @@ window.addEventListener('beforeunload', function() { accumulatePlayTime(); });
 // memory), and the cloud section reports its own unavailability on use.
 showGate();
 if (!storageOK) gateError('This browser is blocking saved data, so progress will not be kept after this tab closes — you can still play as a guest, but cloud sign-in may not work here.');
+
+// ---- v34 auto-updater (WS3) ----
+// Players already in the game when a new build ships should glide onto it —
+// no group-chat "new link" ever again. version.json at the site root carries
+// {version: N}; the publish loop bumps it alongside play.html (which is
+// republished with every version, so it always holds the latest build).
+// Checks: 20s after boot, then every 45s, plus on tab-visible / window-focus,
+// throttled to at most one fetch per 30s. A newer version found while in the
+// menu (the sign-in gate counts as menu state — it is the same page, and the
+// redirect lands on the new build's gate) applies immediately behind a toast;
+// found mid-mission it only raises the quiet #updPill and applies when the
+// player returns to the menu (returnHome calls applyPendingUpdate). A
+// sessionStorage loop guard stops redirect ping-pong while GitHub Pages
+// propagation lags: one redirect per target version per 3 minutes. Every
+// failure (offline, file://, version.json missing) is silently skipped —
+// the updater must never error, block, or interrupt play.
+let _updPending = 0; // remote version waiting for the player to reach the menu (0 = none)
+let _updLastCheck = 0; // ms timestamp of the last version.json fetch (throttle)
+let _updRedirecting = false;
+function _updGuardAllows(target) {
+  try {
+    const raw = sessionStorage.getItem('nd_upd_for');
+    if (!raw) return true;
+    const g = JSON.parse(raw);
+    if (g && g.v === target && (Date.now() - (g.t || 0)) < 3 * 60 * 1000) return false; // already bounced for this version in the last 3 min
+  } catch (e) { /* storage blocked (the v32 contexts) — no guard, still safe: the check cycle re-verifies the version every pass */ }
+  return true;
+}
+function _updMarkGuard(target) { try { sessionStorage.setItem('nd_upd_for', JSON.stringify({ v: target, t: Date.now() })); } catch (e) {} }
+function _updApplyNow(target) {
+  if (_updRedirecting) return;
+  if (!_updGuardAllows(target)) { _updPending = 0; return; } // bounced recently — stay quiet; the normal check cycle re-offers it once the 3-minute window lapses
+  _updRedirecting = true; _updPending = 0; _updMarkGuard(target);
+  const toast = document.getElementById('updToast');
+  if (toast) toast.classList.remove('hidden');
+  setTimeout(function() { try { location.replace(new URL('play.html', location.href).href); } catch (e) { try { location.replace('play.html'); } catch (e2) {} } }, 1200);
+}
+function _updNoteFound(target) {
+  if (!activeGame) { _updApplyNow(target); return; } // menu / gate state: update right away
+  _updPending = target; // mid-mission: pill only, redirect waits for the menu
+  const pill = document.getElementById('updPill');
+  if (pill) pill.classList.remove('hidden');
+}
+function checkForUpdate() {
+  if (_updRedirecting) return;
+  const now = Date.now();
+  if (now - _updLastCheck < 30000) return; // throttle: focus/visibility events can arrive in bursts
+  _updLastCheck = now;
+  let url;
+  try { url = new URL('version.json', location.href).href; } catch (e) { return; }
+  fetch(url, { cache: 'no-store' }).then(function(r) { if (!r.ok) throw new Error('no version file'); return r.json(); }).then(function(j) {
+    const v = j ? (typeof j.version === 'number' ? j.version : parseInt(j.version, 10)) : NaN;
+    if (v && v > BUILD_VERSION) _updNoteFound(v);
+  }).catch(function() { /* offline / no version.json yet / bad JSON — silently skip, play on */ });
+}
+function applyPendingUpdate() { // called from returnHome — the back-to-menu funnel
+  if (!_updPending || activeGame) return;
+  const pill = document.getElementById('updPill');
+  if (pill) pill.classList.add('hidden');
+  _updApplyNow(_updPending);
+}
+setTimeout(checkForUpdate, 20000);
+setInterval(checkForUpdate, 45000);
+document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') checkForUpdate(); });
+window.addEventListener('focus', checkForUpdate);
+// ---- end v34 auto-updater ----
 
 // ---- v23 cloud accounts: Firebase Auth + Firestore layered onto the gate ----
 // The SDK loads LAZILY via dynamic import (first cloud interaction, or a deferred
