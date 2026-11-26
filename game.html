@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!-- v39 WS1: standalone web-app support — on iPhone the ONLY route to true fullscreen is a home-screen app (apple-mobile-web-app-capable + manifest); Android/desktop use the Fullscreen API as before -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#070b14" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -95,7 +102,7 @@
   #hudHpBar { width: 100%; height: 100%; background: #22c55e; transition: width 0.1s; }
   .hud-bottom { position: absolute; bottom: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
   .action-btns { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
-  .hud-btn { background: rgba(15,23,42,0.85); border: 1px solid #38bdf8; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+  .hud-btn { background: rgba(15,23,42,0.85); border: 1px solid #38bdf8; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; cursor: pointer; touch-action: none; } /* v39 WS2: touch-action none — no double-tap zoom / gesture hijack on the action buttons during play */
   .hud-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   #reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 2px solid rgba(56,189,248,0.8); border-radius: 50%; transition: transform 0.13s ease-out; }
   #reticle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); }
@@ -144,8 +151,13 @@
   #targetBoxes { position: fixed; inset: 0; pointer-events: none; z-index: 7; }
   .t-box { position: absolute; width: 38px; height: 38px; border: 2px solid #ef4444; transform: translate(-50%, -50%); border-radius: 4px; }
   .t-box.locked { border-color: #fbbf24; box-shadow: 0 0 12px #fbbf24; }
-  #touchZone { position: fixed; bottom: 80px; left: 20px; width: 110px; height: 110px; border-radius: 50%; clip-path: circle(50% at 50% 50%); border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; } /* v35: clip-path makes the HIT AREA the visible circle too — border-radius alone leaves the square's invisible corners clickable, and a thumb landing in a corner (near the stick, not on it) used to claim it */
-  #touchKnob { position: absolute; top: 35px; left: 35px; width: 40px; height: 40px; border-radius: 50%; background: rgba(56,189,248,0.7); }
+  #touchZone { position: fixed; bottom: 80px; left: 20px; width: 132px; height: 132px; border-radius: 50%; clip-path: circle(50% at 50% 50%); border: 2px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); z-index: 9; pointer-events: auto; touch-action: none; } /* v35: clip-path makes the HIT AREA the visible circle too — border-radius alone leaves the square's invisible corners clickable, and a thumb landing in a corner (near the stick, not on it) used to claim it */ /* v39 WS2: base 110px -> 132px, knob 40px -> 48px — the claim radius and travel derive from the live rect (steerStick), so they scale with it automatically */
+  #touchKnob { position: absolute; top: 42px; left: 42px; width: 48px; height: 48px; border-radius: 50%; background: rgba(56,189,248,0.7); }
+  .roll-stack { display: flex; flex-direction: column; gap: 6px; } /* v39 WS2: touch roll buttons, stacked at the left of the FIRE cluster */
+  /* v39 WS1: in-page immersive fallback for browsers with NO Fullscreen API (iPhone Safari / iOS webviews) — stretch to the full dynamic viewport and drop the safe-area padding; the home-screen app (iosFsModal) is the true-fullscreen route there */
+  body.immersive { height: 100dvh; }
+  body.immersive #gameCanvas { height: 100dvh; }
+  body.immersive .screen { padding: 10px; }
   /* ---- v33 mobile fit: play must not scroll-bounce or double-tap-zoom, and
      small / touch viewports get a layout that actually fits. Desktop rules
      above are untouched; everything here is scoped to touch devices (the
@@ -155,7 +167,7 @@
   #gameCanvas { touch-action: none; }
   body.is-touch #touchZone { bottom: calc(80px + env(safe-area-inset-bottom)); }
   body.is-touch .hud-bottom { bottom: calc(14px + env(safe-area-inset-bottom)); }
-  body.is-touch .hud-btn { min-height: 44px; }
+  body.is-touch .hud-btn { min-height: 56px; min-width: 56px; } /* v39 WS2: 56px minimum effective touch target on touch devices (was 44px height only) */
   body.is-touch .topnav .btn { min-height: 42px; }
   @media (max-width: 700px) {
     .screen { padding: 10px; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
@@ -268,7 +280,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v38 — GROUND TRUTH ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v39 — MOBILE ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -341,6 +353,10 @@
   <div class="hud-bottom">
     <div></div>
     <div class="action-btns">
+      <div class="roll-stack">
+        <button class="hud-btn" id="btnRollLeft">⟲ ROLL</button>
+        <button class="hud-btn" id="btnRollRight">ROLL ⟳</button>
+      </div>
       <button class="hud-btn" id="btnFireGun">FIRE GUN</button>
       <button class="hud-btn" id="btnFireRocket">ROCKET (RDY)</button>
       <button class="hud-btn" id="btnAutoAim">AUTO-AIM (RDY)</button>
@@ -446,6 +462,8 @@
       <label><input type="checkbox" id="musicToggle" checked /> Lobby Music</label>
       <div class="section-label">Touch</div>
       <label>Touch Controls: <select id="touchModeSelect"><option value="auto">Auto — show on touch devices</option><option value="on">On — always show joystick</option><option value="off">Off — never show joystick</option></select></label>
+      <label>Stick Sensitivity: <span id="stickSensVal">1.0x</span> <input type="range" id="stickSensSlider" min="0.7" max="1.6" step="0.05" value="1" /></label>
+      <label><input type="checkbox" id="hapticsToggle" checked /> Haptics (vibration on hits &amp; death)</label>
       <label><input type="checkbox" id="touchLayoutToggle" /> Customize Button Layout</label>
       <div id="touchLayoutBtns" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sec btn-sm" id="btnEditTouchLayout" type="button">Edit Button Layout</button>
@@ -459,6 +477,23 @@
         <button class="btn btn-danger btn-sm" id="btnQuitHome">Quit to Home</button>
       </div>
       <table class="bind-table"><thead><tr><th>Action</th><th>Current Key</th><th>Customize</th></tr></thead><tbody id="bindTableBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- v39 WS1: iPhone fullscreen explainer — iOS Safari / iOS webviews have no Fullscreen API for pages, so the fullscreen button lands here (after switching the in-page immersive stretch on) -->
+<div id="iosFsModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-header"><h2>TRUE FULLSCREEN ON IPHONE</h2><button class="btn btn-sec btn-sm" id="btnCloseIosFs">Close</button></div>
+    <div class="modal-body">
+      <p style="line-height:1.55;color:#cbd5e1;">iPhone browsers can't fullscreen a web page directly — but the home-screen app can, and it takes about 20 seconds:</p>
+      <ol style="line-height:1.65;color:#e2e8f0;padding-left:22px;">
+        <li>Tap the <strong>Share</strong> button in your browser.</li>
+        <li>Tap <strong>“Add to Home Screen”</strong>.</li>
+        <li>Launch <strong>Nebula Dogfight</strong> from your home screen — it opens fullscreen, with no browser bars.</li>
+      </ol>
+      <p style="line-height:1.55;color:#cbd5e1;">Playing inside Messenger/Facebook? Open the link in Safari first — in-app browsers can't add home-screen apps.</p>
+      <p style="line-height:1.55;color:#94a3b8;">Meanwhile we've stretched the game to fill this browser window as much as iOS allows. Tap Fullscreen again to undo the stretch.</p>
     </div>
   </div>
 </div>
@@ -493,7 +528,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 38; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 39; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -502,7 +537,8 @@ const defaultState = {
   ownedTrails: ['standard'], equippedTrail: 'standard', // v36 WS9: plane trails (collectible cosmetics; 'standard' = skin-tinted vapor)
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0, ailerons: 0 }, // v37 J8: ailerons is a base0 track like armor/regen — old saves default-merge to Lv.0
   sensitivity: 1.0, mobileTouch: 'auto', // v33: three-way touch-controls mode ('auto' | 'on' | 'off'); legacy boolean saves migrate in loadGameState
-  touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1, // v32: customizable touch-button layout (editor in Settings)
+  stickSens: 1.0, haptics: true, // v39 WS2: touch-stick sensitivity multiplier (0.7–1.6) + vibration feedback toggle; old saves gain both via the guards in loadGameState
+  touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1.15, // v32: customizable touch-button layout (editor in Settings) // v39 WS2: NEW profiles start at 1.15x button scale (existing profiles keep their saved scale — the serialized value wins the merge)
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   volume: 0.7, muted: false, musicOn: true,
   lastDaily: '', bestWave: 0,
@@ -585,7 +621,10 @@ function loadGameState() {
   if (typeof state.touchLayoutOn !== 'boolean') state.touchLayoutOn = false;
   if (!state.touchLayout || typeof state.touchLayout !== 'object' || Array.isArray(state.touchLayout)) state.touchLayout = {};
   state.touchLayout = Object.assign({}, state.touchLayout);
-  if (typeof state.touchBtnScale !== 'number' || isNaN(state.touchBtnScale) || state.touchBtnScale < 0.8 || state.touchBtnScale > 1.4) state.touchBtnScale = 1;
+  if (typeof state.touchBtnScale !== 'number' || isNaN(state.touchBtnScale) || state.touchBtnScale < 0.8 || state.touchBtnScale > 1.4) state.touchBtnScale = 1.15; // v39 WS2: fallback matches the new-profile default (valid saved values are untouched)
+  // v39 WS2 guards: stick sensitivity + haptics (old saves default via these)
+  if (typeof state.stickSens !== 'number' || isNaN(state.stickSens) || state.stickSens < 0.7 || state.stickSens > 1.6) state.stickSens = 1;
+  if (typeof state.haptics !== 'boolean') state.haptics = true;
   // v33 migration: the touch-joystick toggle was a boolean. true -> 'on' (the
   // player explicitly enabled the stick), false -> 'auto' (the old default-off
   // now means "show it when the device actually has touch"), so a phone player
@@ -1022,8 +1061,14 @@ function showHitmarker(kill) {
   _hmTimer = setTimeout(function() { el.classList.remove('show'); }, kill ? 140 : 90);
 }
 let _dmgFlashAt = 0;
+// v39 WS2 haptics: one guarded vibrate helper (Android Chrome honours it;
+// iOS Safari ignores navigator.vibrate entirely — the call is a safe no-op
+// there). The hit buzz rides flashDamage's existing 120ms throttle below,
+// so weapon hits can never machine-gun the motor; death is a single 40ms.
+function buzz(ms) { if (!state || state.haptics === false) return; try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 function flashDamage() {
   const now = performance.now(); if (now - _dmgFlashAt < 120) return; _dmgFlashAt = now;
+  buzz(12); // v39 WS2: taking a hit — bullets, rockets and storm all funnel through here
   const el = document.getElementById('dmgVignette'); if (!el) return;
   el.style.transition = 'none'; el.style.opacity = '0.9';
   requestAnimationFrame(function() { requestAnimationFrame(function() { el.style.transition = 'opacity 0.3s ease-out'; el.style.opacity = '0'; }); });
@@ -4130,6 +4175,16 @@ function playerDamageMul() { const a = (state && state.upgrades && state.upgrade
 function aileronLevel() { return (state && state.upgrades && state.upgrades.ailerons) || 0; }
 function rollDuration() { return 1.1 * Math.pow(0.92, aileronLevel()); } // ~8% shorter per level, compounding: Lv.0 = 1.10s, Lv.6 = ~0.67s
 function playerRollEvasionMul() { const p = activeGame && activeGame.player; return (p && p.rollT >= 0) ? (2.0 + 0.15 * aileronLevel()) : 1; } // bot GUN error vs the player is multiplied by this while a roll is live (2.0 base, 2.9 at Ailerons Lv.6); rockets home and are unaffected
+// v39 WS2: the ONE roll trigger — the Q/F key poll and the touch ROLL buttons
+// both call this, so a tap and a keypress can never drift apart. Guards mirror
+// the state machine in the player update: no roll while respawning/dying,
+// none mid-roll, none inside the post-roll lockout.
+function startRoll(dir) {
+  const p = activeGame && activeGame.player; if (!p) return;
+  if (p.respawnT === undefined || p.rollT === undefined) return; // fields not lazy-inited yet (pre-first-update)
+  if (p.respawnT > 0 || p.rollT >= 0 || p.rollLockT > 0) return;
+  p.rollT = 0; p.rollDir = dir; p.rollAnim = 0; SFX.whoosh();
+}
 function firePlayerRocket() {
   if (!activeGame || activeGame.player.rocketCd > 0) return;
   if (rocketLockedOut()) { showBanner('Reach Tier 5 in Gun Game to unlock Homing Rockets!', 2000); return; }
@@ -4564,8 +4619,18 @@ function animate(now) {
   // is forced to exactly zero here at the merge, so no stray writer of
   // touchVec (present or future) can ever steer the jet on its own.
   const stickLive = stickPointerId !== null;
-  let rawYaw = stickLive && Math.abs(touchVec.x) > 0.08 ? -touchVec.x : 0;
-  let rawPitch = stickLive && Math.abs(touchVec.y) > 0.08 ? -touchVec.y : 0;
+  // v39 WS2: stick sensitivity — the claimed vector is scaled by
+  // state.stickSens (0.7–1.6, Settings → Touch) and the result clamped to
+  // magnitude 1, so at high sensitivity a partial thumb push saturates to
+  // full deflection while the deadzone and the v35 claim gate are unchanged.
+  let _svx = 0, _svy = 0;
+  if (stickLive) {
+    const _ss = (typeof state.stickSens === 'number' && isFinite(state.stickSens)) ? state.stickSens : 1;
+    _svx = touchVec.x * _ss; _svy = touchVec.y * _ss;
+    const _sm = Math.hypot(_svx, _svy); if (_sm > 1) { _svx /= _sm; _svy /= _sm; }
+  }
+  let rawYaw = stickLive && Math.abs(_svx) > 0.08 ? -_svx : 0;
+  let rawPitch = stickLive && Math.abs(_svy) > 0.08 ? -_svy : 0;
   if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
   if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
   rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
@@ -4611,8 +4676,8 @@ function animate(now) {
     else p.rollAnim = p.rollDir * Math.PI * 2 * p.rollT; // one full 360° turn of the airframe: left = -360°, right = +360°
   }
   else if (p.rollLockT <= 0) {
-    if (keys[state.binds.rollLeft]) { p.rollT = 0; p.rollDir = -1; p.rollAnim = 0; SFX.whoosh(); }
-    else if (keys[state.binds.rollRight]) { p.rollT = 0; p.rollDir = 1; p.rollAnim = 0; SFX.whoosh(); }
+    if (keys[state.binds.rollLeft]) startRoll(-1); // v39 WS2: shared trigger with the touch ROLL buttons
+    else if (keys[state.binds.rollRight]) startRoll(1);
   }
   // Compose: the roll angle rides ON TOP of the bank for this one
   // orientFlight call, then p.roll is restored — bank math, the camera and
@@ -5263,6 +5328,7 @@ function playerDestroyed(title, summary) {
   if (activeGame.mode === 'waves') { const sv = activeGame.wavesCleared || 0; if (sv > (state.bestWave || 0)) { state.bestWave = sv; saveState(); updateTopUI(); } }
   spawnJetExplosion(p.mesh.position);
   SFX.explosion();
+  buzz(40); // v39 WS2: death buzz
   shakeT = Math.max(shakeT, 0.8);
   p.hp = 0; p.mesh.visible = false;
   p.respawnT = 9999; // frozen wreck until the delayed endMatch lands (the Gun Game countdown that decrements respawnT only ticks in gungame mode, which never routes here)
@@ -5291,6 +5357,7 @@ function gungamePlayerDown(cause) {
   }
   spawnJetExplosion(p.mesh.position); // v35: the shared kill explosion replaces the old inline puff burst (18 dark + 6 flame) — same death, bigger show: fireball + shockwave ring + debris sparks + rising smoke column
   SFX.explosion(); // v20: your own death is loud
+  buzz(40); // v39 WS2: death buzz (Gun Game death path)
   shakeT = Math.max(shakeT, 0.6); // v15: your own explosion kicks the camera
   p.mesh.visible = false; p.respawnT = 2.0;
   showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
@@ -5680,21 +5747,41 @@ document.getElementById('btnTopCustom').onclick = function() { renderCustomizati
 document.getElementById('btnTopCollection').onclick = function() { renderCollection(); document.getElementById('collectionModal').classList.remove('hidden'); };
 document.getElementById('btnCloseCollection').onclick = function() { closeModals(); };
 document.getElementById('btnTopSettings').onclick = function() { renderKeybinds(); document.getElementById('pauseActions').classList.add('hidden'); document.getElementById('settingsModal').classList.remove('hidden'); };
-// ---- v37 J10: fullscreen toggle — top bar, Settings and the pause menu ----
+// ---- v37 J10 + v39 WS1: fullscreen toggle — top bar, Settings, pause menu ----
 // One shared path for all three .fsToggleBtn buttons; a fullscreenchange
 // listener keeps their labels in sync (enter vs exit). Fullscreen is a
-// per-session browser state and is deliberately NOT persisted. iPhone
-// Safari has no element fullscreen at all: the tap lands in the
-// unsupported branch and explains itself instead of failing silently.
+// per-session browser state and is deliberately NOT persisted.
+// v39 WS1 PLATFORM SPLIT (Jayce, on an iPhone: the button "doesn't work for
+// mobile"): the v37 version used ONLY the standard Fullscreen API — which
+// iPhone Safari and iOS in-app webviews (WKWebView: Messenger/Facebook,
+// where the game link gets shared) do not implement for page elements AT
+// ALL, so on his phone every tap could only ever reach the fallback toast.
+// iPad Safari, Android Chrome and desktop browsers do implement it and keep
+// the API path below, untouched. On iOS the only true fullscreen is the
+// home-screen web app (enabled by the manifest + apple-mobile-web-app-
+// capable meta in <head>): the button there switches on the in-page
+// immersive stretch AND opens the iosFsModal explainer. If the game is
+// already running standalone (launched from the home screen), the button
+// just confirms it — the player is already as fullscreen as iOS allows.
 function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement || null; }
+function fsStandalone() { try { return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch (e) { return false; } }
+function fsIsIOSLike() { const ua = navigator.userAgent || ''; return /iP(hone|od|ad)/.test(ua) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1); } // iPadOS masquerades as MacIntel+touch; only consulted when the API is missing, where the home-screen advice is still the right answer
 function fsLockLandscape() { // Android Chrome honours this once fullscreen engages; every failure is silent by design
   const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
   if (isTouch && screen.orientation && screen.orientation.lock) { try { const lp = screen.orientation.lock('landscape'); if (lp && lp.catch) lp.catch(function() {}); } catch (e) {} }
 }
 function syncFullscreenButtons() {
-  const on = !!fsElement();
+  const on = !!fsElement() || document.body.classList.contains('immersive'); // v39: the in-page stretch counts as "on" for the label
   document.querySelectorAll('.fsToggleBtn').forEach(function(b) { b.textContent = on ? '⛶ Exit Fullscreen' : '⛶ Fullscreen'; });
-  if (on) fsLockLandscape(); // the change event is the moment the lock can actually succeed
+  if (fsElement()) fsLockLandscape(); // the change event is the moment the lock can actually succeed
+}
+function fsNoApiFallback() { // v39: no Fullscreen API at all (iPhone Safari / iOS webviews) — stretch in-page, then explain the real route
+  const on = document.body.classList.toggle('immersive');
+  syncFullscreenButtons();
+  if (!on) return; // second tap just undoes the stretch
+  try { window.scrollTo(0, 1); } catch (e) {} // nudge Safari toward collapsing its toolbar where it allows it (overflow:hidden pages may not scroll — harmless)
+  if (fsIsIOSLike()) { const m = document.getElementById('iosFsModal'); if (m) m.classList.remove('hidden'); }
+  else showBanner("Fullscreen isn't supported in this browser — try Add to Home Screen", 3600);
 }
 function toggleFullscreen() {
   try {
@@ -5703,11 +5790,12 @@ function toggleFullscreen() {
       if (ex) { const r = ex.call(document); if (r && r.catch) r.catch(function() {}); }
       return;
     }
+    if (fsStandalone()) { showBanner("You're in fullscreen app mode ✓", 2600); return; } // v39: launched from the home screen — already true fullscreen
     const el = document.documentElement;
     const req = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (!req) { showBanner("Fullscreen isn't supported in this browser — try Add to Home Screen", 3600); return; }
+    if (!req) { fsNoApiFallback(); return; }
     const r2 = req.call(el);
-    if (r2 && r2.catch) r2.catch(function() { showBanner("Fullscreen isn't supported in this browser — try Add to Home Screen", 3600); });
+    if (r2 && r2.catch) r2.catch(function() { showBanner("Fullscreen isn't supported in this browser — try Add to Home Screen", 3600); }); // a REJECTED request (embed restrictions etc.) explains itself; it does not toggle the stretch
     fsLockLandscape();
   } catch (e) { showBanner("Fullscreen isn't supported in this browser — try Add to Home Screen", 3600); }
 }
@@ -5716,6 +5804,7 @@ document.addEventListener('webkitfullscreenchange', syncFullscreenButtons);
 document.getElementById('btnTopFullscreen').onclick = function() { toggleFullscreen(); };
 document.getElementById('btnSettingsFullscreen').onclick = function() { toggleFullscreen(); };
 document.getElementById('btnPauseFullscreen').onclick = function() { toggleFullscreen(); };
+document.getElementById('btnCloseIosFs').onclick = function() { closeModals(); }; // v39 WS1: the iPhone fullscreen explainer's close (closeModals hides every .modal, this one included)
 document.getElementById('btnCloseCustom').onclick = function() { closeModals(); };
 document.getElementById('btnCloseSettings').onclick = function() { if (activeGame) togglePause(false); else closeModals(); };
 document.getElementById('btnResumeGame').onclick = function() { togglePause(false); };
@@ -6151,15 +6240,19 @@ function renderKeybinds() {
   const mT = document.getElementById('muteToggle'); if (mT) mT.checked = !!state.muted;
   const muT = document.getElementById('musicToggle'); if (muT) muT.checked = state.musicOn !== false;
   const tlT = document.getElementById('touchLayoutToggle'); if (tlT) { tlT.checked = !!state.touchLayoutOn; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); }
+  const ssS = document.getElementById('stickSensSlider'); if (ssS) { ssS.value = state.stickSens; const ssv = document.getElementById('stickSensVal'); if (ssv) ssv.textContent = Number(state.stickSens).toFixed(2).replace(/0$/, '') + 'x'; } // v39 WS2
+  const hpT = document.getElementById('hapticsToggle'); if (hpT) hpT.checked = state.haptics !== false; // v39 WS2
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
 window.addEventListener('keydown', function(e) { if (!listeningAction) return; e.preventDefault(); state.binds[listeningAction] = e.code; listeningAction = null; saveState(); renderKeybinds(); });
 document.getElementById('sensSlider').oninput = function(e) { state.sensitivity = parseFloat(e.target.value); document.getElementById('sensVal').textContent = state.sensitivity.toFixed(1) + 'x'; saveState(); };
 document.getElementById('touchModeSelect').onchange = function(e) { state.mobileTouch = e.target.value; if (activeGame) { const tzEl2 = document.getElementById('touchZone'); if (tzEl2) tzEl2.classList.toggle('hidden', !touchControlsVisible()); } saveState(); }; // v33: applies live if a mission is running
+document.getElementById('stickSensSlider').oninput = function(e) { state.stickSens = parseFloat(e.target.value); const ssv = document.getElementById('stickSensVal'); if (ssv) ssv.textContent = state.stickSens.toFixed(2).replace(/0$/, '') + 'x'; saveState(); }; // v39 WS2: read live at the flight merge, so it applies mid-mission too
+document.getElementById('hapticsToggle').onchange = function(e) { state.haptics = e.target.checked; saveState(); if (state.haptics) buzz(15); }; // v39 WS2: a confirming buzz when switched on (Android; no-op where vibrate is unsupported)
 document.getElementById('touchLayoutToggle').onchange = function(e) { state.touchLayoutOn = e.target.checked; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); applyTouchLayout(); saveState(); };
 document.getElementById('btnEditTouchLayout').onclick = function() { closeModals(); openLayoutEditor(); };
-document.getElementById('btnResetTouchLayout').onclick = function() { state.touchLayout = {}; state.touchBtnScale = 1; applyTouchLayout(); saveState(); showBanner('Touch layout reset to defaults', 2200); };
+document.getElementById('btnResetTouchLayout').onclick = function() { state.touchLayout = {}; state.touchBtnScale = 1.15; applyTouchLayout(); saveState(); showBanner('Touch layout reset to defaults', 2200); }; // v39 WS2: reset returns to the current default scale (1.15)
 document.getElementById('fovSlider').oninput = function(e) { state.fov = parseFloat(e.target.value); document.getElementById('fovVal').textContent = state.fov + '°'; applyFov(); saveState(); };
 document.getElementById('camDistSlider').oninput = function(e) { state.camDist = parseFloat(e.target.value); document.getElementById('camDistVal').textContent = state.camDist.toFixed(2).replace(/0$/, '') + 'x'; saveState(); };
 document.getElementById('shakeSlider').oninput = function(e) { state.shake = parseFloat(e.target.value); document.getElementById('shakeVal').textContent = state.shake.toFixed(1); saveState(); };
@@ -6213,7 +6306,7 @@ const tz = document.getElementById('touchZone'); const tk = document.getElementB
 // releaseStick(); (4) bindHold stops propagation so a button touch can
 // never bubble into any steering listener, present or future.
 let stickPointerId = null;
-function steerStick(clientX, clientY) { const rect = tz.getBoundingClientRect(); const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; } // v32: center/travel derived from the live rect so the stick stays correct when the layout editor moves/scales it (identical numbers at the default 110px)
+function steerStick(clientX, clientY) { const rect = tz.getBoundingClientRect(); const R = rect.width / 2, lim = R * 0.64; const dx = Math.max(-lim, Math.min(lim, clientX - (rect.left + R))); const dy = Math.max(-lim, Math.min(lim, clientY - (rect.top + R))); tk.style.transform = `translate(${dx}px, ${dy}px)`; touchVec.x = dx / lim; touchVec.y = dy / lim; } // v32: center/travel derived from the live rect so the stick stays correct when the layout editor moves/scales it — v39 WS2: this is why the 132px base needed NO math changes here or in the claim handler's radius test: both read rect.width, never a hardcoded radius
 function releaseStick() { stickPointerId = null; tk.style.transform = 'translate(0,0)'; touchVec = { x: 0, y: 0 }; }
 tz.addEventListener('pointerdown', function(e) {
   if (stickPointerId !== null) return; // one claim at a time — a second finger NEVER takes the stick over
@@ -6236,10 +6329,20 @@ tz.addEventListener('lostpointercapture', function(e) { if (stickPointerId !== n
 document.addEventListener('visibilitychange', function() { if (document.hidden) releaseStick(); }); // v35: tab hidden mid-press — the matching pointerup may never arrive
 function bindHold(id, prop) { const el = document.getElementById(id); const on = function(e) { if (e) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); } if (activeGame) activeGame.player[prop] = true; }; const off = function(e) { if (e && e.stopPropagation) e.stopPropagation(); if (activeGame) activeGame.player[prop] = false; }; el.addEventListener('mousedown', on); el.addEventListener('touchstart', on, { passive: false }); el.addEventListener('mouseup', off); el.addEventListener('touchend', off); el.addEventListener('mouseleave', off); } // v35: stopPropagation — a button touch is consumed by the button, full stop; it can never bubble into any steering listener
 bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindHold('btnFireRocket', '_touchRocket'); // v29: holding the touch rocket button now polls like holding R (its onclick tap still works too)
+// v39 WS2: touch ROLL buttons — a roll is a discrete trigger, not a hold, so
+// these use a tap binder (pointerdown primary; mousedown/touchstart deduped
+// by a 400ms window so one physical tap can never fire twice). They call the
+// SAME startRoll() as the Q/F keys. Like bindHold they stopPropagation, and
+// they write no steering state at all — the v35 invariant (only the claimed
+// stick finger steers) is untouched.
+function bindTap(id, fn) { const el = document.getElementById(id); if (!el) return; let last = 0; const fire = function(e) { if (e) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); } const now = performance.now(); if (now - last < 400) return; last = now; fn(); }; el.addEventListener('pointerdown', fire); el.addEventListener('mousedown', fire); el.addEventListener('touchstart', fire, { passive: false }); }
+bindTap('btnRollLeft', function() { startRoll(-1); });
+bindTap('btnRollRight', function() { startRoll(1); });
 // ---- v32 touch button layout editor ----
 // The mission touch controls: the FIXED-position joystick base (#touchZone,
-// bottom-left) plus the four HUD action buttons (in the .action-btns flex row,
-// bottom-right). The joystick knob is centered inside the base wherever the
+// bottom-left) plus the HUD action buttons (in the .action-btns flex row,
+// bottom-right — the four hold buttons plus, since v39 WS2, the two tap ROLL
+// buttons in their .roll-stack at the row's left end). The joystick knob is centered inside the base wherever the
 // base sits, and the stick math reads the base's live rect, so the base is
 // draggable as a whole. Positions are stored as top-left percentages of the
 // viewport in state.touchLayout[key] = {x, y}; state.touchBtnScale scales all
@@ -6247,6 +6350,8 @@ bindHold('btnFireGun', '_touchFire'); bindHold('btnBoost', '_touchBoost'); bindH
 // top-left origin, so the stored corner stays the visual corner).
 const TOUCH_CONTROLS = [
   { key: 'stick', id: 'touchZone', label: '', def: { x: 2, y: 70 } },
+  { key: 'rollL', id: 'btnRollLeft', label: '⟲ ROLL', def: { x: 44, y: 79 } }, // v39 WS2: stacked just left of the FIRE cluster for right-thumb reach
+  { key: 'rollR', id: 'btnRollRight', label: 'ROLL ⟳', def: { x: 44, y: 88 } },
   { key: 'fire', id: 'btnFireGun', label: 'FIRE GUN', def: { x: 55, y: 90 } },
   { key: 'rocket', id: 'btnFireRocket', label: 'ROCKET (RDY)', def: { x: 66, y: 90 } },
   { key: 'autoaim', id: 'btnAutoAim', label: 'AUTO-AIM (RDY)', def: { x: 79, y: 90 } },
@@ -6268,7 +6373,7 @@ function applyTouchLayout() {
     if (c.key === 'stick') {
       const knob = document.getElementById('touchKnob');
       if (on) {
-        const px = Math.round(110 * s), k = Math.round(40 * s);
+        const px = Math.round(132 * s), k = Math.round(48 * s); // v39 WS2: matches the enlarged 132px base / 48px knob
         el.style.width = px + 'px'; el.style.height = px + 'px';
         if (knob) { knob.style.width = k + 'px'; knob.style.height = k + 'px'; knob.style.left = Math.round((px - k) / 2) + 'px'; knob.style.top = Math.round((px - k) / 2) + 'px'; }
       } else {
@@ -6287,7 +6392,7 @@ let layoutProxies = {};
 function styleLayoutProxy(el, c) {
   const s = state.touchBtnScale || 1;
   if (c.key === 'stick') {
-    const px = Math.round(110 * s), k = Math.round(40 * s);
+    const px = Math.round(132 * s), k = Math.round(48 * s); // v39 WS2: enlarged stick (see applyTouchLayout)
     el.style.width = px + 'px'; el.style.height = px + 'px';
     const knob = el.firstChild; if (knob) { knob.style.width = k + 'px'; knob.style.height = k + 'px'; }
     el.style.transform = '';
