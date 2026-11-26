@@ -92,7 +92,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v18 — GALAXY FRONTIER ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v19 — TERRAIN & PLANETS ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -425,7 +425,13 @@ if (typeof THREE !== 'undefined') {
   // (the standard r160 recipe — no double tonemapping). Any failure here just leaves
   // composer null and the game renders exactly as before.
   try {
-    composer = new EffectComposer(renderer);
+    // v19: the default EffectComposer target has NO MSAA samples, so everything routed
+    // through the composer since v16 rendered without anti-aliasing (jagged edges) even
+    // though the renderer was created with antialias:true. An explicit HalfFloat target
+    // with samples: 4 restores MSAA inside the bloom pipeline; composer.setSize() on
+    // resize resizes this target and preserves its samples.
+    const composerRT = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+    composer = new EffectComposer(renderer, composerRT);
     composer.addPass(new RenderPass(scene, camera));
     bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.47, 0.55, 0.6); // v17: threshold 0.82 -> 0.6 so bloom actually engages in daylight missions, not just the dark menu // v18: initial strength matches the 0.47 menu default
     composer.addPass(bloomPass);
@@ -1800,6 +1806,10 @@ function addAirstrip() {
 }
 function addThemeProps(theme, radius) {
   const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _pos = new THREE.Vector3(), _scl = new THREE.Vector3();
+  // v19: mountain/canyon dressing sits ON the heightmap terrain (buildEnvironment
+  // stored the height function on worldGroup); other themes have flat ground at y=0.
+  const terrH = (theme === 'mountain' || theme === 'canyon') && worldGroup.userData.terrainHeightAt ? worldGroup.userData.terrainHeightAt : null;
+  function groundY(x, z) { return terrH ? terrH(x, z) : 0; }
   function scatterPts(count, rMin, rMax) {
     const pts = [];
     for (let i = 0; i < count * 2 && pts.length < count; i++) {
@@ -1835,13 +1845,13 @@ function addThemeProps(theme, radius) {
     const rockPts = scatterPts(40, 150, radius * 0.95);
     if (rockPts.length) {
       const rockIM = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0x8a5a34, roughness: 0.95 }), rockPts.length);
-      rockPts.forEach(function(rp, i) { const s = 2 + hash2(i, 7) * 5; _pos.set(rp[0], s * 0.45, rp[1]); _scl.set(s, s * 0.75, s); _q.setFromEuler(new THREE.Euler(0, hash2(i, 3) * 3.1, 0)); _m4.compose(_pos, _q, _scl); rockIM.setMatrixAt(i, _m4); });
+      rockPts.forEach(function(rp, i) { const s = 2 + hash2(i, 7) * 5; _pos.set(rp[0], groundY(rp[0], rp[1]) + s * 0.45, rp[1]); _scl.set(s, s * 0.75, s); _q.setFromEuler(new THREE.Euler(0, hash2(i, 3) * 3.1, 0)); _m4.compose(_pos, _q, _scl); rockIM.setMatrixAt(i, _m4); });
       _q.identity(); rockIM.castShadow = true; worldGroup.add(rockIM);
     }
     const cacPts = scatterPts(25, 180, radius * 0.9);
     if (cacPts.length) {
       const cacIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.85, 1.05, 8, 7), new THREE.MeshStandardMaterial({ color: 0x2f7d3a, roughness: 0.85 }), cacPts.length);
-      cacPts.forEach(function(cp2, i) { const s = 0.7 + hash2(i, 11) * 0.7; _pos.set(cp2[0], 4 * s, cp2[1]); _scl.set(1, s, 1); _m4.compose(_pos, _q, _scl); cacIM.setMatrixAt(i, _m4); });
+      cacPts.forEach(function(cp2, i) { const s = 0.7 + hash2(i, 11) * 0.7; _pos.set(cp2[0], groundY(cp2[0], cp2[1]) + 4 * s, cp2[1]); _scl.set(1, s, 1); _m4.compose(_pos, _q, _scl); cacIM.setMatrixAt(i, _m4); });
       cacIM.castShadow = true; worldGroup.add(cacIM);
     }
     const spireMats = [new THREE.MeshStandardMaterial({ color: 0x9c5426, roughness: 0.96 }), new THREE.MeshStandardMaterial({ color: 0x74371a, roughness: 0.96 })];
@@ -1850,9 +1860,10 @@ function addThemeProps(theme, radius) {
       const sx = Math.cos(sa) * sd, sz = Math.sin(sa) * sd;
       if ((Math.abs(sx) < 110 && Math.abs(sz) < 110) || (Math.abs(sx - 500) < 110 && Math.abs(sz) < 760)) continue;
       const br = 17 + hash2(si, 13) * 14, bh = 55 + hash2(si, 17) * 65, th = bh * 0.55;
-      const base = new THREE.Mesh(_coneGeo, spireMats[si % 2]); base.scale.set(br, bh, br); base.position.set(sx, bh / 2, sz); base.castShadow = true; worldGroup.add(base);
-      const top = new THREE.Mesh(_coneGeo, spireMats[(si + 1) % 2]); top.scale.set(br * 0.55, th, br * 0.55); top.position.set(sx, bh + th / 2 - 5, sz); top.castShadow = true; worldGroup.add(top);
-      obstacles.push({ x: sx, z: sz, r: br * 0.72, h: bh + th - 5 });
+      const gy = groundY(sx, sz); // v19: spire base planted on the terrain surface
+      const base = new THREE.Mesh(_coneGeo, spireMats[si % 2]); base.scale.set(br, bh, br); base.position.set(sx, gy + bh / 2, sz); base.castShadow = true; worldGroup.add(base);
+      const top = new THREE.Mesh(_coneGeo, spireMats[(si + 1) % 2]); top.scale.set(br * 0.55, th, br * 0.55); top.position.set(sx, gy + bh + th / 2 - 5, sz); top.castShadow = true; worldGroup.add(top);
+      obstacles.push({ x: sx, z: sz, r: br * 0.72, h: gy + bh + th - 5 });
     }
   } else if (theme === 'mountain') {
     // Snow-country dressing: instanced pine forest + a pale frozen lake
@@ -1860,11 +1871,11 @@ function addThemeProps(theme, radius) {
     if (pinePts.length) {
       const trunkIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.75, 4.5, 6), new THREE.MeshStandardMaterial({ color: 0x4a3826, roughness: 0.95 }), pinePts.length);
       const folIM = new THREE.InstancedMesh(_coneGeo, new THREE.MeshStandardMaterial({ color: 0x1e4d33, roughness: 0.9 }), pinePts.length);
-      pinePts.forEach(function(pp, i) { const s = 0.9 + hash2(i, 21) * 0.9; _pos.set(pp[0], 2.25 * s, pp[1]); _scl.set(s, s, s); _m4.compose(_pos, _q, _scl); trunkIM.setMatrixAt(i, _m4); _pos.y = 10 * s; _scl.set(4.6 * s, 11.5 * s, 4.6 * s); _m4.compose(_pos, _q, _scl); folIM.setMatrixAt(i, _m4); });
+      pinePts.forEach(function(pp, i) { const s = 0.9 + hash2(i, 21) * 0.9; const gy = groundY(pp[0], pp[1]); _pos.set(pp[0], gy + 2.25 * s, pp[1]); _scl.set(s, s, s); _m4.compose(_pos, _q, _scl); trunkIM.setMatrixAt(i, _m4); _pos.y = gy + 10 * s; _scl.set(4.6 * s, 11.5 * s, 4.6 * s); _m4.compose(_pos, _q, _scl); folIM.setMatrixAt(i, _m4); });
       trunkIM.castShadow = true; folIM.castShadow = true; worldGroup.add(trunkIM); worldGroup.add(folIM);
     }
     const lake = new THREE.Mesh(new THREE.CircleGeometry(130, 28), new THREE.MeshStandardMaterial({ color: 0xd9eefc, roughness: 0.22, metalness: 0.15 }));
-    lake.rotation.x = -Math.PI / 2; lake.position.set(-450, 0.35, 380); lake.receiveShadow = true; worldGroup.add(lake);
+    lake.rotation.x = -Math.PI / 2; lake.position.set(-450, groundY(-450, 380) + 0.35, 380); lake.receiveShadow = true; worldGroup.add(lake); // v19: lake hugs the terrain height
   } else if (theme === 'neon') {
     // Night-city dressing: glowing ACE billboards on poles around the skyline
     const bbMat = new THREE.MeshBasicMaterial({ map: getBillboardTexture(), side: THREE.DoubleSide });
@@ -2016,6 +2027,41 @@ function buildSpaceStation() {
   worldGroup.add(grp);
   obstacles.push({ x: SX, z: SZ, r: 55, h: SY + 42 }); // one obstacle routes bots around the whole station
 }
+// ---- Distant sky planets + comet (v19): backdrop dressing shared by both space
+// themes. Planets are visual only (no obstacles), distance-clamped to 3300 units so
+// they always stay inside the sky dome / camera far plane even at Royale radius.
+function addSkyPlanet(group, x, y, z, r, tex, tint, atmColor, ringed) {
+  const pos = new THREE.Vector3(x, y, z);
+  if (pos.length() > 3300) pos.setLength(3300);
+  const grp = new THREE.Group(); grp.position.copy(pos);
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 });
+  if (tint) mat.color.setHex(tint);
+  grp.add(new THREE.Mesh(new THREE.SphereGeometry(r, 36, 24), mat));
+  if (atmColor) { const atm = makeAtmosphere(r * 1.05, atmColor); grp.add(atm); }
+  if (ringed) { // same construction as the menu's ringed planet: flat ring in a tilted group
+    grp.rotation.z = 0.42; grp.rotation.x = 0.15;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r * 1.41, r * 2.35, 56), new THREE.MeshBasicMaterial({ color: 0xf0a6c8, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+    ring.rotation.x = -Math.PI / 2; grp.add(ring);
+  }
+  group.add(grp);
+  return grp;
+}
+let _cometTailTex = null;
+function addComet(group, radius) {
+  const grp = new THREE.Group();
+  const coreMat = new THREE.SpriteMaterial({ map: getSunTexture(), transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending });
+  coreMat.color.setRGB(1.8, 1.9, 2.0); // HDR core so the head blooms
+  const core = new THREE.Sprite(coreMat); core.scale.set(26, 26, 1); grp.add(core);
+  if (!_cometTailTex) _cometTailTex = makeCanvas(256, 32, function(ctx, w, h) { const g = ctx.createLinearGradient(0, 0, w, 0); g.addColorStop(0, 'rgba(190,230,255,0.95)'); g.addColorStop(0.4, 'rgba(150,210,255,0.45)'); g.addColorStop(1, 'rgba(140,200,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); });
+  const tailGeo = new THREE.PlaneGeometry(150, 10); tailGeo.rotateY(Math.PI / 2); // ribbon lies along local Z, bright end (u=0) at the core
+  const tail = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ map: _cometTailTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
+  tail.position.z = -82; grp.add(tail); // trails behind the direction of travel
+  grp.position.set(-radius * 1.1, 620, -radius * 0.6);
+  const vel = new THREE.Vector3(26, -4, 10);
+  grp.lookAt(grp.position.clone().add(vel));
+  group.add(grp);
+  (group.userData.drift || (group.userData.drift = [])).push({ obj: grp, vel: vel, lim: radius * 1.3 }); // animated by the drift hook next to userData.spin in the frame update
+}
 // ---- Galaxy props (v18): space maps are more than asteroids now — derelict
 // satellites, cargo pods and tumbling debris dress both space themes, orbit gains
 // crystal clusters, and nebula gets a backdrop planet + moon on the horizon.
@@ -2084,11 +2130,15 @@ function buildGalaxyProps(group, radius, opts) {
     const moonMat = (typeof getMoonTexture === 'function' && getMoonTexture()) ? new THREE.MeshStandardMaterial({ map: getMoonTexture(), roughness: 1, metalness: 0 }) : new THREE.MeshStandardMaterial({ color: 0xb089a0, roughness: 1, metalness: 0 });
     const moon = new THREE.Mesh(new THREE.SphereGeometry(40, 24, 18), moonMat);
     moon.position.set(px + 300, py + 130, pz + 220); group.add(moon);
+    // v19: the nebula sky gains a ringed planet on the opposite side + a small teal world
+    addSkyPlanet(group, radius * 0.9, 520, -radius * 0.55, 85, getRingPlanetTexture(), 0xffffff, 0xf472b6, true);
+    addSkyPlanet(group, radius * 0.35, 640, -radius * 1.05, 55, getOrbitPlanetTexture(), 0x7dd3d8, 0x2dd4bf, false);
   }
 }
 function buildSpaceEnvironment(theme, radius, density) {
   if (typeof density !== 'number') density = 1;
   worldGroup.userData.spin = [];
+  worldGroup.userData.drift = []; // v19: comet drift list, reset per build like spin
   // Env-scoped violet ambient (dies with worldGroup on rebuild). v17: the v13 env-local
   // HemisphereLight was REMOVED — the global hemiLight is now owned by applyThemeLighting
   // (nebula/orbit entries carry the violet rig), so keeping both would double the fill.
@@ -2125,7 +2175,20 @@ function buildSpaceEnvironment(theme, radius, density) {
       sp.scale.set(ns, ns * (0.55 + Math.random() * 0.3), 1);
       worldGroup.add(sp);
     }
+    if (theme === 'nebula') { // v19: green-teal + gold nebula accents break up the purple/pink/blue palette
+      const extraCols = [0x34d399, 0x2dd4bf, 0xfbbf24];
+      for (let ei = 0; ei < 3; ei++) {
+        const em = new THREE.SpriteMaterial({ map: nebTex, color: extraCols[ei], transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+        const es = new THREE.Sprite(em);
+        const ea = Math.random() * Math.PI * 2, ed = radius * 1.15;
+        es.position.set(Math.cos(ea) * ed, (Math.random() - 0.2) * radius * 0.5, Math.sin(ea) * ed);
+        const esc = radius * (0.55 + Math.random() * 0.4);
+        es.scale.set(esc, esc * 0.6, 1);
+        worldGroup.add(es);
+      }
+    }
   })();
+  addComet(worldGroup, radius); // v19: one comet streaks through both space themes
   if (theme === 'nebula') {
     // No ground in deep space: a faint additive nebula glow far below stands in for a floor
     const disc = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.4, 40), new THREE.MeshBasicMaterial({ map: getCloudTexture(), color: 0x7c3aed, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
@@ -2138,6 +2201,9 @@ function buildSpaceEnvironment(theme, radius, density) {
     planet.position.set(0, -4180, 0); worldGroup.add(planet); // surface crests at y = -180, below the flight floor — visual only, no obstacle
     const atmo = makeAtmosphere(4000 * 1.03, 0x8b7cf6); // v16: fresnel shader shell replaces the flat glow sphere
     atmo.position.copy(planet.position); worldGroup.add(atmo);
+    // v19: two distant worlds join the big below-planet in orbit skies (visual only)
+    addSkyPlanet(worldGroup, -radius * 0.8, 700, -radius * 0.9, 110, getOrbitPlanetTexture(), 0xffffff, 0x8b7cf6, false);
+    addSkyPlanet(worldGroup, radius * 1.0, 380, -radius * 0.7, 70, getRingPlanetTexture(), 0xffffff, 0xf472b6, true);
     buildSpaceStation();
     buildAsteroids(Math.floor(35 * 0.7), radius, 50, 400, [{ x: 260, z: -260, d: 110 }]); // v18: 35 x 0.7 -> 24 rocks; keep the station's airspace clear
     buildGalaxyProps(worldGroup, radius, { crystals: 6, avoid: [{ x: 260, z: -260, d: 130 }] }); // v18: satellites, cargo pods, debris + crystal clusters join orbit
@@ -2197,8 +2263,11 @@ function buildEnvironment(theme, radius, densityScale) {
   } else if (isCityTheme) {
     ground = new THREE.Mesh(new THREE.PlaneGeometry(CITY_PLANE, CITY_PLANE), new THREE.MeshStandardMaterial({ map: getCityGroundTexture(theme === 'neon'), color: 0xffffff, roughness: 0.96, metalness: 0.02 }));
   } else {
-    const gTex = getGroundTexture('noise', cfg.gBase, cfg.gLine);
-    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ map: gTex, bumpMap: gTex, bumpScale: 0.6, color: 0xffffff, roughness: 0.94, metalness: 0.02 })); // v16: noise bump so canyon/mountain ground catches raking light
+    // v19: mountain/canyon — the heightmap terrain built below IS the ground now. This
+    // flat sheet drops to y=-3 UNDER the terrain, tinted like the valley floor, purely
+    // to seal the horizon beyond the terrain's edges (it is larger than the terrain).
+    ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, roughness: 1 }));
+    ground.position.y = -3;
   }
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
   // Harbor water sheen for city themes
@@ -2222,25 +2291,82 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   // Obstacles / scenery (collision data pushed in lock-step with meshes)
   if (theme === 'mountain' || theme === 'canyon') {
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x66707e, roughness: 0.95 });
-    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf4f8ff, roughness: 0.72 });
-    const canyonMats = [0x8a4520, 0x9c5426, 0x74371a].map(function(c) { return new THREE.MeshStandardMaterial({ color: c, roughness: 0.96 }); });
-    for (let i = 0; i < 75; i++) {
-      const angle = (i * 2.39996) % (Math.PI * 2); const dist = 160 + ((i * 73) % Math.max(1, radius - 180));
-      const x = Math.cos(angle) * dist, z = Math.sin(angle) * dist; if (Math.abs(x) < 90 && Math.abs(z) < 90) continue;
-      if (Math.abs(x - 500) < 110 && Math.abs(z) < 760) continue; // airstrip corridor
-      const w = 26 + (i % 5) * 12, d = 26 + ((i * 3) % 5) * 12, h = 55 + ((i * 19) % 165);
-      if (theme === 'mountain') {
-        const mh = h * 1.4;
-        const rock = new THREE.Mesh(_coneGeo, rockMat); rock.scale.set(w * 0.9, mh, w * 0.9); rock.position.set(x, mh / 2, z); rock.castShadow = true; rock.receiveShadow = true; worldGroup.add(rock);
-        const tipH = mh * 0.34, tipR = w * 0.9 * (tipH / mh);
-        const tip = new THREE.Mesh(_coneGeo, snowMat); tip.scale.set(tipR, tipH, tipR); tip.position.set(x, mh - tipH / 2, z); worldGroup.add(tip);
-        obstacles.push({ x: x, z: z, r: w * 0.65, h: h * 1.3 });
-      } else {
-        const mesh = new THREE.Mesh(_coneGeo, canyonMats[i % canyonMats.length]); mesh.scale.set(w * 1.15, h * 1.15, d * 1.15); mesh.position.set(x, (h * 1.15) / 2, z); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
-        obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.62, h: h * 1.05 });
-      }
+    // ---- v19: real heightmap terrain replaces the old cone "mountains"/"mesas" ----
+    // The cones read as ice-cream cones, their obstacle radii/heights didn't match the
+    // visuals (jets clipped rock bases and flew through snow tips), and the snow color
+    // blew out to pure white. Terrain is a displaced plane with vertex colors, shaped
+    // by a deterministic seeded value-noise fbm so every build is identical.
+    function tHash(ix, iz) { const s = Math.sin(ix * 127.1 + iz * 311.7 + 74.7) * 43758.5453; return s - Math.floor(s); }
+    function tNoise(x, z) { // smooth value noise on an integer lattice, output 0..1
+      const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+      const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uz = fz * fz * fz * (fz * (fz * 6 - 15) + 10);
+      const a = tHash(ix, iz), b = tHash(ix + 1, iz), c = tHash(ix, iz + 1), d = tHash(ix + 1, iz + 1);
+      return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
     }
+    function tFbm(x, z) { // 4 octaves, normalized to ~0..1
+      let v = 0, amp = 1, tot = 0;
+      for (let o = 0; o < 4; o++) { v += tNoise(x, z) * amp; tot += amp; x *= 2.03; z *= 2.03; amp *= 0.5; }
+      return v / tot;
+    }
+    function tSmooth(a, b, v) { const t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
+    const terrSize = Math.max(4400, radius * 2.4), terrHalf = terrSize / 2;
+    function terrainHeightAt(x, z) {
+      const dist = Math.hypot(x, z);
+      const mask = tSmooth(0.35, 0.95, dist / terrHalf); // 0 in the arena centre, 1 at the rim — peaks frame the arena
+      const base = tFbm(x * 0.0016, z * 0.0016);
+      const rolling = tFbm(x * 0.005 + 31.4, z * 0.005 + 17.9) * 35; // gentle low ground, max ~35
+      let shaped;
+      if (theme === 'mountain') shaped = Math.pow(base, 1.6) * 340;
+      else { const v = base; shaped = Math.min(v * 260, 150 + v * 40); } // canyon: plateau() flattens the tops into mesas
+      let h = rolling * (1 - mask) + (shaped + rolling * 0.35) * mask;
+      // Airstrip corridor (runway at x=500, |z|<700, tower/hangars to x~605): flatten to ~5%
+      const corr = 0.05 + 0.95 * Math.max(tSmooth(130, 200, Math.abs(x - 500)), tSmooth(800, 920, Math.abs(z)));
+      const spawn = tSmooth(150, 260, dist); // flat spawn disc at origin
+      return h * corr * spawn;
+    }
+    worldGroup.userData.terrainHeightAt = terrainHeightAt; // addThemeProps sits its dressing on the terrain via this
+    const terrGeo = new THREE.PlaneGeometry(terrSize, terrSize, 150, 150);
+    terrGeo.rotateX(-Math.PI / 2);
+    const tp = terrGeo.attributes.position;
+    for (let vi = 0; vi < tp.count; vi++) tp.setY(vi, terrainHeightAt(tp.getX(vi), tp.getZ(vi)));
+    terrGeo.computeVertexNormals();
+    const tn = terrGeo.attributes.normal;
+    const terrCols = new Float32Array(tp.count * 3);
+    const cValley = new THREE.Color(0x5a6b52), cRock = new THREE.Color(0x6e6a63), cSnow = new THREE.Color(0xdfe9f4); // snow toned down from blow-out 0xf4f8ff
+    const strata = [0x8a4520, 0x9c5426, 0x74371a, 0xa8683a].map(function(c) { return new THREE.Color(c); });
+    const cTop = new THREE.Color(0xb07a48);
+    const tmpC = new THREE.Color();
+    for (let vi = 0; vi < tp.count; vi++) {
+      const vx = tp.getX(vi), vy = tp.getY(vi), vz = tp.getZ(vi);
+      const slope = 1 - tn.getY(vi); // 0 = flat, grows on steep faces
+      if (theme === 'mountain') {
+        tmpC.copy(cValley).lerp(cRock, tSmooth(0.06, 0.38, slope) * 0.85 + tSmooth(60, 160, vy) * 0.15);
+        const snowline = 130 + (tFbm(vx * 0.01, vz * 0.01) - 0.5) * 50; // noisy snowline (+/-25)
+        const snowAmt = tSmooth(snowline - 18, snowline + 18, vy) * (1 - tSmooth(0.40, 0.55, slope)); // steep faces stay rock
+        tmpC.lerp(cSnow, snowAmt);
+      } else {
+        const band = Math.floor((vy + (tFbm(vx * 0.01, vz * 0.01) - 0.5) * 20) / 28);
+        tmpC.copy(strata[((band % 4) + 4) % 4]);
+        if (slope < 0.15) tmpC.lerp(cTop, 0.5 * (1 - slope / 0.15)); // lighter mesa tops
+        tmpC.offsetHSL(0, 0, (tHash(vi, 7) - 0.5) * 0.02); // faint per-vertex variation
+      }
+      terrCols[vi * 3] = tmpC.r; terrCols[vi * 3 + 1] = tmpC.g; terrCols[vi * 3 + 2] = tmpC.b;
+    }
+    terrGeo.setAttribute('color', new THREE.BufferAttribute(terrCols, 3));
+    const terrain = new THREE.Mesh(terrGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.02 }));
+    terrain.receiveShadow = true; worldGroup.add(terrain);
+    // Invisible peak guards: the terrain mesh itself isn't an obstacle (like the old
+    // ground), but the big rim peaks get collision columns so bot weaving and the
+    // player collision stay honest around them. Centre is flat and bots cruise at
+    // y 150-370, so these only matter near the arena rim.
+    const guards = [];
+    for (let gx = -terrHalf + 90; gx < terrHalf; gx += 180) for (let gz = -terrHalf + 90; gz < terrHalf; gz += 180) {
+      if (Math.hypot(gx, gz) < radius * 0.55) continue;
+      const gh = terrainHeightAt(gx, gz);
+      if (gh > 120) guards.push({ x: gx, z: gz, r: 130, h: gh });
+    }
+    guards.sort(function(a2, b2) { return b2.h - a2.h; });
+    for (let gi2 = 0; gi2 < Math.min(16, guards.length); gi2++) obstacles.push(guards[gi2]);
   } else if (isSpace) {
     buildSpaceEnvironment(theme, radius, density);
   } else {
@@ -2898,6 +3024,16 @@ function animate(now) {
   if (worldGroup && worldGroup.userData.spin) { // space dressing (v13): slow asteroid tumble + station ring rotation, same env-hook pattern as clouds/water
     const spinArr = worldGroup.userData.spin;
     for (let spi = 0; spi < spinArr.length; spi++) { const sm = spinArr[spi]; sm.rotation.x += (sm.userData.svx || 0) * dt; sm.rotation.y += (sm.userData.svy || 0) * dt; }
+  }
+  if (worldGroup && worldGroup.userData.drift) { // v19: comet drift — translate along velocity, wrap inside a +-lim box so it loops the arena forever
+    const driftArr = worldGroup.userData.drift;
+    for (let dri = 0; dri < driftArr.length; dri++) {
+      const de = driftArr[dri]; de.obj.position.addScaledVector(de.vel, dt);
+      const dp = de.obj.position, dl = de.lim;
+      if (dp.x > dl) dp.x = -dl; else if (dp.x < -dl) dp.x = dl;
+      if (dp.z > dl) dp.z = -dl; else if (dp.z < -dl) dp.z = dl;
+      if (dp.y > 950) dp.y = -80; else if (dp.y < -120) dp.y = 920;
+    }
   }
   // Stable chase camera: offset built from heading/pitch only (roll excluded), world-up preserved so the view never barrel-rolls
   camera.up.set(0, 1, 0);
