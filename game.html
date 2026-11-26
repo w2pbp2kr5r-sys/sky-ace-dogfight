@@ -268,7 +268,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v37 — IMPACT ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v38 — GROUND TRUTH ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -493,7 +493,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 37; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 38; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -3162,7 +3162,7 @@ function buildSpaceEnvironment(theme, radius, density) {
     // No ground in deep space: a faint additive nebula glow far below stands in for a floor
     const disc = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.4, 40), new THREE.MeshBasicMaterial({ map: getCloudTexture(), color: 0x7c3aed, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }));
     disc.rotation.x = -Math.PI / 2; disc.position.y = -140; worldGroup.add(disc);
-    buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), radius, 40, 380, null); // density 0.22 at r=1300: 70 -> ~15 rocks (v18: Gun Game thinned again — props carry the scene now)
+    buildAsteroids(Math.max(10, Math.round(Math.max(60, Math.min(130, Math.round(70 * radius / 1300))) * density)), density < 1 ? 1700 : radius, 40, 380, null); // density 0.22 at r=1300: 70 -> ~15 rocks (v18: Gun Game thinned again — props carry the scene now) // v38 FIX 2: density < 1 IS the Gun Game call (the only sub-1 density startMission ever passes) — its arena fence moved 1300 -> 1700, so its rocks scatter over the wider disc too; the COUNT formula still reads the original radius, so the rock count is unchanged, just spread thinner. Campaign nebula chapters (density 1) keep the 1300 scatter inside their 2100 fence
     buildCrystalSpires(radius, density < 1 ? 6 : 12);
     buildGalaxyProps(worldGroup, radius, { backdrop: true }); // v18: satellites, cargo pods, debris + a backdrop planet for nebula skies
     // v21: the nebula sky fills out — a large banded gas giant, a red rocky world and a
@@ -3651,7 +3651,7 @@ function buildEnvironment(theme, radius, densityScale) {
     // v19: mountain/canyon — the heightmap terrain built below IS the ground now. This
     // flat sheet drops to y=-3 UNDER the terrain, tinted like the valley floor, purely
     // to seal the horizon beyond the terrain's edges (it is larger than the terrain).
-    ground = new THREE.Mesh(new THREE.CircleGeometry(3150, 48), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, map: makeDetailNoiseTexture(140), roughness: 1 })); // v28: finer grain repeat on the flat valley sheet (it had a plain color material) // v36: a 2750-radius disc (was a 4550 square) // v37 J3: widened to 3150 so the sheet still passes UNDER the new 2900 fence with margin (and stays inside the 3770 sky dome)
+    ground = new THREE.Mesh(new THREE.CircleGeometry(3650, 48), new THREE.MeshStandardMaterial({ color: theme === 'mountain' ? 0x5f6d58 : 0x7c3f1e, map: makeDetailNoiseTexture(140), roughness: 1 })); // v28: finer grain repeat on the flat valley sheet (it had a plain color material) // v36: a 2750-radius disc (was a 4550 square) // v37 J3: widened to 3150 so the sheet still passes UNDER the new 2900 fence with margin (and stays inside the 3770 sky dome) // v38 FIX 2: widened again 3150 -> 3650 for the 3400 fence — at 3150 the sheet would have ENDED 250 units inside the new fence, leaving the fence's base ring and wall band floating over void on the annulus in between; 3650 restores the v37 relationship (sheet passes under the fence with margin, still inside the 3770 dome)
     ground.position.y = -3;
   }
   if (ground) { ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground); }
@@ -3662,7 +3662,7 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   // Distant mountain ring silhouette around the play area (surface themes only — floating cones would break the space look)
   if (!isSpace) {
-  const ringR = (theme === 'mountain' || theme === 'canyon') ? 3600 : Math.min(radius * 1.85, 3700); // v36: on terrain themes the silhouette ring moves OUT past the border (its 520-900-wide cones would otherwise straddle the fence) // v37 J3: 3400 -> 3600 with the 2900 fence, so the cones (inner edge >= ~3150) never crowd it — silhouettes stay OUTSIDE the arena
+  const ringR = (theme === 'mountain' || theme === 'canyon') ? 3950 : Math.max(2650, Math.min(radius * 1.85, 3700)); // v36: on terrain themes the silhouette ring moves OUT past the border (its 520-900-wide cones would otherwise straddle the fence) // v37 J3: 3400 -> 3600 with the 2900 fence // v38 FIX 2: terrain 3600 -> 3950 with the 3400 fence (cone inner edge >= ~3500 stays outside it), and the flat-theme ring gets a 2650 floor so its cones (inner edge ~2200) stay outside the new 2100 city/space fence instead of straddling it
   const ringCol = new THREE.Color(cfg.fog); ringCol.lerp(new THREE.Color(cfg.ground), 0.38);
   const ringMat = new THREE.MeshBasicMaterial({ color: ringCol });
   for (let ri = 0; ri < 16; ri++) {
@@ -3809,16 +3809,27 @@ function buildEnvironment(theme, radius, densityScale) {
   }
   if (!isSpace) addAirstrip(); // a runway makes no sense floating in deep space (and its fixed obstacles would be invisible traps)
   addThemeProps(theme, radius);
-  // v36: the border radius is per-theme. Flat and space themes keep the
-  // combat radius (1300, Royale 2400 — storm-driven, unchanged). Terrain
-  // themes move the fence OUTSIDE the mountains: terrHalf (2200) + 700 =
-  // 2900 (v37 J3, widened from v36's +200/2400), with the rim melt (see
-  // terrainHeightAt) guaranteeing no peak — corner wedges included —
-  // reaches it: all real terrain is flat by 2450, leaving a foothills
-  // apron between the ranges and the fence. The fence, its draped base
-  // ring and BOTH enforcement loops (player + bots, via activeGame.borderR)
-  // all read this one number.
-  const borderR = (theme === 'mountain' || theme === 'canyon') ? (Math.max(4400, radius * 2.4) / 2 + 700) : radius; // v37 J3: terrain fence pushed out again, 2400 -> 2900 (terrHalf 2200 + 700), so the full ranges read as scenery inside the arena; the rim melt (flat by 2450) is unchanged and independent of this number
+  // v36: the border radius is per-theme. Terrain themes move the fence
+  // OUTSIDE the mountains, with the rim melt (see terrainHeightAt)
+  // guaranteeing no peak — corner wedges included — reaches it: all real
+  // terrain is flat by 2450, leaving a foothills apron between the ranges
+  // and the fence. The fence, its draped base ring and BOTH enforcement
+  // loops (player + bots, via activeGame.borderR) all read this one number.
+  // v38 FIX 2: the fence moves out EVERYWHERE (Jayce: "you still haven't
+  // made the border farther out" — correct: v36/v37 only ever moved the
+  // TERRAIN fence; flat and space themes sat at the raw combat radius).
+  //   mountain/canyon: terrHalf (2200) + 1200 = 3400 (was +700/2900)
+  //   city/neon + space chapters (campaign / waves / duel): 2100 (was 1300)
+  //     — the city ground plane is 4800 wide (half 2400 > 2100) and the
+  //     harbor water reaches x=2860, so the fenced disc never shows void
+  //   Gun Game (nebula arena): 1700, asteroid scatter widened to match
+  //   Ranked Royale: 2400, UNCHANGED (storm-driven design)
+  // currentMode here is the mode startMission is building for (the duel
+  // path enters as 'campaign', which is exactly the treatment it wants).
+  const borderR = currentMode === 'royale' ? radius
+    : (theme === 'mountain' || theme === 'canyon') ? (Math.max(4400, radius * 2.4) / 2 + 1200)
+    : (currentMode === 'gungame') ? 1700
+    : 2100;
   worldGroup.userData.borderR = borderR;
   buildMapBorder(theme, borderR); // v35: every map gets its visible energy-fence border at the combat radius (added to worldGroup, so it is created/removed with the environment per mission — never in the menu scene)
   buildAmbientLife(theme); // v36: traffic, people, the train, cabins, drones, haulers — registered into `ambient`, ticked by updateAmbientLife in animate
@@ -3902,7 +3913,7 @@ function startMission() {
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
   const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
   const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId, true, currentMode === 'gungame' ? null : getEquippedSkin()); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false, rollT: -1, rollDir: 0, rollAnim: 0, rollLockT: 0 }, entities: [], bullets: [], rockets: [], rings: [], mapRadius: mapRadius, borderR: (worldGroup.userData && worldGroup.userData.borderR) || mapRadius, zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 }; // v35: mapRadius rides along for border enforcement (the v35 energy fence) // v36: borderR is the per-theme fence radius buildEnvironment just built (2900 on terrain themes since v37 J3, = mapRadius elsewhere)
+  activeGame = { mode: currentMode, onlineRoyale: onlineRoyale, mmMatch: mmCfg, puppets: mmCfg ? new Map() : null, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, lockTarget: null, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0, lastHitBy: null, lastHitAt: -99, deaths: 0, respawnT: 0, spawnProtT: 0, _touchRocket: false, rollT: -1, rollDir: 0, rollAnim: 0, rollLockT: 0 }, entities: [], bullets: [], rockets: [], rings: [], mapRadius: mapRadius, borderR: (worldGroup.userData && worldGroup.userData.borderR) || mapRadius, zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 }; // v35: mapRadius rides along for border enforcement (the v35 energy fence) // v36: borderR is the per-theme fence radius buildEnvironment just built (v38 FIX 2: 3400 terrain / 2100 flat+space chapters / 1700 Gun Game / 2400 Royale)
   activeGame.playerTopSpeed = activeGame.player.spd * (currentMode === 'gungame' ? GUN_GAME_TIERS[activeGame.player.ggTier].spd : 1); // v31: bot speed anchor — the player's sustained top speed this mission, derived exactly as the flight update derives curSpd (p.spd already carries jet spd x speed-upgrade multiplier; the tier spd is the Gun Game mode multiplier)
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : (currentMode === 'waves' ? 0 : (mmCfg ? Math.max(0, 50 - mmCfg.matchPlayers.length) : (onlineRoyale ? 48 : 49)))); // v30: waves spawn through the wave system below, not this loop // v18: online royale swaps one bot for the human rival (still 50 pilots) // v25: matchmade royale fills the rest of the 50 with ranked bots
@@ -4634,7 +4645,17 @@ function animate(now) {
       else { playerDestroyed('AIRCRAFT DESTROYED', 'You crashed into the ground and exploded!'); } // v37 J2: was the one crash that DID explode — now it also gets the shake + 1.1s show via the shared funnel
       return;
     }
-    p.mesh.position.y = Math.max(12, Math.min(950, p.mesh.position.y));
+    // v38 FIX 1: the floor clamp is 1.5, NOT 12. With the old 12 floor the
+    // clamp restored y to 12 every frame, so the next frame's integration
+    // started from 12 again and the surface test above (threshold surfH + 2)
+    // needed a single-frame drop of >10 units to EVER fire on flat ground —
+    // impossible (max dive ≈ 2-3 units/frame), which is why streets and
+    // harbor water were immortal while mountains (surfH > ~9, threshold
+    // above the floor) worked. At 1.5 the jet genuinely descends through
+    // the threshold (12 -> 10.2 -> 8.4 -> ... -> 1.2 <= 2 -> crash), and
+    // low flight at y 3-11 — under the old floor, above the threshold —
+    // is legal. Numerically simulated at 30/60/120 fps before shipping.
+    p.mesh.position.y = Math.max(1.5, Math.min(950, p.mesh.position.y));
   }
   if (p.respawnT <= 0) for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = p.mesh.position.x - o.x, dz = p.mesh.position.z - o.z; if (p.mesh.position.y < o.h && (dx * dx + dz * dz) < (o.r * o.r)) { if (activeGame.mode === 'gungame') { gungamePlayerDown('crash'); } else { playerDestroyed('AIRCRAFT DESTROYED', 'You collided with a structure and exploded!'); } return; } }
   if (p.respawnT <= 0) {
@@ -5565,7 +5586,7 @@ function updateWingman(dt) {
   // Terrain impact is the only way GHOST goes down (nothing shoots at him): he ejects
   const wSurf = surfaceHeightAt(wp.x, wp.z);
   if (wSurf !== null && wp.y <= wSurf + 2) { ejectWingman(); return; }
-  wp.y = Math.max(12, Math.min(950, wp.y));
+  wp.y = Math.max(1.5, Math.min(950, wp.y)); // v38 FIX 1: same floor drop as the player (was 12) — formation can hold at low level and the eject test above can actually fire on flat ground
   { const bR = g.borderR || g.mapRadius || 1300; const bd = Math.hypot(wp.x, wp.z); // border: same soft push as the bots
     if (bd > bR) { const over = bd - bR; const push = (30 + over * 1.2) * dt; wp.x -= (wp.x / bd) * push; wp.z -= (wp.z / bd) * push; const hC = Math.atan2(-wp.x, -wp.z); w.heading = angleWrap(w.heading + clampNum(angleWrap(hC - w.heading), -yawRate * dt * 1.5, yawRate * dt * 1.5)); const nd = Math.hypot(wp.x, wp.z); if (nd > bR + 60) { const bs = (bR + 60) / nd; wp.x *= bs; wp.z *= bs; } } }
   for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = wp.x - o.x, dz = wp.z - o.z; const d2 = dx * dx + dz * dz; if (wp.y < o.h && d2 < o.r * o.r && d2 > 0.01) { const d = Math.sqrt(d2); wp.x = o.x + (dx / d) * o.r; wp.z = o.z + (dz / d) * o.r; } } // building scrape: push out, no damage (the bot rule)
