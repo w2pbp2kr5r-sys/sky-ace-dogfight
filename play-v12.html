@@ -14,6 +14,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; font-family: 'Segoe UI', Roboto, Arial, sans-serif; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #070b14; color: #f1f5f9; }
   #gameCanvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(ellipse at center, transparent 58%, rgba(2,0,12,0.42) 100%); }
   .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; background: radial-gradient(circle at center, rgba(10,18,34,0.25) 0%, rgba(5,9,18,0.72) 100%); overflow-y: auto; }
   .hidden { display: none !important; }
   .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: rgba(10,12,28,0.55); border: 1px solid rgba(148,163,255,0.25); border-radius: 18px; padding: 10px 16px; backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3); box-shadow: 0 12px 40px rgba(0,0,0,0.45); }
@@ -86,11 +87,12 @@
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
+<div id="vignette" class="hidden"></div>
 <div id="targetBoxes"></div>
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v16 — NEXT-GEN GRAPHICS ★</div></div>
+    <div class="brand"><h1>NEBULA DOGFIGHT</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ NEBULA DOGFIGHT v17 — MISSION GRAPHICS ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -374,8 +376,9 @@ function awardXP(amount) {
 }
 
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
-let renderer = null, scene = null, camera = null, sunLight = null;
+let renderer = null, scene = null, camera = null, sunLight = null, hemiLight = null, fillLight = null;
 let composer = null, bloomPass = null; // v16: post-processing pipeline (UnrealBloom) — null-safe, plain rendering is the fallback
+let baseBloomStrength = 0.55, bloomQualityFactor = 1, currentThemeName = 'city'; // v17: theme-driven bloom (updateBloom = base x quality factor) + active theme for shadow tracking
 const canvas = document.getElementById('gameCanvas');
 if (typeof THREE !== 'undefined') {
   renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
@@ -421,18 +424,25 @@ if (typeof THREE !== 'undefined') {
   try {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.55, 0.82);
+    bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.55, 0.6); // v17: threshold 0.82 -> 0.6 so bloom actually engages in daylight missions, not just the dark menu
     composer.addPass(bloomPass);
     composer.addPass(new OutputPass());
   } catch (compErr) { composer = null; bloomPass = null; }
-  scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85));
+  hemiLight = new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85); scene.add(hemiLight); // v17: named so applyThemeLighting can drive it per theme
   scene.add(new THREE.AmbientLight(0xffffff, 0.18));
   sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6); sunLight.position.set(300, 600, 250);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(2048, 2048);
-  sunLight.shadow.camera.left = -600; sunLight.shadow.camera.right = 600; sunLight.shadow.camera.top = 600; sunLight.shadow.camera.bottom = -600;
+  sunLight.shadow.camera.left = -450; sunLight.shadow.camera.right = 450; sunLight.shadow.camera.top = 450; sunLight.shadow.camera.bottom = -450; // v17: tightened from +-600 — the frustum now FOLLOWS the player (see animate), so a smaller box = crisper shadows
   sunLight.shadow.camera.near = 50; sunLight.shadow.camera.far = 1800; sunLight.shadow.bias = -0.0006;
   scene.add(sunLight); scene.add(sunLight.target);
+  // v17 camera fill light: parented to the camera (camera joins the scene graph so its
+  // children get world matrices) — the player's jet is never flat-lit from behind in a
+  // mission. No shadows, mission-only (visibility toggled per frame in animate()).
+  scene.add(camera);
+  fillLight = new THREE.DirectionalLight(0xaac4ff, 0.35); fillLight.castShadow = false;
+  fillLight.position.set(0, 0, 0); fillLight.target.position.set(0, 0, -10);
+  camera.add(fillLight); camera.add(fillLight.target); fillLight.visible = false;
 } else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
 // ---- Procedural texture helpers (canvas-generated, no external assets) ----
 function makeCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; }
@@ -999,12 +1009,12 @@ function buildJetMesh(baseColor, accentColor, upg, jetId, withBurnerLight, skin)
   const paintColor = skinActive ? baseColor : (upg.hull >= 3 ? 0x232b38 : baseColor);
   const hullTex = getHullTexture(paintColor, jetId, skinActive ? skin : null);
   const hullMaps = getHullMaps(paintColor, jetId, skinActive ? skin : null);
-  const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 0.85, side: THREE.DoubleSide }; // v16: stronger panel normal detail
+  const hullProps = { color: 0xffffff, map: hullTex, normalMap: hullMaps.n, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: hullMaps.r, roughness: 1.0, metalness: 0.55, envMapIntensity: 1.25, side: THREE.DoubleSide }; // v16: stronger panel normal detail; v17: env reflections up (0.85 -> 1.25) so paint reads at mission distance
   // v15: clearcoat physical hull for ALL jets (the PMREM env makes it cheap to look
   // good) — modest 0.25 clearcoat on bots, the hero jets (withBurnerLight: player +
   // home-screen showcase) keep the richer 0.3 coat and full env intensity.
   const hullMat = (THREE.MeshPhysicalMaterial)
-    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: withBurnerLight ? 0.3 : 0.25, clearcoatRoughness: 0.25, envMapIntensity: withBurnerLight ? 1.0 : 0.9 }))
+    ? new THREE.MeshPhysicalMaterial(Object.assign({}, hullProps, { clearcoat: withBurnerLight ? 0.3 : 0.25, clearcoatRoughness: 0.25, envMapIntensity: 1.25 })) // v17: all jets get the full 1.25 env intensity, hero and bot alike
     : new THREE.MeshStandardMaterial(hullProps);
   const armorMat = new THREE.MeshStandardMaterial({ color: 0x1c222c, metalness: 0.7, roughness: 0.5, envMapIntensity: 0.6 });
   // Control surfaces (v8): same paint, darkened ~15% so the hinge gaps read as separate panels
@@ -1575,6 +1585,7 @@ function showMenuScene() {
   if (menuGroup) menuGroup.visible = true;
   if (worldGroup) worldGroup.visible = false;
   scene.fog = null; scene.background = null;
+  baseBloomStrength = 0.55; updateBloom(); // v17: menu gets the default bloom strength back (missions set it per theme)
 }
 function animateMenuScene(dt) {
   if (!menuGroup || !menuGroup.visible) return;
@@ -1623,6 +1634,31 @@ const ENV_THEMES = {
   nebula:   { sky: 0x0d0217, fog: 0x1a0b2e, ground: 0x12041f, bColor: 0x2a1052, skyTop: '#030110', skyBot: '#2a0a4a', gBase: '#12041f', gLine: '#2a0a3a', sun: 0xd8ccff, cloud: 0xa78bfa },
   orbit:    { sky: 0x0a0618, fog: 0x1a0b2e, ground: 0x0b0620, bColor: 0x241243, skyTop: '#02010a', skyBot: '#1e0b40', gBase: '#0b0620', gLine: '#241243', sun: 0xd8ccff, cloud: 0xa78bfa }
 };
+// ---- v17: per-theme cinematic lighting. ENV_THEMES above still owns sky-dome/fog COLORS
+// (chapter sky/fog character is preserved); this table owns the LIGHT RIG — sun color /
+// intensity / direction, hemisphere colors, tone-mapping exposure, fog density — applied
+// by applyThemeLighting() at the end of every buildEnvironment(). fogDensity is the v13
+// 0.00038 x1.15 for earth themes (a touch more depth), space stays at its tuned 0.00013.
+const THEME_LIGHTING = {
+  city:     { sun: 0xffe3b3, sunInt: 1.7,  sunDir: [0.55, 0.62, 0.35],  hemiSky: 0xbfd9ff, hemiGround: 0x4a4238, hemiInt: 0.5,  exposure: 1.12, fogDensity: 0.00044 },
+  canyon:   { sun: 0xffc38a, sunInt: 1.8,  sunDir: [0.7, 0.38, 0.2],    hemiSky: 0xffd9b0, hemiGround: 0x6b3a22, hemiInt: 0.45, exposure: 1.14, fogDensity: 0.00044 },
+  mountain: { sun: 0xeaf2ff, sunInt: 1.65, sunDir: [0.35, 0.8, 0.3],    hemiSky: 0xd6e6ff, hemiGround: 0x5a6672, hemiInt: 0.55, exposure: 1.1,  fogDensity: 0.00044 },
+  neon:     { sun: 0x8fb4ff, sunInt: 0.9,  sunDir: [-0.4, 0.7, -0.3],   hemiSky: 0x2a3560, hemiGround: 0x0a0a14, hemiInt: 0.5,  exposure: 1.18, fogDensity: 0.00044 },
+  nebula:   { sun: 0xd8ccff, sunInt: 1.5,  sunDir: [0.5, 0.65, 0.45],   hemiSky: 0x6a5acd, hemiGround: 0x14042a, hemiInt: 0.6,  exposure: 1.12, fogDensity: 0.00013 },
+  orbit:    { sun: 0xf3e8ff, sunInt: 1.6,  sunDir: [-0.45, 0.6, 0.5],   hemiSky: 0x7a6fe0, hemiGround: 0x180538, hemiInt: 0.6,  exposure: 1.14, fogDensity: 0.00013 }
+};
+const _sunDirVec = (typeof THREE !== 'undefined') ? new THREE.Vector3(0.55, 0.62, 0.35).normalize() : null;
+function themeSunDir(theme) { const L = THEME_LIGHTING[theme] || THEME_LIGHTING.city; if (_sunDirVec) _sunDirVec.set(L.sunDir[0], L.sunDir[1], L.sunDir[2]).normalize(); return _sunDirVec; }
+function updateBloom() { if (bloomPass) bloomPass.strength = baseBloomStrength * bloomQualityFactor; }
+function setBloomForTheme(theme) { baseBloomStrength = (theme === 'nebula' || theme === 'orbit') ? 0.85 : (theme === 'neon' ? 0.8 : 0.5); updateBloom(); }
+function applyThemeLighting(theme) {
+  const L = THEME_LIGHTING[theme] || THEME_LIGHTING.city;
+  currentThemeName = theme;
+  if (sunLight) { sunLight.color.set(L.sun); sunLight.intensity = L.sunInt; const d = themeSunDir(theme); if (d) sunLight.position.copy(d).multiplyScalar(900); sunLight.target.position.set(0, 0, 0); }
+  if (hemiLight) { hemiLight.color.set(L.hemiSky); hemiLight.groundColor.set(L.hemiGround); hemiLight.intensity = L.hemiInt; }
+  if (renderer) renderer.toneMappingExposure = L.exposure;
+  setBloomForTheme(theme);
+}
 const _boxGeo = (typeof THREE !== 'undefined') ? new THREE.BoxGeometry(1, 1, 1) : null;
 const _coneGeo = (typeof THREE !== 'undefined') ? new THREE.ConeGeometry(1, 1, 6) : null;
 const CITY_PITCH = 150; // world units per city block; ground texture tile maps 1:1 to this
@@ -1975,9 +2011,10 @@ function buildSpaceStation() {
 function buildSpaceEnvironment(theme, radius, density) {
   if (typeof density !== 'number') density = 1;
   worldGroup.userData.spin = [];
-  // Env-scoped violet lighting (dies with worldGroup on rebuild; the global directional keeps its cfg.sun tint)
+  // Env-scoped violet ambient (dies with worldGroup on rebuild). v17: the v13 env-local
+  // HemisphereLight was REMOVED — the global hemiLight is now owned by applyThemeLighting
+  // (nebula/orbit entries carry the violet rig), so keeping both would double the fill.
   worldGroup.add(new THREE.AmbientLight(0x7c5cff, 0.55));
-  worldGroup.add(new THREE.HemisphereLight(0x8a6fe0, 0x14042a, 0.45));
   // Starfield: Points on a far shell (fog:false so the deep-space fog never washes them out)
   (function() {
     let N = theme === 'orbit' ? 1300 : 1560; if (density < 1) N += 300; // v15: star counts +30%, Gun Game gets +300 bonus stars
@@ -2033,8 +2070,9 @@ function buildEnvironment(theme, radius, densityScale) {
   scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
   const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
   const isSpace = (theme === 'nebula' || theme === 'orbit');
-  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, 0.00038);
-  if (isSpace) { scene.background = new THREE.Color(0x0a0418); scene.fog = new THREE.FogExp2(0x1a0b2e, 0.00013); } // v13 deep-space override: dark purple, low density so asteroids stay visible out to ~radius*1.2
+  const _tl = THEME_LIGHTING[theme] || THEME_LIGHTING.city; // v17: fog density is theme-driven (earth 0.00038 x1.15, space unchanged)
+  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, _tl.fogDensity);
+  if (isSpace) { scene.background = new THREE.Color(0x0a0418); scene.fog = new THREE.FogExp2(0x1a0b2e, _tl.fogDensity); } // v13 deep-space override: dark purple, low density so asteroids stay visible out to ~radius*1.2
   // Gradient sky dome (BackSide sphere with canvas gradient)
   const skyR = Math.min(radius * 2.9, 4200);
   const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot), side: THREE.BackSide, fog: false, depthWrite: false }));
@@ -2042,11 +2080,11 @@ function buildEnvironment(theme, radius, densityScale) {
   // Sun disc sprite aligned with the directional light
   if (!isSpace) { // space themes have no sun disc — the starfield + nebulae carry the sky
     const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSunTexture(), color: cfg.sun, fog: false, depthWrite: false, transparent: true }));
-    sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun);
+    const _sd = themeSunDir(theme); if (_sd) sun.position.copy(_sd).multiplyScalar(skyR * 0.92); else sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun); // v17: disc sits where the theme's light actually comes from
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: getFlareTexture(), color: cfg.sun, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, fog: false, depthWrite: false }));
     flare.position.copy(sun.position); flare.scale.setScalar(Math.min(radius * 1.3, 1150)); worldGroup.add(flare);
   }
-  if (sunLight) { sunLight.position.set(radius * 0.35, radius * 0.7, radius * 0.3); sunLight.target.position.set(0, 0, 0); sunLight.color.set(cfg.sun); }
+  applyThemeLighting(theme); // v17: sun/hemi/exposure/bloom all come from THEME_LIGHTING now (shadow tracking in animate() re-aims the sun at the player from here)
   // Clouds: soft radial-gradient billboards, slow drift (animated in animate())
   const cloudTex = getCloudTexture(); const clouds = [];
   const cloudCount = isSpace ? 0 : 110; // no weather in space — nebula sprites replace the clouds (clouds array stays empty, drift hook no-ops)
@@ -2059,6 +2097,16 @@ function buildEnvironment(theme, radius, densityScale) {
     worldGroup.add(sp); clouds.push(sp);
   }
   worldGroup.userData.clouds = clouds; worldGroup.userData.cloudBound = Math.min(radius * 2.1, 3600);
+  if (!isSpace) { // v17: distant "cloud sea" — a second ring of huge, faint billboards at the horizon (earth themes only) so the sky meets the map edge like a real aerial vista. They ride the same clouds array, so the existing drift hook animates them and worldGroup cleanup removes them.
+    for (let hi = 0; hi < 24; hi++) {
+      const hm = new THREE.SpriteMaterial({ map: cloudTex, color: cfg.cloud, transparent: true, opacity: 0.05 + Math.random() * 0.05, depthWrite: false, fog: false });
+      const hs = new THREE.Sprite(hm);
+      const ha = (hi / 24) * Math.PI * 2 + Math.random() * 0.25;
+      hs.position.set(Math.cos(ha) * 2000, 500 + Math.random() * 200, Math.sin(ha) * 2000);
+      hs.scale.set(700 + Math.random() * 400, 120 + Math.random() * 80, 1);
+      worldGroup.add(hs); clouds.push(hs);
+    }
+  }
   // Ground: city themes use a road-grid texture exactly aligned with the building blocks; other themes use natural noise
   const isCityTheme = (theme === 'city' || theme === 'neon');
   let ground = null;
@@ -2132,6 +2180,7 @@ function startMission() {
   if (menuGroup) menuGroup.visible = false;
   document.getElementById('menuScreen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('vignette').classList.remove('hidden'); // v17: cinematic vignette lives and dies with the HUD
   document.getElementById('touchZone').classList.toggle('hidden', !state.mobileTouch);
   document.getElementById('minimap').classList.toggle('hidden', currentMode !== 'royale');
   const jetCfg = JETS.find(function(j) { return j.id === state.selectedJet; }) || JETS[0];
@@ -2300,7 +2349,8 @@ function togglePause(forceOpen) {
 function endMatch(victory, title, summary) {
   const modeAtEnd = currentMode; const chapterAtEnd = activeGame ? activeGame.chapter : Number(chSel.value);
   activeGame = null; paused = false; clearSmoke();
-  document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
+  document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = '';
+  applyFov(); // v17: snap FOV back to the player's setting (a boost kick may have left it wide)
   document.getElementById('statusTitle').textContent = title;
   let nextBtn = '';
   if (victory && modeAtEnd === 'campaign' && chapterAtEnd < 10) nextBtn = '<button class="btn btn-play" onclick="nextChapter()">Next Chapter</button>';
@@ -2308,7 +2358,7 @@ function endMatch(victory, title, summary) {
   document.getElementById('statusModal').classList.remove('hidden');
 }
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
-function returnHome() { activeGame = null; paused = false; clearSmoke(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); updateTopUI(); showMenuScene(); }
+function returnHome() { activeGame = null; paused = false; clearSmoke(); closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('vignette').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); applyFov(); updateTopUI(); showMenuScene(); }
 let lastTime = performance.now();
 let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
@@ -2377,6 +2427,7 @@ const SMOKE_CAP = 320;
 function spawnSmokePuff(x, y, z, o) {
   if (!scene || smokePool.length >= SMOKE_CAP) return;
   const mat = new THREE.SpriteMaterial({ map: getSmokeTexture(), color: o.color, transparent: true, opacity: 0, depthWrite: false });
+  if (o.hdr) mat.color.multiplyScalar(o.hdr); // v17: HDR color boost so explosion cores cross the bloom threshold
   const sp = new THREE.Sprite(mat);
   sp.position.set(x, y, z); sp.scale.setScalar(o.size);
   scene.add(sp);
@@ -2444,7 +2495,7 @@ function spawnImpactFx(pos) {
   if (!activeGame || !activeGame.player) return;
   if (pos.distanceTo(activeGame.player.mesh.position) > 600 && pos.distanceTo(camera.position) > 600) return;
   for (let s = 0; s < 5; s++) spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xffa63d, size: 0.8, grow: 1.5, life: 0.25, opacity: 0.9, vx: (Math.random() - 0.5) * 22, vy: (Math.random() - 0.5) * 22, vz: (Math.random() - 0.5) * 22 });
-  spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.2, grow: 3, life: 0.12, opacity: 0.95, vx: 0, vy: 0, vz: 0 });
+  spawnSmokePuff(pos.x, pos.y, pos.z, { color: 0xfff2b0, size: 2.2, grow: 3, life: 0.12, opacity: 0.95, vx: 0, vy: 0, vz: 0, hdr: 1.6 }); // v17: impact flash blooms
 }
 // v16: tail-strobe blink — brief white flash every 1.2s, driven off a shared clock so
 // it works in the menu scene and in missions alike. Material is unique per jet.
@@ -2462,8 +2513,21 @@ function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
   if (!renderer) return;
+  if (fillLight) fillLight.visible = !!activeGame; // v17: camera fill light is mission-only
   if (!activeGame) { animateMenuScene(dt); renderFrame(); return; }
   if (paused) { renderFrame(); return; }
+  // v17 WS1 — SHADOWS THAT FOLLOW THE PLAYER: the sun's +-450 shadow frustum used to sit
+  // fixed on the map origin, so shadows vanished a few hundred units into a mission. Now
+  // the frustum anchor tracks the player, snapped to a 50-unit grid (snapping is what
+  // stops the shadow map from swimming/shimmering as it moves). The light rides 800
+  // units out along the active theme's sun direction; depth range 160..1440 sits well
+  // inside the shadow camera's near 50 / far 1800.
+  if (sunLight && activeGame.player) {
+    const pp = activeGame.player.mesh.position;
+    const ax = Math.round(pp.x / 50) * 50, ay = Math.round(pp.y / 50) * 50, az = Math.round(pp.z / 50) * 50;
+    const sd = themeSunDir(currentThemeName);
+    if (sd) { sunLight.position.set(ax + sd.x * 800, ay + sd.y * 800, az + sd.z * 800); sunLight.target.position.set(ax, ay, az); sunLight.target.updateMatrixWorld(); }
+  }
   if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 4.5, -13).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderFrame(); return; }
   const p = activeGame.player;
   gameTime += dt;
@@ -2747,6 +2811,10 @@ function animate(now) {
     shakeT = Math.max(0, shakeT - dt * 1.7);
   }
   camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(20)));
+  // v17: boost FOV kick — while the afterburner is lit the view widens by 7 degrees for
+  // a sense of speed, easing back to the player's FOV setting when they let off.
+  const targetFov = (state.fov || 65) + ((boosting && p.respawnT <= 0) ? 7 : 0);
+  if (Math.abs(camera.fov - targetFov) > 0.01) { camera.fov += (targetFov - camera.fov) * Math.min(1, 6 * dt); if (Math.abs(camera.fov - targetFov) <= 0.01) camera.fov = targetFov; camera.updateProjectionMatrix(); }
   updateStrobe(p.mesh); activeGame.entities.forEach(function(e) { updateStrobe(e.mesh); }); // v16: strobe blink
   updateHUD(curSpd); renderFrame();
 }
@@ -2788,7 +2856,7 @@ function gungamePlayerDown(cause) {
     if (killer.kills >= 15) { endMatch(false, 'DEFEAT', `${killer.name} reached 15 kills first!`); return; }
   }
   for (let xp = 0; xp < 18; xp++) spawnSmokePuff(p.mesh.position.x + (Math.random() - 0.5) * 6, p.mesh.position.y + (Math.random() - 0.5) * 4, p.mesh.position.z + (Math.random() - 0.5) * 6, { color: 0x222329, size: 5 + Math.random() * 3, grow: 9, life: 1.1 + Math.random() * 0.5, opacity: 0.65, vx: (Math.random() - 0.5) * 14, vy: 4 + Math.random() * 5, vz: (Math.random() - 0.5) * 14 });
-  for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8 });
+  for (let xf = 0; xf < 6; xf++) spawnSmokePuff(p.mesh.position.x, p.mesh.position.y, p.mesh.position.z, { color: 0xff7a26, size: 3.5, grow: 3, life: 0.5, opacity: 0.85, vx: (Math.random() - 0.5) * 8, vy: 3, vz: (Math.random() - 0.5) * 8, hdr: 1.6 }); // v17: fireball core blooms
   shakeT = Math.max(shakeT, 0.6); // v15: your own explosion kicks the camera
   p.deaths++; p.mesh.visible = false; p.respawnT = 2.0;
   showBanner(cause === 'crash' ? 'CRASHED — RESPAWNING IN 2s' : 'SHOT DOWN — RESPAWNING IN 2s', 2000);
@@ -2977,10 +3045,14 @@ function applyQuality() {
   const q = state.quality || 'high';
   // v16: bloom follows quality — high full strength, medium softer + cheaper composer
   // buffer, low bypasses the composer entirely (renderFrame checks quality).
+  // v17: strength itself is theme-owned (baseBloomStrength); quality only scales it.
   if (composer && bloomPass) {
-    if (q === 'medium') { bloomPass.strength = 0.4; composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }
-    else { bloomPass.strength = 0.55; composer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); }
+    // v17: quality now scales the THEME's bloom strength instead of owning it — medium
+    // keeps x0.73 of whatever the theme asked for (0.4/0.55 in the old flat scheme).
+    if (q === 'medium') { bloomQualityFactor = 0.73; composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); }
+    else { bloomQualityFactor = 1; composer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); }
     composer.setSize(window.innerWidth, window.innerHeight);
+    updateBloom();
   }
   if (q === 'medium') {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
