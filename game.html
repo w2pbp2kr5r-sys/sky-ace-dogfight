@@ -84,7 +84,7 @@
 
 <div id="menuScreen" class="screen">
   <div class="topbar">
-    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ REALISM UPDATE v3 — NEW GRAPHICS & FLIGHT ★</div></div>
+    <div class="brand"><h1>SKY ACE 3D</h1><span>Tactical Fighter Jet Dogfight</span><div style="display:inline-block;margin-top:6px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#231a00;font-weight:800;font-size:0.82rem;letter-spacing:0.4px;padding:6px 14px;border-radius:999px;border:2px solid #ffe9a8;box-shadow:0 0 14px rgba(245,158,11,0.65);">★ BOT UPDATE v4 — TOUGHER BOTS, SMARTER AI ★</div></div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/250 XP)</div>
       <div class="pill rank" id="uiRank">Rank: Silver (0 RP)</div>
@@ -759,10 +759,11 @@ function startMission() {
     const randJet = JETS[i % JETS.length];
     const botUpg = currentMode === 'royale' ? { hull: 1 + (i % 4), damage: 1 + (i % 3), agility: 1 + (i % 3), speed: 1 } : { hull: 1, damage: 1, agility: 1, speed: 1 };
     const m = buildJetMesh(randJet.color, randJet.accent, botUpg, randJet.id); m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
-    let botHp = currentMode === 'campaign' ? (55 + ch.num * 10) : (currentMode === 'gungame' ? 75 : 165);
     let skill = diff === 'rookie' ? 0.55 : (diff === 'ace' ? 1.15 : 0.85);
     if (currentMode === 'royale') { const rName = getRankName(state.rp); skill = rName === 'Silver' ? 0.65 : (rName === 'Gold' ? 0.9 : (rName === 'Diamond' ? 1.15 : 1.35)); }
-    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0 });
+    const botBaseHp = currentMode === 'campaign' ? (170 + 30 * ch.num) : (currentMode === 'gungame' ? 230 : 380);
+    const botHp = Math.round(botBaseHp * (0.9 + 0.2 * skill));
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0, lastHitAt: -99, lastAttacker: null, aiState: 'engage', stateT: 0, retargetT: Math.random() * 2, weaveSeed: Math.random() * 100, tgt: null, closeT: 0, engageT: 0, lastDealtHitAt: -99, waypoint: null, evadeDur: 3, _seenHitAt: -99, lastEvadeEnd: -99 });
   }
   if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
   paused = false;
@@ -814,6 +815,7 @@ function endMatch(victory, title, summary) {
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
 function returnHome() { activeGame = null; paused = false; closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); updateTopUI(); }
 let lastTime = performance.now();
+let gameTime = 0; // shared elapsed clock (seconds, accumulated from dt in animate) for AI damage tracking
 // ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
 const _flightEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ') : null;
 const _camEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ') : null;
@@ -822,6 +824,37 @@ const _camOff = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
 function angleWrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
 function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
+// ---- Bot AI helpers (v4): damage tracking, targeting, target info ----
+const _botTmpFwd = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+function noteBotHit(ent, ownerId) {
+  ent.lastHitAt = gameTime; ent.lastAttacker = ownerId;
+  if (ownerId !== 'player' && ownerId !== 'remote' && activeGame) {
+    for (let q = 0; q < activeGame.entities.length; q++) { if (activeGame.entities[q].id === ownerId) { activeGame.entities[q].lastDealtHitAt = gameTime; break; } }
+  }
+}
+function botIsAliveTarget(t) { return t === 'player' || (!!t && !!activeGame && activeGame.entities.indexOf(t) !== -1); }
+function pickBotTarget(bot) {
+  const p = activeGame.player;
+  // Revenge (FFA modes): whoever shot me in the last 6s gets targeted 50% of retargets
+  if (activeGame.mode !== 'campaign' && bot.lastAttacker != null && (gameTime - bot.lastHitAt) < 6 && Math.random() < 0.5) {
+    if (bot.lastAttacker === 'player') return 'player';
+    const atk = activeGame.entities.find(function(e) { return e.id === bot.lastAttacker; });
+    if (atk && atk !== bot) return atk;
+  }
+  // Campaign: 65% hunt the player, 35% pick a fight with the nearest other bot
+  if (activeGame.mode === 'campaign' && Math.random() < 0.65) return 'player';
+  let best = null, bestD = Infinity;
+  const includePlayer = activeGame.mode !== 'campaign';
+  if (includePlayer) { best = 'player'; bestD = bot.mesh.position.distanceTo(p.mesh.position); }
+  for (let j = 0; j < activeGame.entities.length; j++) { const e = activeGame.entities[j]; if (e === bot || e.id === 'remote') continue; const d = bot.mesh.position.distanceTo(e.mesh.position); if (d < bestD) { bestD = d; best = e; } }
+  return best || 'player';
+}
+function botTargetInfo(bot) {
+  const t = bot.tgt;
+  if (t === 'player') { const pm = activeGame.player.mesh; _botTmpFwd.set(0, 0, 1).applyQuaternion(pm.quaternion); return { pos: pm.position, fx: _botTmpFwd.x, fz: _botTmpFwd.z }; }
+  if (t && t.mesh) { _botTmpFwd.set(0, 0, 1).applyQuaternion(t.mesh.quaternion); return { pos: t.mesh.position, fx: _botTmpFwd.x, fz: _botTmpFwd.z }; }
+  return null;
+}
 function flickerFlames(mesh, boost, dt) {
   if (!mesh || !mesh.userData.flames) return;
   const s = boost ? 1.55 : 1.0;
@@ -834,6 +867,7 @@ function animate(now) {
   if (!activeGame || paused) { renderer.render(scene, camera); return; }
   if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 6, -18).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderer.render(scene, camera); return; }
   const p = activeGame.player;
+  gameTime += dt;
   if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
   if (p.buffTimer > 0) { p.buffTimer -= dt; if (p.buffTimer <= 0) p.buff = null; }
   // --- Stable flight model (player): smoothed inputs -> capped rates -> clamped heading/pitch -> Euler YXZ orientation ---
@@ -885,17 +919,99 @@ function animate(now) {
     drawMinimap();
   }
   let incomingMissile = false;
+  // ================= BOT AI STATE MACHINE (v4) =================
+  // States: 'engage' (intercept + fire when actually pointing at the target),
+  // 'extend' (break off a circling merge and open distance), 'reposition'
+  // (fly to a waypoint after a stale, hitless fight), 'evade' (flee + weave
+  // through the streets when badly hurt or freshly hit). All steering still
+  // goes through the stable heading/pitch/roll model + orientFlight.
   for (let i = activeGame.entities.length - 1; i >= 0; i--) {
     const bot = activeGame.entities[i]; bot.fireCd -= dt; bot.rocketCd -= dt;
-    let tgtPos = p.mesh.position, bestDist = bot.mesh.position.distanceTo(p.mesh.position);
-    if (activeGame.mode !== 'campaign') { for (let j = 0; j < activeGame.entities.length; j++) { if (i === j) continue; const d = bot.mesh.position.distanceTo(activeGame.entities[j].mesh.position); if (d < bestDist * 0.95) { bestDist = d; tgtPos = activeGame.entities[j].mesh.position; } } }
-    bot.wanderAng += dt * 1.4;
-    // Bots use the same heading/pitch model as the player: steer toward the target at capped rates, bank into turns, level out — no barrel-rolls
-    const bdx = tgtPos.x - bot.mesh.position.x, bdy = tgtPos.y - bot.mesh.position.y, bdz = tgtPos.z - bot.mesh.position.z;
-    const bHoriz = Math.max(1, Math.hypot(bdx, bdz));
-    const weaveYaw = Math.sin(bot.wanderAng) * 0.28, weavePitch = Math.cos(bot.wanderAng * 0.8) * 0.13;
-    const desH = Math.atan2(bdx, bdz) + weaveYaw;
-    const desP = clampNum(Math.atan2(bdy, bHoriz) + weavePitch, -0.92, 0.92);
+    if (bot.id === 'remote') continue; // online rival is driven by the network, not the AI
+    if (bot.lastHitAt === undefined) { bot.lastHitAt = -99; bot.lastAttacker = null; bot.aiState = 'engage'; bot.stateT = 0; bot.retargetT = Math.random() * 2; bot.weaveSeed = Math.random() * 100; bot.tgt = null; bot.closeT = 0; bot.engageT = 0; bot.lastDealtHitAt = -99; bot.waypoint = null; bot.evadeDur = 3; bot._seenHitAt = -99; bot.lastEvadeEnd = -99; }
+    bot.stateT += dt; bot.retargetT -= dt; bot.wanderAng += dt * 1.4;
+    const bp = bot.mesh.position;
+    const hpFrac = bot.hp / bot.maxHp;
+
+    // ---- Targeting: re-validate every frame, re-pick every 2-4s ----
+    if (bot.retargetT <= 0 || !botIsAliveTarget(bot.tgt)) { bot.tgt = pickBotTarget(bot); bot.retargetT = 2 + Math.random() * 2; }
+    const ti = botTargetInfo(bot);
+    const dist = ti ? bp.distanceTo(ti.pos) : 9999;
+
+    // ---- Evade entry: badly hurt, or a fresh hit (35% roll per hit, never per frame) ----
+    if (bot.lastHitAt > bot._seenHitAt) {
+      bot._seenHitAt = bot.lastHitAt;
+      if (bot.aiState !== 'evade' && Math.random() < 0.35) { bot.aiState = 'evade'; bot.stateT = 0; bot.evadeDur = 2.5 + Math.random() * 1.5; }
+    }
+    if (bot.aiState !== 'evade' && hpFrac < 0.35 && (gameTime - bot.lastEvadeEnd) > 5) { bot.aiState = 'evade'; bot.stateT = 0; bot.evadeDur = 2.5 + Math.random() * 1.5; }
+
+    // ---- State transitions ----
+    if (bot.aiState === 'evade' && bot.stateT >= bot.evadeDur) {
+      if (hpFrac < 0.25 && bot.stateT < 6) { bot.evadeDur = bot.stateT + 0.5; } // still critical: keep running a bit longer (max ~6s)
+      else { bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0; bot.closeT = 0; bot.lastEvadeEnd = gameTime; }
+    } else if (bot.aiState === 'extend' && bot.stateT >= 1.6) {
+      bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0;
+    } else if (bot.aiState === 'reposition') {
+      const wp = bot.waypoint; const wpDist = wp ? Math.hypot(wp.x - bp.x, wp.z - bp.z) : 0;
+      if (!wp || wpDist < 60 || bot.stateT > 14) { bot.aiState = 'engage'; bot.stateT = 0; bot.engageT = 0; bot.waypoint = null; }
+    } else if (bot.aiState === 'engage') {
+      bot.engageT += dt;
+      if (dist < 70) bot.closeT += dt; else bot.closeT = Math.max(0, bot.closeT - dt * 2);
+      if (bot.closeT > 1.2) { bot.aiState = 'extend'; bot.stateT = 0; bot.closeT = 0; } // circling merge: break off and extend
+      else if (bot.engageT > 9 && (gameTime - bot.lastDealtHitAt) > 9) { // stale fight, no hits dealt: reposition
+        const wa = Math.random() * Math.PI * 2, wd = 400 + Math.random() * 300;
+        bot.waypoint = { x: (bp.x + Math.cos(wa) * wd) * 0.45, y: 90 + Math.random() * 160, z: (bp.z + Math.sin(wa) * wd) * 0.45 }; // biased toward map center / streets
+        bot.aiState = 'reposition'; bot.stateT = 0;
+      }
+    }
+
+    // ---- Base desired heading/pitch per state ----
+    let desH = bot.heading, desP = 0, spdMul = 1;
+    if (bot.aiState === 'evade') {
+      let fleePos = ti ? ti.pos : null;
+      if (bot.lastAttacker === 'player') fleePos = p.mesh.position;
+      else if (bot.lastAttacker != null) { const atk = activeGame.entities.find(function(e) { return e.id === bot.lastAttacker; }); if (atk) fleePos = atk.mesh.position; }
+      const awayH = fleePos ? Math.atan2(bp.x - fleePos.x, bp.z - fleePos.z) : bot.heading;
+      desH = awayH + Math.sin(gameTime * 2.6 + bot.weaveSeed) * 0.65; // hard weave while running
+      desP = Math.cos(gameTime * 3.1 + bot.weaveSeed) * 0.3;
+      if (bp.y > 110) desP -= 0.22; else if (bp.y < 35) desP += 0.22; // street-canyon altitude band 35-110
+      spdMul = 1.3;
+    } else if (bot.aiState === 'extend') {
+      desH = bot.heading; desP = 0.18; spdMul = 1.15; // hold course, slight climb, open the distance
+    } else if (bot.aiState === 'reposition' && bot.waypoint) {
+      const wp = bot.waypoint;
+      desH = Math.atan2(wp.x - bp.x, wp.z - bp.z);
+      desP = clampNum(Math.atan2(wp.y - bp.y, Math.max(1, Math.hypot(wp.x - bp.x, wp.z - bp.z))), -0.6, 0.6);
+      spdMul = 1.15;
+    } else if (ti) { // engage: steer to an intercept point ahead of the target
+      const lead = dist * 0.02;
+      const ix = ti.pos.x + ti.fx * lead, iy = ti.pos.y, iz = ti.pos.z + ti.fz * lead;
+      const weaveYaw = Math.sin(bot.wanderAng) * 0.18, weavePitch = Math.cos(bot.wanderAng * 0.8) * 0.08;
+      desH = Math.atan2(ix - bp.x, iz - bp.z) + weaveYaw;
+      desP = clampNum(Math.atan2(iy - bp.y, Math.max(1, Math.hypot(ix - bp.x, iz - bp.z))) + weavePitch, -0.92, 0.92);
+    }
+
+    // ---- Building avoidance / street weave (strongest while evading) ----
+    let threat = null, threatScore = Infinity;
+    for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const od = Math.hypot(bp.x - o.x, bp.z - o.z) - o.r; if (od < 130 && bp.y < o.h + 25 && od < threatScore) { threatScore = od; threat = o; } }
+    if (threat) {
+      const rightX = Math.cos(bot.heading), rightZ = -Math.sin(bot.heading);
+      let bestSide = 1, bestClear = -Infinity;
+      for (let s = -1; s <= 1; s += 2) {
+        const cx = threat.x + rightX * s * (threat.r + 55), cz = threat.z + rightZ * s * (threat.r + 55);
+        let clear = Infinity;
+        for (let oj = 0; oj < obstacles.length; oj++) { const o2 = obstacles[oj]; const cd = Math.hypot(cx - o2.x, cz - o2.z) - o2.r; if (cd < clear) clear = cd; }
+        if (clear > bestClear) { bestClear = clear; bestSide = s; }
+      }
+      const avoidH = Math.atan2((threat.x + rightX * bestSide * (threat.r + 55)) - bp.x, (threat.z + rightZ * bestSide * (threat.r + 55)) - bp.z);
+      const wAvoid = bot.aiState === 'evade' ? 0.8 : 0.55;
+      desH = desH + angleWrap(avoidH - desH) * wAvoid;
+      // If the threat is close and directly ahead, climb over it instead of threading past
+      const toThreatH = Math.atan2(threat.x - bp.x, threat.z - bp.z);
+      if (Math.abs(angleWrap(toThreatH - bot.heading)) < 0.5 && threatScore < 120) desP = Math.max(desP, clampNum((threat.h + 30 - bp.y) * 0.01, 0, 0.6));
+    }
+
+    // ---- Apply capped steering through the stable flight model ----
     const yawDiff = angleWrap(desH - bot.heading);
     const botYawRate = 1.15 * bot.skill * 0.8, botPitchRate = 0.9 * bot.skill;
     bot.heading = angleWrap(bot.heading + clampNum(yawDiff, -botYawRate * dt, botYawRate * dt));
@@ -903,9 +1019,18 @@ function animate(now) {
     bot.roll = THREE.MathUtils.lerp(bot.roll || 0, -clampNum(yawDiff, -1, 1) * 0.55, Math.min(1, 5 * dt));
     orientFlight(bot);
     const bFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bot.mesh.quaternion);
-    bot.mesh.position.addScaledVector(bFwd, bot.spd * dt); bot.mesh.position.y = Math.max(40, Math.min(850, bot.mesh.position.y));
-    if (bestDist < 420 && bot.fireCd <= 0) { spawnBullet(bot.mesh.position.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill, 0xf87171); bot.fireCd = 0.45 / bot.skill; }
-    if (bestDist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { let tgtObj = 'player'; if (tgtPos !== p.mesh.position) { for (let k = 0; k < activeGame.entities.length; k++) { if (activeGame.entities[k].mesh.position === tgtPos) tgtObj = activeGame.entities[k]; } } spawnRocket(bot.mesh.position.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, tgtObj, 35); bot.rocketCd = 11 / bot.skill; }
+    bp.addScaledVector(bFwd, bot.spd * spdMul * dt); bp.y = Math.max(12, Math.min(950, bp.y));
+
+    // ---- Building scrape: push out to the edge, 5 hp, can never kill ----
+    for (let oi = 0; oi < obstacles.length; oi++) { const o = obstacles[oi]; const dx = bp.x - o.x, dz = bp.z - o.z; const d2 = dx * dx + dz * dz; if (bp.y < o.h && d2 < o.r * o.r && d2 > 0.01) { const d = Math.sqrt(d2); bp.x = o.x + (dx / d) * o.r; bp.z = o.z + (dz / d) * o.r; bot.hp = Math.max(1, bot.hp - 5); } }
+
+    // ---- Weapons: engage only, and only when actually pointing at the target ----
+    if (bot.aiState === 'engage' && ti) {
+      const toT = ti.pos.clone().sub(bp).normalize();
+      const aimAng = Math.acos(clampNum(bFwd.dot(toT), -1, 1));
+      if (dist < 420 && aimAng < 0.35 && bot.fireCd <= 0) { spawnBullet(bp.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill, 0xf87171); bot.fireCd = 0.45 / bot.skill; }
+      if (dist < 520 && bot.rocketCd <= 0 && activeGame.mode !== 'campaign') { spawnRocket(bp.clone().add(bFwd.clone().multiplyScalar(6)), bFwd, bot.id, bot.tgt === 'player' ? 'player' : bot.tgt, 35); bot.rocketCd = 11 / bot.skill; }
+    }
   }
   for (let i = activeGame.bullets.length - 1; i >= 0; i--) {
     const b = activeGame.bullets[i]; b.life -= dt; b.mesh.position.addScaledVector(b.dir, 360 * dt);
@@ -914,7 +1039,7 @@ function animate(now) {
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 9) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     if (b.ownerId !== 'player' && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg; hit = true; }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; hit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < 6.5) { ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); hit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -925,7 +1050,7 @@ function animate(now) {
     rk.mesh.position.addScaledVector(rk.dir, 185 * dt); rk.mesh.lookAt(rk.mesh.position.clone().add(rk.dir));
     if (rk.ownerId !== 'player' && rk.mesh.position.distanceTo(p.mesh.position) < 8) { p.hp -= rk.dmg; scene.remove(rk.mesh); activeGame.rockets.splice(i, 1); continue; }
     let rHit = false;
-    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
+    for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (rk.ownerId === ent.id) continue; if (rk.mesh.position.distanceTo(ent.mesh.position) < 8.5) { ent.hp -= rk.dmg; noteBotHit(ent, rk.ownerId); rHit = true; if (ent.hp <= 0) handleEntityEliminated(eIdx, rk.ownerId); break; } }
     if (rHit || rk.life <= 0) { scene.remove(rk.mesh); if (activeGame && activeGame.rockets[i] === rk) activeGame.rockets.splice(i, 1); }
     if (!activeGame) return;
   }
@@ -959,7 +1084,7 @@ function handleEntityEliminated(eIdx, killerId) {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
     if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; killerBot.ggTier = Math.min(14, killerBot.kills); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
   }
-  if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); }
+  if (activeGame.mode === 'gungame') { victim.hp = victim.maxHp; const a = Math.random() * 6.28; victim.mesh.position.set(Math.cos(a) * 650, 200, Math.sin(a) * 650); victim.heading = Math.atan2(-victim.mesh.position.x, -victim.mesh.position.z); victim.pitch = 0; victim.aiState = 'engage'; victim.stateT = 0; victim.closeT = 0; victim.engageT = 0; victim.tgt = null; victim.lastHitAt = -99; victim.lastAttacker = null; victim._seenHitAt = -99; }
   else {
     scene.remove(victim.mesh); activeGame.entities.splice(eIdx, 1);
     if (activeGame.entities.length === 0) {
