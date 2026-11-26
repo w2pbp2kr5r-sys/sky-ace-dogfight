@@ -272,53 +272,288 @@ function awardXP(amount) {
 }
 
 // THREE.JS ENGINE (guarded so menu/UI still work if CDN fails)
-let renderer = null, scene = null, camera = null;
+let renderer = null, scene = null, camera = null, sunLight = null;
 const canvas = document.getElementById('gameCanvas');
 if (typeof THREE !== 'undefined') {
   renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 4500);
+  camera.up.set(0, 1, 0);
   window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.05));
-  const dirLight = new THREE.DirectionalLight(0xffffff, 1.1); dirLight.position.set(300, 600, 250); scene.add(dirLight);
+  scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x334155, 0.85));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+  sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6); sunLight.position.set(300, 600, 250);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.left = -500; sunLight.shadow.camera.right = 500; sunLight.shadow.camera.top = 500; sunLight.shadow.camera.bottom = -500;
+  sunLight.shadow.camera.near = 50; sunLight.shadow.camera.far = 1800; sunLight.shadow.bias = -0.0006;
+  scene.add(sunLight); scene.add(sunLight.target);
 } else { showBanner('Three.js failed to load — check your connection and reload.', 6000); }
-function buildJetMesh(baseColor, accentColor, upg) {
+// ---- Procedural texture helpers (canvas-generated, no external assets) ----
+function makeCanvas(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; }
+let _winTex = null, _cloudTex = null, _sunTex = null;
+function getWindowTexture() {
+  if (_winTex) return _winTex;
+  _winTex = makeCanvas(128, 256, function(ctx, w, h) {
+    ctx.fillStyle = '#2b3444'; ctx.fillRect(0, 0, w, h);
+    for (let y = 8; y < h - 8; y += 16) for (let x = 8; x < w - 8; x += 14) {
+      const lit = Math.random() < 0.55;
+      ctx.fillStyle = lit ? (Math.random() < 0.5 ? '#ffd98a' : '#aee2ff') : '#161c28';
+      ctx.fillRect(x, y, 8, 10);
+    }
+  });
+  _winTex.wrapS = _winTex.wrapT = THREE.RepeatWrapping;
+  return _winTex;
+}
+function getGroundTexture(kind, base, line) {
+  const t = makeCanvas(256, 256, function(ctx, w, h) {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, w, h);
+    if (kind === 'city') {
+      ctx.strokeStyle = line; ctx.lineWidth = 10; ctx.strokeRect(0, 0, w, h);
+      ctx.strokeStyle = 'rgba(255,220,120,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([14, 12]);
+      ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 40; i++) ctx.fillRect(Math.random() * w, Math.random() * h, 20, 14);
+    } else {
+      for (let i = 0; i < 2600; i++) { ctx.fillStyle = Math.random() < 0.5 ? line : 'rgba(0,0,0,0.16)'; ctx.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.moveTo(Math.random() * w, 0); ctx.lineTo(Math.random() * w, h); ctx.stroke(); }
+    }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(28, 28);
+  if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function getCloudTexture() {
+  if (_cloudTex) return _cloudTex;
+  _cloudTex = makeCanvas(128, 128, function(ctx, w, h) {
+    const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+    g.addColorStop(0, 'rgba(255,255,255,0.85)'); g.addColorStop(0.55, 'rgba(255,255,255,0.38)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+  return _cloudTex;
+}
+function getSunTexture() {
+  if (_sunTex) return _sunTex;
+  _sunTex = makeCanvas(128, 128, function(ctx, w, h) {
+    const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+    g.addColorStop(0, 'rgba(255,246,200,1)'); g.addColorStop(0.25, 'rgba(255,224,138,0.9)'); g.addColorStop(1, 'rgba(255,200,80,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+  return _sunTex;
+}
+function getSkyTexture(top, bottom) {
+  const t = makeCanvas(4, 512, function(ctx, w, h) {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, top); g.addColorStop(0.55, bottom); g.addColorStop(1, bottom);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  });
+  if (THREE.SRGBColorSpace) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function tierJetId(tier) { return JETS[Math.abs(tier | 0) % JETS.length].id; }
+const JET_SPECS = {
+  f16:   { len: 10.0, rad: 0.92, width: 1.0, flat: 0.88, span: 9.6, sweep: 1.7, tipChord: 1.1, engines: 1, engGap: 0, tails: 1, finH: 2.7, cant: 0, canard: false, ventral: true, canopyZ: 1.15 },
+  fa18:  { len: 10.6, rad: 0.98, width: 1.12, flat: 0.85, span: 10.2, sweep: 1.15, tipChord: 1.5, engines: 2, engGap: 0.58, tails: 2, finH: 2.3, cant: 0.34, canard: false, lerx: true, canopyZ: 1.2 },
+  f35:   { len: 10.2, rad: 1.0, width: 1.18, flat: 0.8, span: 9.2, sweep: 1.95, tipChord: 1.3, engines: 1, engGap: 0, tails: 2, finH: 2.0, cant: 0.26, canard: false, canopyZ: 1.05 },
+  f22:   { len: 11.0, rad: 1.02, width: 1.48, flat: 0.72, span: 11.0, sweep: 2.35, tipChord: 2.0, engines: 2, engGap: 0.62, tails: 2, finH: 2.2, cant: 0.42, canard: false, canopyZ: 1.25 },
+  su57:  { len: 11.2, rad: 1.0, width: 1.68, flat: 0.64, span: 11.6, sweep: 2.0, tipChord: 1.7, engines: 2, engGap: 1.0, tails: 2, finH: 2.0, cant: 0.3, canard: false, canopyZ: 1.3 },
+  x02:   { len: 10.8, rad: 0.94, width: 1.1, flat: 0.82, span: 10.6, sweep: -1.9, tipChord: 1.6, engines: 2, engGap: 0.55, tails: 2, finH: 2.2, cant: 0.3, canard: true, canopyZ: 1.2 },
+  adf11: { len: 12.2, rad: 1.05, width: 1.25, flat: 0.78, span: 11.2, sweep: 2.2, tipChord: 1.5, engines: 2, engGap: 0.6, tails: 2, finH: 2.4, cant: 0.22, canard: true, canopyZ: 1.7 }
+};
+const _jetGeoCache = {};
+function flatWingGeo(span, rootLead, rootTrail, sweep, tipChord, mirror) {
+  const s = mirror ? -1 : 1;
+  const shape = new THREE.Shape();
+  shape.moveTo(s * 0.45, rootLead);
+  shape.lineTo(s * (span / 2), rootLead - sweep);
+  shape.lineTo(s * (span / 2), rootLead - sweep - tipChord);
+  shape.lineTo(s * 0.45, rootTrail);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: false });
+  return geo;
+}
+function getJetGeos(spec, key) {
+  if (_jetGeoCache[key]) return _jetGeoCache[key];
+  const L = spec.len, R = spec.rad;
+  const pts = [];
+  const prof = [[0.30, -0.50], [0.78, -0.46], [0.97, -0.28], [1.0, -0.05], [0.93, 0.16], [0.74, 0.32], [0.46, 0.44], [0.16, 0.485], [0.02, 0.50]];
+  prof.forEach(function(pr) { pts.push(new THREE.Vector2(Math.max(0.02, pr[0] * R), pr[1] * L)); });
+  const geos = {
+    fuse: new THREE.LatheGeometry(pts, 14),
+    canopy: new THREE.SphereGeometry(0.72, 18, 12),
+    wingR: flatWingGeo(spec.span, 1.15, -1.55, spec.sweep, spec.tipChord, false),
+    wingL: flatWingGeo(spec.span, 1.15, -1.55, spec.sweep, spec.tipChord, true),
+    stabR: flatWingGeo(spec.span * 0.46, 0.55, -0.75, spec.sweep * 0.55, 0.7, false),
+    stabL: flatWingGeo(spec.span * 0.46, 0.55, -0.75, spec.sweep * 0.55, 0.7, true),
+    canardR: flatWingGeo(3.4, 0.5, -0.55, 0.8, 0.55, false),
+    canardL: flatWingGeo(3.4, 0.5, -0.55, 0.8, 0.55, true),
+    fin: new THREE.BoxGeometry(0.15, spec.finH, 1.6),
+    intake: new THREE.BoxGeometry(0.55, 0.62, 2.4),
+    nozzle: new THREE.CylinderGeometry(0.30, 0.38, 0.9, 10),
+    flame: new THREE.ConeGeometry(0.42, 2.4, 10),
+    pod: new THREE.CylinderGeometry(0.20, 0.26, 2.8, 8),
+    box: new THREE.BoxGeometry(1, 1, 1),
+    light: new THREE.SphereGeometry(0.14, 8, 6)
+  };
+  _jetGeoCache[key] = geos;
+  return geos;
+}
+function buildJetMesh(baseColor, accentColor, upg, jetId) {
   upg = upg || { hull: 1, damage: 1, agility: 1, speed: 1 };
+  const spec = JET_SPECS[jetId] || JET_SPECS.f16;
+  const geos = getJetGeos(spec, jetId && JET_SPECS[jetId] ? jetId : 'f16');
   const g = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({ color: upg.hull >= 3 ? 0x1e293b : baseColor, metalness: 0.65, roughness: 0.3 });
-  const accMat = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.25, metalness: 0.5, roughness: 0.3 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.1 });
-  const body = new THREE.Mesh(new THREE.ConeGeometry(1.1, 8.5, 8), hullMat); body.rotation.x = Math.PI / 2; g.add(body);
-  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8), glassMat); cockpit.scale.set(0.85, 0.7, 2.1); cockpit.position.set(0, 0.65, 0.8); g.add(cockpit);
-  const wingSpan = 9.5 + (upg.agility - 1) * 0.6;
-  const wings = new THREE.Mesh(new THREE.BoxGeometry(wingSpan, 0.16, 2.4), hullMat); wings.position.set(0, 0, -0.4); g.add(wings);
-  const tailL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.9, 1.4), accMat); tailL.position.set(-1.1, 0.9, -3.1); tailL.rotation.z = 0.25;
-  const tailR = tailL.clone(); tailR.position.x = 1.1; tailR.rotation.z = -0.25; g.add(tailL, tailR);
-  if (upg.damage >= 2) { const podL = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 2.6, 6), accMat); podL.rotation.x = Math.PI / 2; podL.position.set(-3.2, -0.2, 0); const podR = podL.clone(); podR.position.x = 3.2; g.add(podL, podR); }
-  const nozzleScale = 1 + (upg.speed - 1) * 0.18;
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.55 * nozzleScale, 2.2 * nozzleScale, 8), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); flame.rotation.x = -Math.PI / 2; flame.position.set(0, 0, -5.0); g.add(flame); g.userData.flame = flame;
+  const hullMat = new THREE.MeshStandardMaterial({ color: upg.hull >= 3 ? 0x232b38 : baseColor, metalness: 0.72, roughness: 0.34, side: THREE.DoubleSide });
+  const darkMat = new THREE.MeshStandardMaterial({ color: 0x141a24, metalness: 0.8, roughness: 0.45 });
+  const accMat = new THREE.MeshStandardMaterial({ color: accentColor, emissive: accentColor, emissiveIntensity: 0.35, metalness: 0.5, roughness: 0.3 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x1d4e5e, metalness: 0.95, roughness: 0.08 });
+  const wingSpan = spec.span + (upg.agility - 1) * 0.35;
+  // Fuselage: lathe profile (tail -> pointed nose), rotated so length runs along +Z (forward)
+  const fuse = new THREE.Mesh(geos.fuse, hullMat);
+  fuse.rotation.x = Math.PI / 2; fuse.scale.set(spec.width, 1, spec.flat); g.add(fuse);
+  // Canopy
+  const canopy = new THREE.Mesh(geos.canopy, glassMat);
+  canopy.scale.set(0.78 * spec.width, 0.55, 1.9); canopy.position.set(0, spec.rad * 0.78, spec.canopyZ); g.add(canopy);
+  // Spine accent stripe
+  const stripe = new THREE.Mesh(geos.box, accMat); stripe.scale.set(0.20, 0.07, spec.len * 0.52); stripe.position.set(0, spec.rad * 0.92, -0.6); g.add(stripe);
+  // Main wings + stabilizers (extruded flat shapes, thickness becomes vertical)
+  const wR = new THREE.Mesh(geos.wingR, hullMat); wR.rotation.x = Math.PI / 2; wR.scale.x = wingSpan / spec.span; wR.position.y = -0.08; g.add(wR);
+  const wL = new THREE.Mesh(geos.wingL, hullMat); wL.rotation.x = Math.PI / 2; wL.scale.x = wingSpan / spec.span; wL.position.y = -0.08; g.add(wL);
+  const sR = new THREE.Mesh(geos.stabR, hullMat); sR.rotation.x = Math.PI / 2; sR.position.set(0, 0.02, -spec.len * 0.40); g.add(sR);
+  const sL = new THREE.Mesh(geos.stabL, hullMat); sL.rotation.x = Math.PI / 2; sL.position.set(0, 0.02, -spec.len * 0.40); g.add(sL);
+  // Wing accent tips
+  [-1, 1].forEach(function(side) {
+    const tip = new THREE.Mesh(geos.box, accMat); tip.scale.set(0.85, 0.15, 0.7); tip.position.set(side * (wingSpan / 2 - 0.35), -0.06, -0.35 - spec.sweep * 0.5); g.add(tip);
+  });
+  // Canards / LERX
+  if (spec.canard || spec.lerx) {
+    const cR = new THREE.Mesh(geos.canardR, hullMat); cR.rotation.x = Math.PI / 2; cR.position.set(0, 0.05, spec.len * 0.26); g.add(cR);
+    const cL = new THREE.Mesh(geos.canardL, hullMat); cL.rotation.x = Math.PI / 2; cL.position.set(0, 0.05, spec.len * 0.26); g.add(cL);
+  }
+  // Vertical tail(s): single centre fin or canted twins
+  if (spec.tails === 1) {
+    const fin = new THREE.Mesh(geos.fin, hullMat); fin.position.set(0, spec.finH / 2 + 0.15, -spec.len * 0.40); fin.rotation.x = -0.28; g.add(fin);
+  } else {
+    [-1, 1].forEach(function(side) {
+      const fin = new THREE.Mesh(geos.fin, hullMat);
+      fin.position.set(side * (0.62 + spec.engGap * 0.5), spec.finH / 2 + 0.12, -spec.len * 0.40);
+      fin.rotation.x = -0.28; fin.rotation.z = -side * spec.cant; g.add(fin);
+    });
+  }
+  // Ventral fins (F-16)
+  if (spec.ventral) {
+    [-1, 1].forEach(function(side) {
+      const vf = new THREE.Mesh(geos.fin, accMat); vf.scale.set(0.8, 0.42, 0.8); vf.position.set(side * 0.55, -0.75, -spec.len * 0.38); vf.rotation.z = side * 0.5; g.add(vf);
+    });
+  }
+  // Intakes
+  [-1, 1].forEach(function(side) {
+    const intake = new THREE.Mesh(geos.intake, darkMat); intake.position.set(side * (spec.rad * spec.width * 0.82 + 0.18), -0.28, 0.35); g.add(intake);
+  });
+  // Engine nozzle(s) + afterburner flame(s)
+  const flames = [];
+  const nozzleScale = 1 + (upg.speed - 1) * 0.15;
+  const engXs = spec.engines === 1 ? [0] : [-spec.engGap, spec.engGap];
+  engXs.forEach(function(ex) {
+    const noz = new THREE.Mesh(geos.nozzle, darkMat); noz.rotation.x = Math.PI / 2; noz.position.set(ex, 0, -spec.len * 0.50); g.add(noz);
+    const flame = new THREE.Mesh(geos.flame, new THREE.MeshBasicMaterial({ color: 0x66c7ff, transparent: true, opacity: 0.85 }));
+    flame.rotation.x = -Math.PI / 2; flame.scale.set(nozzleScale, nozzleScale, nozzleScale);
+    flame.position.set(ex, 0, -spec.len * 0.50 - 1.55); g.add(flame); flames.push(flame);
+  });
+  g.userData.flames = flames; g.userData.flame = flames[0];
+  // Missile / gun pods with damage upgrade
+  if (upg.damage >= 2) {
+    [-1, 1].forEach(function(side) {
+      const pod = new THREE.Mesh(geos.pod, accMat); pod.rotation.x = Math.PI / 2; pod.position.set(side * wingSpan * 0.30, -0.34, 0.1); g.add(pod);
+      const pod2 = new THREE.Mesh(geos.pod, darkMat); pod2.rotation.x = Math.PI / 2; pod2.scale.setScalar(0.8); pod2.position.set(side * wingSpan * 0.44, -0.30, -0.3); g.add(pod2);
+    });
+  }
+  // Navigation lights: port red (left), starboard green (right)
+  const port = new THREE.Mesh(geos.light, new THREE.MeshBasicMaterial({ color: 0xff2222 })); port.position.set(-wingSpan / 2, 0, -0.35 - spec.sweep * 0.5); g.add(port);
+  const star = new THREE.Mesh(geos.light, new THREE.MeshBasicMaterial({ color: 0x22ff66 })); star.position.set(wingSpan / 2, 0, -0.35 - spec.sweep * 0.5); g.add(star);
+  g.traverse(function(o) { if (o.isMesh && o.material !== glassMat) { o.castShadow = true; } });
+  flames.forEach(function(f) { f.castShadow = false; });
+  port.castShadow = false; star.castShadow = false;
   return g;
 }
 let worldGroup = (typeof THREE !== 'undefined') ? new THREE.Group() : null;
 if (scene && worldGroup) scene.add(worldGroup);
 let obstacles = [];
+const ENV_THEMES = {
+  city:     { sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x2a3342, bColor: 0x334155, skyTop: '#1c5f9e', skyBot: '#a8d8f8', gBase: '#232a36', gLine: '#10141c', sun: 0xfff2d8, cloud: 0xffffff },
+  mountain: { sky: 0x7dd3fc, fog: 0xe0f2fe, ground: 0xdbeafe, bColor: 0x94a3b8, skyTop: '#2f6fb4', skyBot: '#dcefff', gBase: '#c8d6e4', gLine: '#9db4c8', sun: 0xfff6e0, cloud: 0xffffff },
+  canyon:   { sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, bColor: 0x7c2d12, skyTop: '#7a3b12', skyBot: '#f7b733', gBase: '#8a3d18', gLine: '#5f2708', sun: 0xffd9a0, cloud: 0xffe8cc },
+  neon:     { sky: 0x050811, fog: 0x1e1b4b, ground: 0x090d16, bColor: 0x1e1b4b, skyTop: '#02020a', skyBot: '#2a1052', gBase: '#0a0d18', gLine: '#1c2450', sun: 0xbfd4ff, cloud: 0x8f7fd8 }
+};
+const _boxGeo = (typeof THREE !== 'undefined') ? new THREE.BoxGeometry(1, 1, 1) : null;
+const _coneGeo = (typeof THREE !== 'undefined') ? new THREE.ConeGeometry(1, 1, 6) : null;
 function buildEnvironment(theme, radius) {
   if (!scene) return; radius = radius || 1400;
   scene.remove(worldGroup); worldGroup = new THREE.Group(); obstacles = [];
-  const cfgs = { city: { sky: 0x38bdf8, fog: 0x7dd3fc, ground: 0x1e293b, bColor: 0x334155 }, mountain: { sky: 0x7dd3fc, fog: 0xe0f2fe, ground: 0xdbeafe, bColor: 0x94a3b8 }, canyon: { sky: 0xfb923c, fog: 0xfed7aa, ground: 0x9a3412, bColor: 0x7c2d12 }, neon: { sky: 0x050811, fog: 0x1e1b4b, ground: 0x090d16, bColor: 0x1e1b4b } };
-  const cfg = cfgs[theme] || cfgs.city;
-  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, 0.00042);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ color: cfg.ground, roughness: 0.9 })); ground.rotation.x = -Math.PI / 2; worldGroup.add(ground);
+  const cfg = ENV_THEMES[theme] || ENV_THEMES.city;
+  scene.background = new THREE.Color(cfg.sky); scene.fog = new THREE.FogExp2(cfg.fog, 0.00038);
+  // Gradient sky dome (BackSide sphere with canvas gradient)
+  const skyR = Math.min(radius * 2.9, 4200);
+  const skyDome = new THREE.Mesh(new THREE.SphereGeometry(skyR, 24, 14), new THREE.MeshBasicMaterial({ map: getSkyTexture(cfg.skyTop, cfg.skyBot), side: THREE.BackSide, fog: false, depthWrite: false }));
+  worldGroup.add(skyDome);
+  // Sun disc sprite aligned with the directional light
+  const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: getSunTexture(), color: cfg.sun, fog: false, depthWrite: false, transparent: true }));
+  sun.position.set(skyR * 0.30, skyR * 0.55, skyR * 0.25); sun.scale.setScalar(Math.min(radius * 0.85, 750)); worldGroup.add(sun);
+  if (sunLight) { sunLight.position.set(radius * 0.35, radius * 0.7, radius * 0.3); sunLight.target.position.set(0, 0, 0); sunLight.color.set(cfg.sun); }
+  // Clouds: soft radial-gradient billboards, slow drift (animated in animate())
+  const cloudTex = getCloudTexture(); const clouds = [];
+  const cloudCount = 84;
+  for (let ci = 0; ci < cloudCount; ci++) {
+    const cm = new THREE.SpriteMaterial({ map: cloudTex, color: cfg.cloud, transparent: true, opacity: 0.30 + Math.random() * 0.34, depthWrite: false });
+    const sp = new THREE.Sprite(cm);
+    const ca = Math.random() * Math.PI * 2, cd = Math.random() * Math.min(radius * 1.9, 3400);
+    sp.position.set(Math.cos(ca) * cd, 300 + Math.random() * 320, Math.sin(ca) * cd);
+    sp.scale.set(180 + Math.random() * 260, 55 + Math.random() * 70, 1);
+    worldGroup.add(sp); clouds.push(sp);
+  }
+  worldGroup.userData.clouds = clouds; worldGroup.userData.cloudBound = Math.min(radius * 2.1, 3600);
+  // Ground with canvas texture (city street grid / natural noise)
+  const gTex = getGroundTexture(theme === 'city' || theme === 'neon' ? 'city' : 'noise', cfg.gBase, cfg.gLine);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(radius * 3.5, radius * 3.5), new THREE.MeshStandardMaterial({ map: gTex, color: 0xffffff, roughness: 0.94, metalness: 0.02 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; worldGroup.add(ground);
+  // Harbor water sheen for city themes
+  if (theme === 'city') {
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(radius * 1.5, radius * 3.2), new THREE.MeshStandardMaterial({ color: 0x155e86, roughness: 0.18, metalness: 0.75, transparent: true, opacity: 0.82 }));
+    water.rotation.x = -Math.PI / 2; water.position.set(radius * 1.45, 0.6, 0); water.receiveShadow = true; worldGroup.add(water);
+  }
+  // Obstacles / scenery (collision data pushed in lock-step with meshes)
+  const winTex = getWindowTexture();
+  const cityMats = [0x8a97a8, 0x6b7a90, 0xa8b2c0, 0x54627a].map(function(tint) {
+    return new THREE.MeshStandardMaterial({ map: winTex, color: tint, roughness: 0.62, metalness: 0.28, emissive: 0xffc37a, emissiveMap: winTex, emissiveIntensity: theme === 'neon' ? 0.95 : 0.22 });
+  });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x66707e, roughness: 0.95 });
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xf4f8ff, roughness: 0.72 });
+  const canyonMats = [0x8a4520, 0x9c5426, 0x74371a].map(function(c) { return new THREE.MeshStandardMaterial({ color: c, roughness: 0.96 }); });
   const count = (theme === 'mountain' || theme === 'canyon') ? 75 : 110;
   for (let i = 0; i < count; i++) {
     const angle = (i * 2.39996) % (Math.PI * 2); const dist = 160 + ((i * 73) % Math.max(1, radius - 180));
     const x = Math.cos(angle) * dist, z = Math.sin(angle) * dist; if (Math.abs(x) < 90 && Math.abs(z) < 90) continue;
-    const w = 26 + (i % 5) * 12, d = 26 + ((i * 3) % 5) * 12, h = 55 + ((i * 19) % 165); let mesh;
-    if (theme === 'mountain') { mesh = new THREE.Mesh(new THREE.ConeGeometry(w * 0.9, h * 1.4, 5), new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.85 })); mesh.position.set(x, (h * 1.4) / 2, z); obstacles.push({ x: x, z: z, r: w * 0.65, h: h * 1.3 }); }
-    else { const mat = new THREE.MeshStandardMaterial({ color: cfg.bColor, emissive: theme === 'neon' ? 0x38bdf8 : 0x000000, emissiveIntensity: theme === 'neon' ? 0.25 : 0 }); mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); mesh.position.set(x, h / 2, z); obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.55, h: h }); }
-    worldGroup.add(mesh);
+    const w = 26 + (i % 5) * 12, d = 26 + ((i * 3) % 5) * 12, h = 55 + ((i * 19) % 165);
+    if (theme === 'mountain') {
+      const mh = h * 1.4;
+      const rock = new THREE.Mesh(_coneGeo, rockMat); rock.scale.set(w * 0.9, mh, w * 0.9); rock.position.set(x, mh / 2, z); rock.castShadow = true; rock.receiveShadow = true; worldGroup.add(rock);
+      const tipH = mh * 0.34, tipR = w * 0.9 * (tipH / mh);
+      const tip = new THREE.Mesh(_coneGeo, snowMat); tip.scale.set(tipR, tipH, tipR); tip.position.set(x, mh - tipH / 2, z); worldGroup.add(tip);
+      obstacles.push({ x: x, z: z, r: w * 0.65, h: h * 1.3 });
+    } else if (theme === 'canyon') {
+      const mesh = new THREE.Mesh(_coneGeo, canyonMats[i % canyonMats.length]); mesh.scale.set(w * 1.15, h * 1.15, d * 1.15); mesh.position.set(x, (h * 1.15) / 2, z); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
+      obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.62, h: h * 1.05 });
+    } else {
+      const mesh = new THREE.Mesh(_boxGeo, cityMats[i % cityMats.length]); mesh.scale.set(w, h, d); mesh.position.set(x, h / 2, z); mesh.castShadow = true; mesh.receiveShadow = true; worldGroup.add(mesh);
+      const roof = new THREE.Mesh(_boxGeo, cityMats[(i + 2) % cityMats.length]); roof.scale.set(w * 0.55, 5, d * 0.55); roof.position.set(x, h + 2.5, z); worldGroup.add(roof);
+      obstacles.push({ x: x, z: z, r: Math.max(w, d) * 0.55, h: h });
+    }
   }
   scene.add(worldGroup);
 }
@@ -340,19 +575,20 @@ function startMission() {
   buildEnvironment(theme, mapRadius);
   if (activeGame && activeGame.entities) { activeGame.entities.forEach(function(ent) { scene.remove(ent.mesh); }); activeGame.bullets.forEach(function(b) { scene.remove(b.mesh); }); activeGame.rockets.forEach(function(r) { scene.remove(r.mesh); }); activeGame.rings.forEach(function(rg) { scene.remove(rg.mesh); }); if (activeGame.player) scene.remove(activeGame.player.mesh); }
   const maxHp = currentMode === 'gungame' ? 85 : (jetCfg.hp + (state.upgrades.hull - 1) * 35);
-  const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
-  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
+  const playerJetId = currentMode === 'gungame' ? tierJetId(0) : jetCfg.id;
+  const playerMesh = buildJetMesh(jetCfg.color, jetCfg.accent, state.upgrades, playerJetId); playerMesh.position.set(0, 180, 0); scene.add(playerMesh);
+  activeGame = { mode: currentMode, chapter: ch.num, player: { mesh: playerMesh, hp: maxHp, maxHp: maxHp, spd: 75 * jetCfg.spd * (1 + (state.upgrades.speed - 1) * 0.08), turn: 1.45 * jetCfg.turn * (1 + (state.upgrades.agility - 1) * 0.1), dmg: jetCfg.dmg + (state.upgrades.damage - 1) * 6, fireCd: 0, rocketCd: 0, autoAimLeft: 0, autoAimCd: 0, ggTier: 0, kills: 0, buff: null, buffTimer: 0, _touchFire: false, _touchBoost: false, heading: 0, pitch: 0, roll: 0, yawIn: 0, pitchIn: 0 }, entities: [], bullets: [], rockets: [], rings: [], zoneRadius: 2300, zoneTimer: 45, countdown: currentMode === 'royale' ? 3 : 0 };
   const diff = document.getElementById('diffSelect').value;
   const botCount = currentMode === 'campaign' ? ch.enemies : (currentMode === 'gungame' ? 10 : 49);
   for (let i = 0; i < botCount; i++) {
     const ang = (i / botCount) * Math.PI * 2; const dist = currentMode === 'royale' ? (350 + Math.random() * 1650) : (320 + Math.random() * 550);
     const randJet = JETS[i % JETS.length];
     const botUpg = currentMode === 'royale' ? { hull: 1 + (i % 4), damage: 1 + (i % 3), agility: 1 + (i % 3), speed: 1 } : { hull: 1, damage: 1, agility: 1, speed: 1 };
-    const m = buildJetMesh(randJet.color, randJet.accent, botUpg); m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
+    const m = buildJetMesh(randJet.color, randJet.accent, botUpg, randJet.id); m.position.set(Math.cos(ang) * dist, 150 + Math.random() * 220, Math.sin(ang) * dist); scene.add(m);
     let botHp = currentMode === 'campaign' ? (55 + ch.num * 10) : (currentMode === 'gungame' ? 75 : 165);
     let skill = diff === 'rookie' ? 0.55 : (diff === 'ace' ? 1.15 : 0.85);
     if (currentMode === 'royale') { const rName = getRankName(state.rp); skill = rName === 'Silver' ? 0.65 : (rName === 'Gold' ? 0.9 : (rName === 'Diamond' ? 1.15 : 1.35)); }
-    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28 });
+    activeGame.entities.push({ id: i, name: `Pilot-${100 + i}`, mesh: m, hp: botHp, maxHp: botHp, spd: 68 * skill, skill: skill, fireCd: Math.random() * 1.5, rocketCd: 4 + Math.random() * 5, ggTier: 0, kills: 0, targetIdx: -1, wanderAng: Math.random() * 6.28, heading: Math.atan2(-m.position.x, -m.position.z), pitch: 0, roll: 0 });
   }
   if (currentMode === 'royale') { for (let i = 0; i < 6; i++) spawnPowerRing(); runCountdown(); }
   paused = false;
@@ -404,26 +640,56 @@ function endMatch(victory, title, summary) {
 function nextChapter() { chSel.value = Math.min(10, Number(chSel.value) + 1); document.getElementById('statusModal').classList.add('hidden'); startMission(); }
 function returnHome() { activeGame = null; paused = false; closeModals(); document.getElementById('hud').classList.add('hidden'); document.getElementById('touchZone').classList.add('hidden'); document.getElementById('targetBoxes').innerHTML = ''; document.getElementById('menuScreen').classList.remove('hidden'); updateTopUI(); }
 let lastTime = performance.now();
+// ---- Stable flight model: orientation is BUILT from heading/pitch/roll each frame (Euler YXZ), never accumulated ----
+const _flightEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ') : null;
+const _camEuler = (typeof THREE !== 'undefined') ? new THREE.Euler(0, 0, 0, 'YXZ') : null;
+const _camQuat = (typeof THREE !== 'undefined') ? new THREE.Quaternion() : null;
+const _camOff = (typeof THREE !== 'undefined') ? new THREE.Vector3() : null;
+function angleWrap(a) { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; }
+function clampNum(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+function orientFlight(o) { _flightEuler.set(-o.pitch, o.heading, o.roll, 'YXZ'); o.mesh.quaternion.setFromEuler(_flightEuler); }
+function flickerFlames(mesh, boost, dt) {
+  if (!mesh || !mesh.userData.flames) return;
+  const s = boost ? 1.55 : 1.0;
+  mesh.userData.flames.forEach(function(f) { const fl = (0.82 + Math.random() * 0.38) * s; f.scale.y = fl; f.scale.x = f.scale.z = 0.9 + Math.random() * 0.2; });
+}
 function animate(now) {
   requestAnimationFrame(animate);
   const dt = Math.min((now - lastTime) / 1000, 0.05); lastTime = now;
   if (!renderer) return;
   if (!activeGame || paused) { renderer.render(scene, camera); return; }
-  if (activeGame.countdown > 0) { const p0 = activeGame.player; const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 6, -18).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderer.render(scene, camera); return; }
+  if (activeGame.countdown > 0) { const p0 = activeGame.player; orientFlight(p0); const camPos = p0.mesh.position.clone().add(new THREE.Vector3(0, 6, -18).applyQuaternion(p0.mesh.quaternion)); camera.position.copy(camPos); camera.lookAt(p0.mesh.position); renderer.render(scene, camera); return; }
   const p = activeGame.player;
   if (p.fireCd > 0) p.fireCd -= dt; if (p.rocketCd > 0) p.rocketCd -= dt; if (p.autoAimLeft > 0) p.autoAimLeft -= dt; if (p.autoAimCd > 0) p.autoAimCd -= dt;
   if (p.buffTimer > 0) { p.buffTimer -= dt; if (p.buffTimer <= 0) p.buff = null; }
-  let pitch = touchVec.y, yaw = -touchVec.x;
-  if (keys[state.binds.pitchUp]) pitch -= 1; if (keys[state.binds.pitchDown]) pitch += 1; if (keys[state.binds.turnLeft]) yaw += 1; if (keys[state.binds.turnRight]) yaw -= 1;
+  // --- Stable flight model (player): smoothed inputs -> capped rates -> clamped heading/pitch -> Euler YXZ orientation ---
   const sens = state.sensitivity * (p.buff === 'speed' ? 1.35 : 1.0);
-  p.mesh.rotateY(yaw * p.turn * sens * dt); p.mesh.rotateX(pitch * p.turn * 0.85 * sens * dt); p.mesh.rotation.z = THREE.MathUtils.lerp(p.mesh.rotation.z, -yaw * 0.55, 5 * dt);
+  let rawYaw = Math.abs(touchVec.x) > 0.08 ? -touchVec.x : 0;
+  let rawPitch = Math.abs(touchVec.y) > 0.08 ? -touchVec.y : 0;
+  if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
+  if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
+  rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
+  const smoothK = Math.min(1, 10 * dt);
+  p.yawIn = THREE.MathUtils.lerp(p.yawIn || 0, rawYaw, smoothK);
+  p.pitchIn = THREE.MathUtils.lerp(p.pitchIn || 0, rawPitch, smoothK);
   if (p.autoAimLeft > 0 && activeGame.entities.length > 0) {
+    // Auto-aim steers heading/pitch toward the target at a capped rate — no quaternion slerp, no flips
     let closest = activeGame.entities[0], bestD = 999999;
     activeGame.entities.forEach(function(e) { const d = e.mesh.position.distanceTo(p.mesh.position); if (d < bestD) { bestD = d; closest = e; } });
-    const desired = closest.mesh.position.clone().sub(p.mesh.position).normalize();
-    const qTarget = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), desired);
-    p.mesh.quaternion.slerp(qTarget, 0.08 + state.upgrades.autoaim * 0.035);
+    const dx = closest.mesh.position.x - p.mesh.position.x, dy = closest.mesh.position.y - p.mesh.position.y, dz = closest.mesh.position.z - p.mesh.position.z;
+    const horiz = Math.max(1, Math.hypot(dx, dz));
+    const desHeading = Math.atan2(dx, dz);
+    const desPitch = clampNum(Math.atan2(dy, horiz), -1.05, 1.05);
+    p.yawIn = clampNum(angleWrap(desHeading - p.heading) * 2.2, -1, 1);
+    p.pitchIn = clampNum((desPitch - p.pitch) * 2.2, -1, 1);
   }
+  const yawRate = 1.1 * (p.turn / 1.45) * sens;
+  const pitchRate = 0.9 * (p.turn / 1.45) * sens;
+  p.heading = angleWrap(p.heading + p.yawIn * yawRate * dt);
+  p.pitch = clampNum(p.pitch + p.pitchIn * pitchRate * dt, -1.05, 1.05);
+  const rollTarget = -p.yawIn * 0.9;
+  p.roll = THREE.MathUtils.lerp(p.roll || 0, rollTarget, Math.min(1, 6 * dt));
+  orientFlight(p);
   const boosting = keys[state.binds.boost] || p._touchBoost;
   const tierSpd = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].spd : 1;
   const curSpd = p.spd * tierSpd * (boosting ? 1.45 : 1) * (p.buff === 'speed' ? 1.45 : 1);
@@ -449,10 +715,18 @@ function animate(now) {
     let tgtPos = p.mesh.position, bestDist = bot.mesh.position.distanceTo(p.mesh.position);
     if (activeGame.mode !== 'campaign') { for (let j = 0; j < activeGame.entities.length; j++) { if (i === j) continue; const d = bot.mesh.position.distanceTo(activeGame.entities[j].mesh.position); if (d < bestDist * 0.95) { bestDist = d; tgtPos = activeGame.entities[j].mesh.position; } } }
     bot.wanderAng += dt * 1.4;
-    const weave = new THREE.Vector3(Math.sin(bot.wanderAng) * 45, Math.cos(bot.wanderAng * 0.8) * 28, Math.cos(bot.wanderAng) * 45);
-    const aimPoint = tgtPos.clone().add(weave); const desired = aimPoint.sub(bot.mesh.position).normalize();
-    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), desired);
-    bot.mesh.quaternion.slerp(q, 1.6 * dt * bot.skill);
+    // Bots use the same heading/pitch model as the player: steer toward the target at capped rates, bank into turns, level out — no barrel-rolls
+    const bdx = tgtPos.x - bot.mesh.position.x, bdy = tgtPos.y - bot.mesh.position.y, bdz = tgtPos.z - bot.mesh.position.z;
+    const bHoriz = Math.max(1, Math.hypot(bdx, bdz));
+    const weaveYaw = Math.sin(bot.wanderAng) * 0.28, weavePitch = Math.cos(bot.wanderAng * 0.8) * 0.13;
+    const desH = Math.atan2(bdx, bdz) + weaveYaw;
+    const desP = clampNum(Math.atan2(bdy, bHoriz) + weavePitch, -0.92, 0.92);
+    const yawDiff = angleWrap(desH - bot.heading);
+    const botYawRate = 1.15 * bot.skill, botPitchRate = 0.9 * bot.skill;
+    bot.heading = angleWrap(bot.heading + clampNum(yawDiff, -botYawRate * dt, botYawRate * dt));
+    bot.pitch = clampNum(bot.pitch + clampNum(desP - bot.pitch, -botPitchRate * dt, botPitchRate * dt), -1.0, 1.0);
+    bot.roll = THREE.MathUtils.lerp(bot.roll || 0, -clampNum(yawDiff, -1, 1) * 0.8, Math.min(1, 5 * dt));
+    orientFlight(bot);
     const bFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(bot.mesh.quaternion);
     bot.mesh.position.addScaledVector(bFwd, bot.spd * dt); bot.mesh.position.y = Math.max(40, Math.min(850, bot.mesh.position.y));
     if (bestDist < 420 && bot.fireCd <= 0) { spawnBullet(bot.mesh.position.clone().add(bFwd.clone().multiplyScalar(5)), bFwd, bot.id, 7 * bot.skill, 0xf87171); bot.fireCd = 0.45 / bot.skill; }
@@ -486,15 +760,26 @@ function animate(now) {
     else { endMatch(false, 'SHOT DOWN', 'Your fighter was destroyed. Upgrade your hull or agility in the hangar!'); }
     return;
   }
-  const camOffset = new THREE.Vector3(0, 4.5, -15).applyQuaternion(p.mesh.quaternion);
-  camera.position.lerp(p.mesh.position.clone().add(camOffset), Math.min(1, 10 * dt)); camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(25)));
+  // Afterburner flicker + cloud drift (visual life, no allocations)
+  flickerFlames(p.mesh, boosting, dt);
+  for (let fi = 0; fi < activeGame.entities.length; fi++) flickerFlames(activeGame.entities[fi].mesh, false, dt);
+  if (worldGroup && worldGroup.userData.clouds) {
+    const cb = worldGroup.userData.cloudBound || 2600;
+    worldGroup.userData.clouds.forEach(function(sp) { sp.position.x += dt * 3.2; if (sp.position.x > cb) sp.position.x = -cb; });
+  }
+  // Stable chase camera: offset built from heading/pitch only (roll excluded), world-up preserved so the view never barrel-rolls
+  camera.up.set(0, 1, 0);
+  _camEuler.set(-p.pitch, p.heading, 0, 'YXZ'); _camQuat.setFromEuler(_camEuler);
+  _camOff.set(0, 4.5, -15).applyQuaternion(_camQuat);
+  camera.position.lerp(_camOff.add(p.mesh.position), Math.min(1, 10 * dt));
+  camera.lookAt(p.mesh.position.clone().add(fwd.clone().multiplyScalar(25)));
   updateHUD(curSpd); renderer.render(scene, camera);
 }
 function handleEntityEliminated(eIdx, killerId) {
   if (!activeGame) return; const victim = activeGame.entities[eIdx]; if (!victim) return; const p = activeGame.player;
   if (killerId === 'player') {
     p.kills++; const coinGain = activeGame.mode === 'campaign' ? 20 : 6; const xpGain = activeGame.mode === 'campaign' ? 35 : 12; state.coins += coinGain; awardXP(xpGain);
-    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; showBanner(`PROMOTED: ${tier.name} — ${tier.ability}`, 3000); }
+    if (activeGame.mode === 'gungame') { p.ggTier++; if (p.ggTier >= 15) { state.coins += coinGain * 5; saveState(); endMatch(true, 'GUN GAME VICTORY!', `You reached Tier 15 and won the match! (+${coinGain * 5} Bonus Coins)`); return; } const tier = GUN_GAME_TIERS[p.ggTier]; const swapMesh = buildJetMesh(tier.color, 0x38bdf8, state.upgrades, tierJetId(p.ggTier)); swapMesh.position.copy(p.mesh.position); swapMesh.quaternion.copy(p.mesh.quaternion); scene.remove(p.mesh); scene.add(swapMesh); p.mesh = swapMesh; showBanner(`PROMOTED: ${tier.name} — ${tier.ability}`, 3000); }
   } else {
     const killerBot = activeGame.entities.find(function(b) { return b.id === killerId; });
     if (killerBot && activeGame.mode === 'gungame') { killerBot.kills++; killerBot.ggTier = Math.min(14, killerBot.kills); if (killerBot.kills >= 15) { endMatch(false, 'DEFEAT', `${killerBot.name} reached 15 kills first!`); return; } }
@@ -626,8 +911,8 @@ function setupPeerConn(c) {
     const savedMode = currentMode; currentMode = 'campaign'; startMission(); currentMode = 'online1v1'; if (activeGame) activeGame.mode = 'campaign';
     if (!activeGame) return;
     activeGame.entities.forEach(function(e) { scene.remove(e.mesh); }); activeGame.entities = [];
-    const oppMesh = buildJetMesh(0xef4444, 0xfbbf24); oppMesh.position.set(0, 220, 450); scene.add(oppMesh);
-    const remoteEnt = { id: 'remote', name: 'Online Rival', mesh: oppMesh, hp: 180, maxHp: 180, spd: 0, skill: 0, fireCd: 99, rocketCd: 99, wanderAng: 0, kills: 0, ggTier: 0 };
+    const oppMesh = buildJetMesh(0xef4444, 0xfbbf24, null, 'f22'); oppMesh.position.set(0, 220, 450); scene.add(oppMesh);
+    const remoteEnt = { id: 'remote', name: 'Online Rival', mesh: oppMesh, hp: 180, maxHp: 180, spd: 0, skill: 0, fireCd: 99, rocketCd: 99, wanderAng: 0, kills: 0, ggTier: 0, heading: Math.PI, pitch: 0, roll: 0 };
     activeGame.entities.push(remoteEnt);
     if (peerSyncTimer) clearInterval(peerSyncTimer);
     peerSyncTimer = setInterval(function() { if (activeGame && conn && conn.open) { try { conn.send({ pos: activeGame.player.mesh.position.toArray(), quat: activeGame.player.mesh.quaternion.toArray() }); } catch (e) {} } }, 50);
