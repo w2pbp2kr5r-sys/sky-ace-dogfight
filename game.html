@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" /> <!-- v40: viewport-fit=cover — without it WebKit zeroes env(safe-area-inset-*), which silently disabled every v33/v39 bottom-inset compensation and contributed to the standalone bottom cutoff -->
 <!-- v39 WS1: standalone web-app support — on iPhone the ONLY route to true fullscreen is a home-screen app (apple-mobile-web-app-capable + manifest); Android/desktop use the Fullscreen API as before -->
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -155,8 +155,8 @@
   #touchKnob { position: absolute; top: 42px; left: 42px; width: 48px; height: 48px; border-radius: 50%; background: rgba(56,189,248,0.7); }
   .roll-stack { display: flex; flex-direction: column; gap: 6px; } /* v39 WS2: touch roll buttons, stacked at the left of the FIRE cluster */
   /* v39 WS1: in-page immersive fallback for browsers with NO Fullscreen API (iPhone Safari / iOS webviews) — stretch to the full dynamic viewport and drop the safe-area padding; the home-screen app (iosFsModal) is the true-fullscreen route there */
-  body.immersive { height: 100dvh; }
-  body.immersive #gameCanvas { height: 100dvh; }
+  body.immersive { height: 100dvh; height: var(--app-h, 100dvh); } /* v40: measured height wins over the raw dvh guess */
+  body.immersive #gameCanvas { height: 100dvh; height: var(--app-h, 100dvh); }
   body.immersive .screen { padding: 10px; }
   /* ---- v33 mobile fit: play must not scroll-bounce or double-tap-zoom, and
      small / touch viewports get a layout that actually fits. Desktop rules
@@ -167,6 +167,7 @@
   #gameCanvas { touch-action: none; }
   body.is-touch #touchZone { bottom: calc(80px + env(safe-area-inset-bottom)); }
   body.is-touch .hud-bottom { bottom: calc(14px + env(safe-area-inset-bottom)); }
+  body.is-touch .screen { padding-bottom: calc(16px + env(safe-area-inset-bottom)); } /* v40: menu bottom content clears the home indicator at every width (the <=700px rule below refines it to 10px); live only now that viewport-fit=cover makes the inset real */
   body.is-touch .hud-btn { min-height: 56px; min-width: 56px; } /* v39 WS2: 56px minimum effective touch target on touch devices (was 44px height only) */
   body.is-touch .topnav .btn { min-height: 42px; }
   @media (max-width: 700px) {
@@ -208,7 +209,7 @@
     .draft-card { min-height: 0; padding: 12px 10px; }
   }
   @media (max-height: 500px) and (orientation: landscape) {
-    .screen { padding: 8px; }
+    .screen { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); } /* v40: landscape phones still have a home-indicator strip (~21px) */
     .topbar { padding: 7px 10px; }
     .menu-center { padding: 11px; gap: 9px; }
     #countdownOverlay { font-size: 22vh; }
@@ -216,6 +217,22 @@
     #minimap { width: 84px; height: 84px; }
     #touchZone { bottom: calc(64px + env(safe-area-inset-bottom)); }
   }
+  /* ---- v40 SCREEN FIT: measured-height sizing. The bug: every root layer
+     was height:100% / position:fixed inset:0, i.e. sized by iOS's
+     launch-state layout viewport, and the renderer snapshotted innerHeight
+     once at boot; in a home-screen (standalone) launch nothing ever
+     re-measured, so the stack's bottom could sit below the visible screen.
+     Now JS keeps --app-h equal to the settled window.innerHeight (see
+     handleViewportResize) and every root layer takes its height from it,
+     top-anchored: height:100dvh is the pre-JS fallback, var(--app-h) the
+     measured value. On desktop/Android --app-h == the innerHeight the old
+     code already used, so this is a no-op there. ---- */
+  :root { --app-h: 100dvh; }
+  html, body { height: 100dvh; height: var(--app-h, 100dvh); }
+  #gameCanvas, #vignette, .screen, .modal, #hud, #dmgVignette, #bootOverlay, #loginGate, #countdownOverlay, #targetBoxes, #layoutEditor { height: 100dvh; height: var(--app-h, 100dvh); }
+  .modal-card { max-height: calc(var(--app-h, 100dvh) * 0.88); }
+  .gate-card { max-height: calc(var(--app-h, 100dvh) * 0.92); }
+  @media (max-width: 700px) { .modal-card { max-height: calc(var(--app-h, 100dvh) * 0.92); } }
 </style>
 </head>
 <body>
@@ -280,7 +297,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v39 — MOBILE ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v40 — SCREEN FIT ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -528,7 +545,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 39; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 40; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -1135,12 +1152,40 @@ if (typeof THREE !== 'undefined') {
   } catch (envErr) { /* reflections are cosmetic; game runs fine without them */ }
   camera = new THREE.PerspectiveCamera(state.fov || 65, window.innerWidth / window.innerHeight, 0.5, 4500);
   camera.up.set(0, 1, 0);
-  window.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (composer) composer.setSize(window.innerWidth, window.innerHeight); });
-  // v33: on phones the browser chrome (URL bar) showing/hiding resizes the
-  // VISUAL viewport without always firing a window resize — follow it too, so
-  // the canvas and camera always match what is actually on screen. Rotation
-  // still arrives through the window resize handler above.
-  if (window.visualViewport) window.visualViewport.addEventListener('resize', function() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); if (composer) composer.setSize(window.innerWidth, window.innerHeight); });
+  // v40: ONE viewport pipeline (the v33 window-resize + visualViewport
+  // handlers merged — they used to be two anonymous duplicates of the lines
+  // below). It maintains --app-h = the measured visible height on <html>;
+  // every root layer's CSS height reads var(--app-h), and the renderer sizes
+  // from its container (the canvas's parent, whose height IS --app-h) after
+  // the var is refreshed — so a stale launch-state height can never persist.
+  // Re-measure triggers: load (the immediate call below), window resize,
+  // visualViewport resize (v33: browser chrome show/hide on phones),
+  // pageshow, orientationchange PLUS a ~350ms re-measure (iOS reports stale
+  // dimensions mid-rotation), and — for home-screen standalone launches —
+  // ~400ms after DOMContentLoaded, because iOS can hand a standalone app a
+  // wrong initial height that only settles after launch, and standalone
+  // fires no chrome events that would ever correct a boot-time snapshot.
+  let _lastAppH = 0;
+  function updateAppHeight() { const h = window.innerHeight; if (h > 0) document.documentElement.style.setProperty('--app-h', h + 'px'); return h; }
+  function isStandaloneApp() { return (window.navigator && window.navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
+  function handleViewportResize() {
+    const h = updateAppHeight();
+    if (renderer && camera) {
+      const holder = canvas.parentElement;
+      let w = holder ? holder.clientWidth : 0, hh = holder ? holder.clientHeight : 0;
+      if (!w || !hh) { w = window.innerWidth; hh = h || window.innerHeight; }
+      camera.aspect = w / hh; camera.updateProjectionMatrix();
+      renderer.setSize(w, hh);
+      if (composer) composer.setSize(w, hh);
+    }
+    if (h && Math.abs(h - _lastAppH) > 1) { _lastAppH = h; try { if (typeof applyTouchLayout === 'function') applyTouchLayout(); } catch (e) {} } // stored layout positions are % of innerWidth/innerHeight — re-assert them against the settled height
+  }
+  window.addEventListener('resize', handleViewportResize);
+  window.addEventListener('orientationchange', function() { handleViewportResize(); setTimeout(handleViewportResize, 350); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', handleViewportResize);
+  window.addEventListener('pageshow', handleViewportResize);
+  handleViewportResize();
+  if (isStandaloneApp()) { const _saSettle = function() { setTimeout(handleViewportResize, 400); }; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _saSettle); else _saSettle(); }
   // Post-processing (v16): RenderPass -> UnrealBloom -> OutputPass. OutputPass applies
   // the renderer's ACES tone mapping + sRGB conversion to the HDR composer buffer
   // (the standard r160 recipe — no double tonemapping). Any failure here just leaves
