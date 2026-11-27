@@ -300,7 +300,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v41 — MOUSE CONTROL ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v42 — AIM TUNED ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -554,7 +554,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 41; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 42; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -4182,9 +4182,9 @@ let _playerShotCount = 0;
 // intercept point (bullet speed 360, the same lead math as the v5 auto-aim).
 // Outside the cone nothing changes. Player only — bots never come through here.
 const PLAYER_GUN_SPREAD = 0.0075; // v36: v35's 0.006 trimmed back a touch at Jayce's word ("a little less on the aim but its perfect") — everything in this block eases off ~15-20%, nothing else about the funnel changes
-const AIM_ASSIST_CONE = 11.5 * Math.PI / 180; // v36: full-bend cone, was 14° in v35
-const AIM_ASSIST_CONE_PARTIAL = 18 * Math.PI / 180; // v36: 11.5°–18° is the partial-bend zone (v35: 14°–22°)
-const AIM_ASSIST_PARTIAL_BEND = 0.40; // v36: a partial-zone shot bends 40% of the angular way toward the intercept (v35: 45%)
+const AIM_ASSIST_CONE = 8 * Math.PI / 180; // v42: full-bend cone, was 11.5° in v36 (14° in v35) — Jayce: "make aim assist less" again
+const AIM_ASSIST_CONE_PARTIAL = 13 * Math.PI / 180; // v42: 8°–13° is the partial-bend zone (v36: 11.5°–18°)
+const AIM_ASSIST_PARTIAL_BEND = 0.28; // v42: a partial-zone shot bends 28% of the angular way toward the intercept (v36: 40%, v35: 45%)
 const AIM_ASSIST_RANGE = 1100; // v36: was 1200 in v35 (player bullet reach is 450 x 2.8s = 1260, still comfortably past it)
 const PLAYER_BULLET_SPEED = 450; // v35: player rounds fly faster (was 360, shared with bots) — the assist AND locked auto-aim lead math use this; bot rounds stay 360
 let _muzzleLight = null, _muzzleFlash = null, _botFlash = null, _botFlashT = 0;
@@ -4793,8 +4793,8 @@ function animate(now) {
       const horiz = Math.max(1, Math.hypot(dx, dz));
       const desHeading = Math.atan2(dx, dz);
       const desPitch = clampNum(Math.atan2(dy, horiz), -1.05, 1.05);
-      p.yawIn = clampNum(angleWrap(desHeading - p.heading) * 3.2, -1, 1);
-      p.pitchIn = clampNum((desPitch - p.pitch) * 3.2, -1, 1);
+      p.yawIn = clampNum(angleWrap(desHeading - p.heading) * 1.92, -1, 1); // v42: auto-aim steering gain 3.2 x 0.6 — Jayce: "make auto aim less"; time-to-align grows ~1.67x, lock still converges
+      p.pitchIn = clampNum((desPitch - p.pitch) * 1.92, -1, 1); // v42: same 0.6 factor on the pitch axis
     }
   }
   const tierTurn = activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].turn : 1;
@@ -4903,14 +4903,15 @@ function animate(now) {
       shotDir.normalize();
     } else {
       // v31 soft aim assist (player only, non-locked shots), v35 widened,
-      // v36 trimmed ~15-20% at Jayce's word (v35 overshot slightly):
+      // v36 trimmed ~15-20% at Jayce's word (v35 overshot slightly),
+      // v42 trimmed ~a third again at his word ("make aim assist less"):
       // find the hostile whose PREDICTED intercept point lies closest to the
       // nose direction (smallest angle wins, so with two hostiles in the zone
-      // the one the crosshair is most centered on is chosen). v36 zones:
-      // within 11.5° of the nose the round bends exactly onto the intercept
-      // (full correction, half spread); between 11.5° and 18° it bends 40% of
+      // the one the crosshair is most centered on is chosen). v42 zones:
+      // within 8° of the nose the round bends exactly onto the intercept
+      // (full correction, half spread); between 8° and 13° it bends 28% of
       // the angular way toward the intercept (partial correction, full
-      // spread); beyond 18° or past 1100 units the shot flies the nose true.
+      // spread); beyond 13° or past 1100 units the shot flies the nose true.
       // The lead math uses the player bullet speed (450). Bots never come
       // through this path — their funnel, spread and lead are untouched.
       let spreadAmt = PLAYER_GUN_SPREAD;
@@ -4927,7 +4928,7 @@ function animate(now) {
         if (aAng < assistAng) { assistAng = aAng; assistDir = aDir; }
       }
       if (assistDir && assistAng <= AIM_ASSIST_CONE) { shotDir = assistDir; spreadAmt = PLAYER_GUN_SPREAD * 0.5; } // full bend + half spread
-      else if (assistDir) { shotDir = fwd.clone().lerp(assistDir, AIM_ASSIST_PARTIAL_BEND).normalize(); } // partial bend (40% of the way), full spread
+      else if (assistDir) { shotDir = fwd.clone().lerp(assistDir, AIM_ASSIST_PARTIAL_BEND).normalize(); } // partial bend (28% of the way since v42), full spread
       else shotDir = fwd.clone();
       shotDir.x += (Math.random() - 0.5) * spreadAmt; shotDir.y += (Math.random() - 0.5) * spreadAmt; shotDir.z += (Math.random() - 0.5) * spreadAmt;
       shotDir.normalize();
@@ -5247,7 +5248,7 @@ function animate(now) {
     for (let r = activeGame.rockets.length - 1; r >= 0; r--) { const rk = activeGame.rockets[r]; if (rk.ownerId !== b.ownerId && b.mesh.position.distanceTo(rk.mesh.position) < 12) { scene.remove(rk.mesh); activeGame.rockets.splice(r, 1); if (b.ownerId === 'player') showBanner('INCOMING ROCKET INTERCEPTED!', 1500); hit = true; break; } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); continue; }
     if (b.ownerId !== 'player' && b.ownerId !== 'wingman' && p.respawnT <= 0 && p.spawnProtT <= 0 && b.mesh.position.distanceTo(p.mesh.position) < 6) { p.hp -= b.dmg * playerDamageMul(); p.lastHitBy = b.ownerId; p.lastHitAt = gameTime; shakeT = Math.max(shakeT, 0.35); SFX.hit(); flashDamage(); hit = true; spawnImpactFx(b.mesh.position); }
-    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < (b.ownerId === 'player' ? 9.5 : 6.5)) { /* v36: player rounds get +3 hit radius vs bot jets (9.5 vs 6.5) — v35's +4 trimmed with the rest of the aim pass; bot rounds unchanged */ if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player' && b.ownerId !== 'wingman') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly (v36: the wingman is exempt — his rounds are player-side and DO damage bots) — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
+    else { for (let eIdx = activeGame.entities.length - 1; eIdx >= 0; eIdx--) { const ent = activeGame.entities[eIdx]; if (b.ownerId === ent.id) continue; if (b.mesh.position.distanceTo(ent.mesh.position) < (b.ownerId === 'player' ? 8 : 6.5)) { /* v42: player rounds get +1.5 hit radius vs bot jets (8 vs 6.5) — v36's +3 halved with the rest of the v42 aim pass; bot rounds unchanged */ if ((activeGame.mode === 'campaign' || activeGame.mode === 'waves') && b.ownerId !== 'player' && b.ownerId !== 'wingman') { hit = true; spawnImpactFx(b.mesh.position); break; } /* v21: campaign bot-on-bot stray fire sparks off harmlessly (v36: the wingman is exempt — his rounds are player-side and DO damage bots) — no damage and no noteBotHit, so it can never kill, retarget or spook another bot (v30: waves shares the rule) */ ent.hp -= b.dmg; noteBotHit(ent, b.ownerId); if (b.ownerId === 'player') showHitmarker(ent.hp <= 0); hit = true; spawnImpactFx(b.mesh.position); if (ent.hp <= 0) handleEntityEliminated(eIdx, b.ownerId); break; } } }
     if (hit) { scene.remove(b.mesh); activeGame.bullets.splice(i, 1); }
     if (!activeGame) return;
   }
