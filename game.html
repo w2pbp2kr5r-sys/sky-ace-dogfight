@@ -106,6 +106,9 @@
   .hud-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   #reticle { position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 2px solid rgba(56,189,248,0.8); border-radius: 50%; transition: transform 0.13s ease-out; }
   #reticle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); }
+  /* v41: mouse-steering reticle — a ring + dot that rides the cursor during missions while mouse steering is live, so the player sees their steering offset. Fixed-positioned and transform-driven from the pointermove handler; pointer-events none; z-index 9 sits inside the HUD layer, far below the modals (z 25+). */
+  #mouseReticle { position: fixed; left: 0; top: 0; width: 34px; height: 34px; border: 2px solid rgba(250,204,21,0.9); border-radius: 50%; pointer-events: none; z-index: 9; box-shadow: 0 0 6px rgba(0,0,0,0.45); }
+  #mouseReticle::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: #facc15; border-radius: 50%; transform: translate(-50%, -50%); }
   #hitmarker { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: 900; line-height: 1; color: #ffffff; text-shadow: 0 0 7px rgba(0,0,0,0.85); opacity: 0; pointer-events: none; z-index: 9; transition: opacity 0.08s; }
   #hitmarker.show { opacity: 1; }
   #hitmarker.kill { color: #ef4444; font-size: 34px; }
@@ -297,7 +300,7 @@
         <h1>NEBULA DOGFIGHT</h1>
         <div class="brand-sub">Tactical Fighter Jet Dogfight</div>
       </div>
-      <div class="ver-chip">★ NEBULA DOGFIGHT v40 — SCREEN FIT ★</div>
+      <div class="ver-chip">★ NEBULA DOGFIGHT v41 — MOUSE CONTROL ★</div>
     </div>
     <div class="stats-row">
       <div class="pill" id="uiPilotLvl">Pilot Lv. 1 (0/400 XP)</div>
@@ -353,7 +356,7 @@
     <div class="nav-buttons">
       <button class="btn btn-play" id="btnStartPlay">Start Mission</button>
     </div>
-    <p style="color:#94a3b8;font-size:0.82rem;text-align:center">PC: W/S Pitch • A/D Turn • Space Fire • R Rocket • E Auto-Aim • Shift Boost • Q/F Roll • Esc Pause</p>
+    <p style="color:#94a3b8;font-size:0.82rem;text-align:center">PC: W/S Pitch • A/D Turn • Space Fire • R Rocket • E Auto-Aim • Shift Boost • Q/F Roll • Esc Pause • Mouse Steer + Click Fire (Settings → Mouse)</p>
   </div>
   <div></div>
 </div>
@@ -367,6 +370,7 @@
   <div id="bannerAlert" class="hidden"></div>
   <div id="updPill" class="hidden">⬆ Update ready — applies after this match</div>
   <div id="reticle"></div>
+  <div id="mouseReticle" class="hidden"></div>
   <div class="hud-bottom">
     <div></div>
     <div class="action-btns">
@@ -486,6 +490,11 @@
         <button class="btn btn-sec btn-sm" id="btnEditTouchLayout" type="button">Edit Button Layout</button>
         <button class="btn btn-sec btn-sm" id="btnResetTouchLayout" type="button">Reset Layout</button>
       </div>
+      <div class="section-label">Mouse</div>
+      <label>Mouse Steering: <select id="mouseModeSelect"><option value="auto">Auto — steer once the mouse moves</option><option value="on">On — always steer with the mouse</option><option value="off">Off — keyboard / touch only</option></select></label>
+      <label>Mouse Sensitivity: <span id="mouseSensVal">1.0x</span> <input type="range" id="mouseSensSlider" min="0.5" max="2" step="0.05" value="1" /></label>
+      <label><input type="checkbox" id="mouseInvertYToggle" /> Invert Mouse Pitch (mouse only)</label>
+      <p style="color:#94a3b8;font-size:0.82rem">Move the mouse to steer (away from center = harder turn). Hold <strong>left-click</strong> to fire guns, <strong>right-click</strong> for a rocket.</p>
       <button class="btn btn-sec btn-sm" id="btnResetBinds">Reset Keys</button>
       <div id="pauseActions" class="hidden" style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-play btn-sm" id="btnResumeGame">Resume Flight</button>
@@ -545,7 +554,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SAVE_KEY = 'skyace_save_v1';
-const BUILD_VERSION = 40; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
+const BUILD_VERSION = 41; // v34: the auto-updater's single source of truth — bump every release; version.json at the site root carries the same number (see the updater block near the gate boot code)
 const defaultState = {
   coins: 300, xp: 0, level: 1, rp: 0,
   unlockedChapter: 1, selectedJet: 'f16',
@@ -555,6 +564,7 @@ const defaultState = {
   upgrades: { hull: 1, damage: 1, agility: 1, speed: 1, autoaim: 1, rocket: 1, armor: 0, regen: 0, ailerons: 0 }, // v37 J8: ailerons is a base0 track like armor/regen — old saves default-merge to Lv.0
   sensitivity: 1.0, mobileTouch: 'auto', // v33: three-way touch-controls mode ('auto' | 'on' | 'off'); legacy boolean saves migrate in loadGameState
   stickSens: 1.0, haptics: true, // v39 WS2: touch-stick sensitivity multiplier (0.7–1.6) + vibration feedback toggle; old saves gain both via the guards in loadGameState
+  mouseMode: 'auto', mouseSens: 1.0, mouseInvertY: false, // v41: mouse steering (Settings → Mouse, mirroring Touch) — three-way mode ('auto' | 'on' | 'off'), sensitivity 0.5–2.0, mouse-only pitch invert; old saves gain all three via the guards in loadGameState
   touchLayoutOn: false, touchLayout: {}, touchBtnScale: 1.15, // v32: customizable touch-button layout (editor in Settings) // v39 WS2: NEW profiles start at 1.15x button scale (existing profiles keep their saved scale — the serialized value wins the merge)
   fov: 65, camDist: 1.0, shake: 0.6, invertY: false, assist: true, quality: 'high',
   volume: 0.7, muted: false, musicOn: true,
@@ -642,6 +652,10 @@ function loadGameState() {
   // v39 WS2 guards: stick sensitivity + haptics (old saves default via these)
   if (typeof state.stickSens !== 'number' || isNaN(state.stickSens) || state.stickSens < 0.7 || state.stickSens > 1.6) state.stickSens = 1;
   if (typeof state.haptics !== 'boolean') state.haptics = true;
+  // v41 guards: mouse steering settings (old saves default via these)
+  if (['auto', 'on', 'off'].indexOf(state.mouseMode) === -1) state.mouseMode = 'auto';
+  if (typeof state.mouseSens !== 'number' || isNaN(state.mouseSens) || state.mouseSens < 0.5 || state.mouseSens > 2) state.mouseSens = 1;
+  if (typeof state.mouseInvertY !== 'boolean') state.mouseInvertY = false;
   // v33 migration: the touch-joystick toggle was a boolean. true -> 'on' (the
   // player explicitly enabled the stick), false -> 'auto' (the old default-off
   // now means "show it when the device actually has touch"), so a phone player
@@ -3954,6 +3968,70 @@ window.addEventListener('orientationchange', refreshDeviceDetect);
 refreshDeviceDetect();
 window.addEventListener('keydown', function(e) { keys[e.code] = true; if (activeGame && e.code === state.binds.pause) togglePause(); if (activeGame && !paused && e.code === state.binds.rocket) firePlayerRocket(); if (activeGame && !paused && e.code === state.binds.autoaim) triggerAutoAim(); });
 window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+// ---- v41 mouse steering (War-Thunder-style, position-based; no pointer lock) ----
+// The steering vector is the cursor's offset from the CENTER of the game
+// viewport, normalized by a reference radius of 0.32 x min(viewportW,
+// viewportH), clamped to [-1, 1] per axis, with a 0.06 deadzone per axis
+// (rescaled so full deflection is still reachable). It feeds the SAME
+// flight-input merge as the keyboard and the touch stick — additive, with
+// the merge's existing final clamp — and contributes ONLY while a mission
+// is running unpaused, the mode allows it, and a real mouse has moved.
+//
+// The tracking listens to pointermove/pointerdown with pointerType ===
+// 'mouse' rather than raw mousemove/mousedown, on purpose: touch taps fire
+// compatibility mouse events in mobile browsers, and the v35 audit relied on
+// those events having no steering listener to feed. A thumb tap must never
+// become a steering vector — pointerType is how a real mouse is told apart
+// from a synthesized one. For an actual mouse the behavior is identical to
+// mousemove/mousedown.
+//
+// Mode (state.mouseMode, Settings → Mouse): 'auto' (default) and 'on' both
+// activate once a real mouse move has been seen — a position is required
+// either way, and touch-only devices never produce one, so Auto is inert
+// there. 'off' disables steering, the reticle and the buttons entirely.
+let mousePos = { x: 0, y: 0 }; let mouseSeen = false; let mouseVec = { x: 0, y: 0 };
+const mouseReticleEl = document.getElementById('mouseReticle');
+function mouseModeAllows() { const m = state ? state.mouseMode : 'auto'; return m === 'auto' || m === 'on' || m === true; } // anything unrecognized (incl. legacy) behaves as Auto; loadGameState already normalizes the stored value
+function mouseSteeringLive() { return mouseSeen && mouseModeAllows(); } // merge-time gate; the merge itself additionally requires an unpaused mission
+function mouseDz(v) { const a = Math.abs(v); if (a <= 0.06) return 0; return (v < 0 ? -1 : 1) * (a - 0.06) / 0.94; } // deadzone 0.06, rescaled over the remaining 0.94
+window.addEventListener('pointermove', function(e) {
+  if (e.pointerType !== 'mouse') return; // touch/pen moves are not the mouse — see the header note
+  mousePos.x = e.clientX; mousePos.y = e.clientY; mouseSeen = true;
+  const w = window.innerWidth, h = window.innerHeight, rad = 0.32 * Math.min(w, h);
+  mouseVec.x = mouseDz(clampNum((e.clientX - w / 2) / rad, -1, 1));
+  mouseVec.y = mouseDz(clampNum((e.clientY - h / 2) / rad, -1, 1));
+  if (mouseReticleEl) mouseReticleEl.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px) translate(-50%,-50%)'; // the reticle rides the cursor; the flight merge decides when it is visible
+});
+// Mouse buttons in missions: LEFT hold = fire guns (via p._mouseFire, read by
+// the same per-frame firing poll as Space / the FIRE touch button), RIGHT
+// press = one rocket through firePlayerRocket() — the exact entry point the
+// R key uses, so rocketCd / rocketLockedOut / respawn guards all apply and
+// one press can never double-fire (the per-frame rocket poll reads keys and
+// the touch flag only, never the mouse). Events are honored ONLY over the
+// game itself: a press on any button / form control / modal / HUD box keeps
+// that element's own behavior, and any open modal (pause Settings included)
+// makes the buttons inert. Menus: activeGame is null, so nothing engages.
+function mouseEventOnGame(e) {
+  const t = e.target;
+  if (!t || !t.closest) return false;
+  if (t.closest('button, a, input, select, textarea, label, .modal, .hud-box, .gate-card, #loginGate')) return false; // interactive UI owns its clicks
+  if (document.querySelector('.modal:not(.hidden)')) return false; // a menu/modal screen is up (pause Settings, draft, shop...)
+  return true;
+}
+window.addEventListener('pointerdown', function(e) {
+  if (e.pointerType !== 'mouse') return;
+  if (!activeGame || paused || (activeGame && activeGame.draftOpen)) { if (activeGame && activeGame.player) activeGame.player._mouseFire = false; return; }
+  if (!mouseModeAllows()) return; // mode Off: buttons inert (steering and reticle too — see the merge)
+  if (!mouseEventOnGame(e)) return;
+  if (e.button === 0) { activeGame.player._mouseFire = true; }
+  else if (e.button === 2) { firePlayerRocket(); }
+});
+window.addEventListener('pointerup', function(e) { if (e.pointerType === 'mouse' && e.button === 0 && activeGame && activeGame.player) activeGame.player._mouseFire = false; });
+window.addEventListener('blur', function() { if (activeGame && activeGame.player) activeGame.player._mouseFire = false; }); // alt-tab mid-hold: never leave the guns stuck on
+// Right-click must never open a context menu over the game (it is the rocket
+// button mid-flight). Suppressed everywhere on the page except inside form
+// fields, where the menu (paste etc.) is genuinely useful.
+window.addEventListener('contextmenu', function(e) { const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return; e.preventDefault(); });
 // v31 WS1: bot speed anchor. Bot top speed used to be a flat 68 x skill while
 // the player's jet (faster airframes + speed upgrades) cruises far quicker, so
 // bots could never keep pace and fights kept breaking down. Now every bot's
@@ -4678,6 +4756,25 @@ function animate(now) {
   let rawPitch = stickLive && Math.abs(_svy) > 0.08 ? -_svy : 0;
   if (keys[state.binds.turnLeft]) rawYaw += 1; if (keys[state.binds.turnRight]) rawYaw -= 1;
   if (keys[state.binds.pitchUp]) rawPitch += 1; if (keys[state.binds.pitchDown]) rawPitch -= 1;
+  // v41: mouse steering joins the SAME merge, additive, ahead of the shared
+  // clamp below. Sign conventions mirror the keys exactly: cursor RIGHT of
+  // center turns right (rawYaw -=, like the D key), cursor ABOVE center
+  // pitches the way W does (mouseVec.y is screen-down positive, so it is
+  // negated into rawPitch). state.mouseSens scales the vector first;
+  // state.mouseInvertY flips the mouse's pitch contribution only (the
+  // global invertY below still applies to the merged total, as it does to
+  // every input). The reticle is visible exactly while this contribution
+  // is live — this block runs only in an unpaused mission, and the HUD
+  // (the reticle's parent) hides with the mission, so menus never show it.
+  const mouseLive = mouseSteeringLive();
+  if (mouseLive) {
+    const _ms = (typeof state.mouseSens === 'number' && isFinite(state.mouseSens)) ? state.mouseSens : 1;
+    rawYaw -= mouseVec.x * _ms;
+    let _mp = -mouseVec.y * _ms;
+    if (state.mouseInvertY) _mp = -_mp;
+    rawPitch += _mp;
+  }
+  if (mouseReticleEl) mouseReticleEl.classList.toggle('hidden', !mouseLive);
   rawYaw = clampNum(rawYaw, -1, 1); rawPitch = clampNum(rawPitch, -1, 1);
   if (state.invertY) rawPitch = -rawPitch; // v15 setting: Invert Y
   const smoothK = Math.min(1, 8.5 * dt);
@@ -4790,7 +4887,7 @@ function animate(now) {
     }
   }
   if (p.respawnT <= 0) emitDamageSmoke(p, dt); // player always trails damage smoke when hurt
-  const firing = keys[state.binds.fire] || p._touchFire;
+  const firing = keys[state.binds.fire] || p._touchFire || p._mouseFire; // v41: left mouse button hold joins the same firing poll
   const fireRate = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].fireRate : 0.13) * (p.buff === 'rapid' ? 0.5 : 1) * (activeGame.waveMods ? 1 / activeGame.waveMods.fireMul : 1); // v31: Wave Defense fire-rate perks divide the interval at this funnel
   const gunDmg = (activeGame.mode === 'gungame' ? GUN_GAME_TIERS[p.ggTier].dmg : p.dmg) * (activeGame.waveMods ? activeGame.waveMods.dmgMul : 1); // v31: Wave Defense bullet-damage perks multiply at this funnel
   if (firing && p.fireCd <= 0 && p.respawnT <= 0) {
@@ -6287,6 +6384,9 @@ function renderKeybinds() {
   const tlT = document.getElementById('touchLayoutToggle'); if (tlT) { tlT.checked = !!state.touchLayoutOn; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); }
   const ssS = document.getElementById('stickSensSlider'); if (ssS) { ssS.value = state.stickSens; const ssv = document.getElementById('stickSensVal'); if (ssv) ssv.textContent = Number(state.stickSens).toFixed(2).replace(/0$/, '') + 'x'; } // v39 WS2
   const hpT = document.getElementById('hapticsToggle'); if (hpT) hpT.checked = state.haptics !== false; // v39 WS2
+  const mmS = document.getElementById('mouseModeSelect'); if (mmS) mmS.value = (['auto', 'on', 'off'].indexOf(state.mouseMode) !== -1) ? state.mouseMode : 'auto'; // v41: three-way select mirroring touchModeSelect
+  const msS = document.getElementById('mouseSensSlider'); if (msS) { msS.value = state.mouseSens; const msv = document.getElementById('mouseSensVal'); if (msv) msv.textContent = Number(state.mouseSens).toFixed(2).replace(/0$/, '') + 'x'; } // v41
+  const miT = document.getElementById('mouseInvertYToggle'); if (miT) miT.checked = !!state.mouseInvertY; // v41
   document.getElementById('bindTableBody').innerHTML = BIND_LABELS.map(function(pair) { const act = pair[0], label = pair[1]; return `<tr><td>${label}</td><td><span class="key-badge" id="badge_${act}">${state.binds[act]}</span></td><td><button class="btn btn-sec btn-sm" onclick="startRebind('${act}')">Rebind</button></td></tr>`; }).join('');
 }
 function startRebind(act) { listeningAction = act; const el = document.getElementById('badge_' + act); if (el) el.textContent = 'PRESS KEY...'; }
@@ -6295,6 +6395,9 @@ document.getElementById('sensSlider').oninput = function(e) { state.sensitivity 
 document.getElementById('touchModeSelect').onchange = function(e) { state.mobileTouch = e.target.value; if (activeGame) { const tzEl2 = document.getElementById('touchZone'); if (tzEl2) tzEl2.classList.toggle('hidden', !touchControlsVisible()); } saveState(); }; // v33: applies live if a mission is running
 document.getElementById('stickSensSlider').oninput = function(e) { state.stickSens = parseFloat(e.target.value); const ssv = document.getElementById('stickSensVal'); if (ssv) ssv.textContent = state.stickSens.toFixed(2).replace(/0$/, '') + 'x'; saveState(); }; // v39 WS2: read live at the flight merge, so it applies mid-mission too
 document.getElementById('hapticsToggle').onchange = function(e) { state.haptics = e.target.checked; saveState(); if (state.haptics) buzz(15); }; // v39 WS2: a confirming buzz when switched on (Android; no-op where vibrate is unsupported)
+document.getElementById('mouseModeSelect').onchange = function(e) { state.mouseMode = e.target.value; if (!mouseModeAllows() && mouseReticleEl) mouseReticleEl.classList.add('hidden'); saveState(); }; // v41: read live at the flight merge, so Off bites mid-mission too
+document.getElementById('mouseSensSlider').oninput = function(e) { state.mouseSens = parseFloat(e.target.value); const msv = document.getElementById('mouseSensVal'); if (msv) msv.textContent = state.mouseSens.toFixed(2).replace(/0$/, '') + 'x'; saveState(); }; // v41: read live at the flight merge, so it applies mid-mission too
+document.getElementById('mouseInvertYToggle').onchange = function(e) { state.mouseInvertY = e.target.checked; saveState(); }; // v41
 document.getElementById('touchLayoutToggle').onchange = function(e) { state.touchLayoutOn = e.target.checked; const tb = document.getElementById('touchLayoutBtns'); if (tb) tb.classList.toggle('hidden', !state.touchLayoutOn); applyTouchLayout(); saveState(); };
 document.getElementById('btnEditTouchLayout').onclick = function() { closeModals(); openLayoutEditor(); };
 document.getElementById('btnResetTouchLayout').onclick = function() { state.touchLayout = {}; state.touchBtnScale = 1.15; applyTouchLayout(); saveState(); showBanner('Touch layout reset to defaults', 2200); }; // v39 WS2: reset returns to the current default scale (1.15)
